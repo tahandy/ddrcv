@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Subscriber</title>
+</head>
+<body>
+    <h1>WebRTC Data Channel Example</h1>
+    <div id="messages">
+        <h2>Received Messages:</h2>
+        <ul id="messageList"></ul>
+    </div>
+
+    <script>
+        const signalingServerUrl = 'ws://localhost:9000';  // WebSocket signaling server URL
+        const signalingSocket = new WebSocket(signalingServerUrl);
+        let pc = new RTCPeerConnection({
+            bundlePolicy: "max-bundle"
+        });
+
+        // Create a data channel BEFORE generating the SDP offer
+        let dataChannel = pc.createDataChannel("chat");
+        // let dataChannel;
+
+        // Handle incoming data on the data channel
+        dataChannel.onmessage = (event) => {
+            const message = event.data;
+            console.log(`Received: ${message}`);
+            displayMessage(message);
+        };
+
+        dataChannel.onopen = () => {
+            console.log("Data channel is open!");
+        };
+
+        dataChannel.onerror = (error) => {
+            console.error("Data channel error:", error);
+        };
+
+        // WebSocket signaling
+        signalingSocket.onopen = async () => {
+            console.log("WebSocket connected to signaling server.");
+
+            // Create an SDP offer (AFTER the data channel has been created)
+            const offer = await pc.createOffer();
+            console.log("Generated SDP offer:", offer.sdp);
+
+            await pc.setLocalDescription(offer);
+
+            // Send the offer to the WebRTC server over WebSocket
+            signalingSocket.send(JSON.stringify({ sdp: pc.localDescription }));
+        };
+
+        signalingSocket.onmessage = async (message) => {
+            const data = JSON.parse(message.data);
+            console.log(data)
+
+            // Handle SDP answer and ICE candidates
+            if (data.sdp) {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            }
+            if (data.candidate) {
+                await pc.addIceCandidate(data.candidate);
+            }
+        };
+
+        // Send ICE candidates to the server
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                signalingSocket.send(JSON.stringify({ candidate: event.candidate }));
+            }
+        };
+
+        // Function to display received messages
+        function displayMessage(message) {
+            const messageList = document.getElementById("messageList");
+            const newMessage = document.createElement("li");
+            newMessage.textContent = message;
+            messageList.appendChild(newMessage);
+        }
+
+        signalingSocket.onclose = () => {
+            console.log("WebSocket connection closed.");
+        };
+
+        signalingSocket.onerror = (error) => {
+            console.error("WebSocket error:", error);
+        };
+    </script>
+</body>
+</html>
