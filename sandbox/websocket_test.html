@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Client with Latest Message Only</title>
+</head>
+<body>
+    <h1>WebSocket Example</h1>
+    <div id="messages">
+        <h2>Received Messages:</h2>
+        <ul id="messageList"></ul>
+    </div>
+
+    <script>
+        const serverUrl = 'ws://localhost:9000';
+        const socket = new WebSocket(serverUrl);
+
+        socket.addEventListener('open', () => {
+            console.log('Connected to the WebSocket server.');
+        });
+
+        socket.addEventListener('message', (event) => {
+            const message = event.data;
+            console.log(`Received message: ${message}`);
+            displayMessage(message);
+        });
+
+        socket.addEventListener('close', () => {
+            console.log('Disconnected from the WebSocket server.');
+        });
+
+        socket.addEventListener('error', (error) => {
+            console.error('WebSocket error:', error);
+        });
+
+        // Function to display received messages in the DOM
+        function displayMessage(message) {
+            const messageList = document.getElementById('messageList');
+            const newMessage = document.createElement('li');
+            newMessage.textContent = message;
+            messageList.appendChild(newMessage);
+        }
+    </script>
+</body>
+</html>
