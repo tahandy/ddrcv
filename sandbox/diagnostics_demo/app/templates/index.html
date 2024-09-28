@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnostics Viewer</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Live Diagnostics</h1>
+    <div id="status" style="font-weight: bold; color: red;">Connecting...</div>
+    <div id="logContainer" style="border: 1px solid black; width: 100%; height: 300px; overflow-y: scroll;"></div>
+
+    <script>
+        // Set up connection options for Socket.IO with automatic reconnection enabled
+        var socket = io.connect('http://' + document.domain + ':' + location.port, {
+            reconnection: true,                 // Enable automatic reconnection
+            reconnectionAttempts: Infinity,     // Retry forever
+            reconnectionDelay: 1000,            // Wait 1 second before trying to reconnect
+            reconnectionDelayMax: 5000,         // Wait up to 5 seconds between retries
+            timeout: 20000                      // Consider the connection lost after 20 seconds
+        });
+
+        // DOM elements for displaying logs and status
+        let logContainer = document.getElementById('logContainer');
+        let statusDisplay = document.getElementById('status');
+
+        // Listen for log messages and display them
+        socket.on('log_message', function(data) {
+            let newLog = document.createElement('div');
+            newLog.textContent = data.message;
+            logContainer.appendChild(newLog);
+
+            // Auto-scroll to the bottom
+            logContainer.scrollTop = logContainer.scrollHeight;
+        });
+
+        // Handle connection success
+        socket.on('connect', function() {
+            statusDisplay.textContent = "Connected";
+            statusDisplay.style.color = "green";
+        });
+
+        // Handle disconnection
+        socket.on('disconnect', function() {
+            statusDisplay.textContent = "Disconnected - Trying to reconnect...";
+            statusDisplay.style.color = "red";
+        });
+
+        // Handle reconnection attempts
+        socket.on('reconnect_attempt', function() {
+            statusDisplay.textContent = "Reconnecting...";
+            statusDisplay.style.color = "orange";
+        });
+
+        // Handle successful reconnection
+        socket.on('reconnect', function() {
+            statusDisplay.textContent = "Reconnected";
+            statusDisplay.style.color = "green";
+        });
+
+        // Handle reconnection error
+        socket.on('reconnect_error', function() {
+            statusDisplay.textContent = "Reconnection failed. Retrying...";
+            statusDisplay.style.color = "red";
+        });
+
+        // Handle reconnection failure
+        socket.on('reconnect_failed', function() {
+            statusDisplay.textContent = "Reconnection failed. Please refresh the page.";
+            statusDisplay.style.color = "red";
+        });
+    </script>
+</body>
+</html>
