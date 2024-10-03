@@ -21,7 +21,7 @@ def main():
     """
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Scrape and process song data from a specified URL.')
-    parser.add_argument('--config', type=str, default='configs/ddr_world.json', help='Path to the configuration file (default: config.json)')
+    parser.add_argument('--config', type=str, default='../configs/ddr_world.json', help='Path to the configuration file (default: config.json)')
 
     args = parser.parse_args()
 

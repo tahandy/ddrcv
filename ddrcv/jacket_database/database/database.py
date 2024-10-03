@@ -1,5 +1,5 @@
 import json
-import pickle
+import dill as pickle
 import time
 from copy import copy
 from pathlib import Path
@@ -7,7 +7,7 @@ from typing import Union
 
 import numpy as np
 from PIL import Image
-from encoder import Encoder
+from ddrcv.jacket_database.database.encoder import Encoder
 from tqdm import tqdm
 import faiss
 
@@ -30,6 +30,9 @@ class Song:
         if resize is not None:
             img = img.resize(resize)
         return img
+
+    def __str__(self):
+        return str(self.song_data)
 
     @staticmethod
     def parse_metadata_file(metadata_file):
@@ -180,19 +183,22 @@ class DatabaseLookup:
         """
         HxWx3 input image
         """
+        tic = time.time()
         q = self.encoder.encode_numpy(rgb_image, normalize=True)
         q = q.reshape(1, -1)
+        print(f'Encoding took {1000*(time.time() - tic)} ms')
+        tic = time.time()
         distances, indices = self.index.search(q, count)
-        nearest_songs = [self.db[ii] for ii in indices]
-        return distances, nearest_songs
-
+        print(f'Lookup took {1000*(time.time() - tic)} ms')
+        nearest_songs = [self.db[ii] for ii in indices[0]]
+        return distances[0], nearest_songs
 
 
 if __name__ == "__main__":
-    # db = Database.build('../output', encoder_model='efficientnet_b1', encoder_cache='cache')
-    # db.save('../output/db_effnetb1.pkl')
-    # db = Database.load('../output/db_effnetb1.pkl')
-    db = DatabaseLookup.from_prebuilt('../output/db_effnetb1.pkl')
+    db = Database.build('../output', encoder_model='efficientnet_b0', encoder_cache='cache')
+    db.save('../output/db_effnetb0.pkl')
+    # db = Database.load('../output/db_effnetb0.pkl')
+    # db = DatabaseLookup.from_prebuilt('../output/db_effnetb1.pkl')
     a = 1
 
     

@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebRTC Subscriber</title>
 </head>
 <body>
@@ -15,64 +14,76 @@
     <script>
         const signalingServerUrl = 'ws://localhost:9000';  // WebSocket signaling server URL
         const signalingSocket = new WebSocket(signalingServerUrl);
-        let pc = new RTCPeerConnection({
-            bundlePolicy: "max-bundle"
-        });
-
-        // Create a data channel BEFORE generating the SDP offer
-        let dataChannel = pc.createDataChannel("chat");
-        // let dataChannel;
-
-        // Handle incoming data on the data channel
-        dataChannel.onmessage = (event) => {
-            const message = event.data;
-            console.log(`Received: ${message}`);
-            displayMessage(message);
-        };
-
-        dataChannel.onopen = () => {
-            console.log("Data channel is open!");
-        };
-
-        dataChannel.onerror = (error) => {
-            console.error("Data channel error:", error);
-        };
+        let pc = new RTCPeerConnection();
 
         // WebSocket signaling
-        signalingSocket.onopen = async () => {
+        signalingSocket.onopen = () => {
             console.log("WebSocket connected to signaling server.");
-
-            // Create an SDP offer (AFTER the data channel has been created)
-            const offer = await pc.createOffer();
-            console.log("Generated SDP offer:", offer.sdp);
-
-            await pc.setLocalDescription(offer);
-
-            // Send the offer to the WebRTC server over WebSocket
-            signalingSocket.send(JSON.stringify({ sdp: pc.localDescription }));
+            // Client requests the offer from the server
+            signalingSocket.send(JSON.stringify({ request_offer: true }));
         };
 
         signalingSocket.onmessage = async (message) => {
             const data = JSON.parse(message.data);
-            console.log(data)
+            console.log("Received data from server:", data);
 
-            // Handle SDP answer and ICE candidates
+            // Handle SDP offer from the server
             if (data.sdp) {
                 await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+
+                // Send the SDP answer to the server
+                signalingSocket.send(JSON.stringify({ sdp: pc.localDescription }));
             }
-            if (data.candidate) {
-                await pc.addIceCandidate(data.candidate);
+
+            // Handle ICE candidates from the server
+            else if (data.candidate) {
+                try {
+                    await pc.addIceCandidate(data.candidate);
+                } catch (e) {
+                    console.error("Error adding received ICE candidate", e);
+                }
             }
         };
 
         // Send ICE candidates to the server
         pc.onicecandidate = (event) => {
             if (event.candidate) {
-                signalingSocket.send(JSON.stringify({ candidate: event.candidate }));
+                const candidate = {
+                    candidate: event.candidate.candidate,
+                    sdpMid: event.candidate.sdpMid,
+                    sdpMLineIndex: event.candidate.sdpMLineIndex,
+                };
+                signalingSocket.send(JSON.stringify({ candidate: candidate }));
             }
         };
 
-        // Function to display received messages
+        // Listen for the server-created data channel
+        pc.ondatachannel = (event) => {
+            const dataChannel = event.channel;
+            console.log("Data channel received from server.");
+
+            dataChannel.onopen = () => {
+                console.log("Data channel is open on client side!");
+            };
+
+            dataChannel.onmessage = (event) => {
+                const message = event.data;
+                console.log(`Received message: ${message}`);
+                displayMessage(message);
+            };
+
+            dataChannel.onclose = () => {
+                console.log("Data channel closed on client side.");
+            };
+
+            dataChannel.onerror = (error) => {
+                console.error("Data channel error:", error);
+            };
+        };
+
+        // Function to display received messages in the DOM
         function displayMessage(message) {
             const messageList = document.getElementById("messageList");
             const newMessage = document.createElement("li");

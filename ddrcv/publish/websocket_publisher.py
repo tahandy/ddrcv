@@ -1,20 +1,34 @@
 import asyncio
 import json
+import logging
 import time
 from multiprocessing import Process, Lock, Manager
 import websockets
 
-class Publisher:
-    def __init__(self, host='127.0.0.1', port=9000, delay=0.1):
+
+class WebSocketPublisher:
+    def __init__(self, host='127.0.0.1', port=9000, delay=0.1, only_send_new=True, logger=None):
+        if logger is None:
+            self.logger = logging.getLogger('WebSocketPublisher')
+        else:
+            self.logger = logger
+
         self.host = host
         self.port = port
+        self.delay = delay  # Publishing delay duration to throttle sends
+        self.only_send_new = only_send_new
         manager = Manager()
         self.latest_message = manager.dict()
         self.latest_message['content'] = None  # Initialize with None
         self.latest_message['version'] = 0     # Version number to track updates
         self.lock = Lock()
         self.process = None
-        self.delay = delay  # Publishing delay duration to throttle sends
+
+    @classmethod
+    def from_config(cls, config, logger=None):
+        if logger is None:
+            logger = logging.getLogger('WebSocketPublisher')
+        return WebSocketPublisher(**config, logger=logger)
 
     def start(self):
         self.process = Process(target=self._run_server, args=(self.latest_message, self.lock))
@@ -23,12 +37,17 @@ class Publisher:
     def send_message(self, json_contents):
         with self.lock:
             self.latest_message['content'] = json_contents
-            self.latest_message['version'] += 1  # Increment version to indicate update
+            if self.only_send_new:
+                self.latest_message['version'] += 1  # Increment version to indicate update
+                self.latest_message['version'] %= 32000
 
     def stop(self):
         if self.process and self.process.is_alive():
             self.process.terminate()
             self.process.join()
+
+    def __del__(self):
+        self.stop()
 
     def _run_server(self, latest_message, lock):
         connected_clients = set()
@@ -49,13 +68,17 @@ class Publisher:
             while True:
                 await asyncio.sleep(self.delay)  # Small delay to prevent tight loop
                 with lock:
-                    current_version = latest_message['version']
-                    if current_version != last_version and latest_message['content'] is not None:
-                        # There is a new message to send
-                        message = json.dumps(latest_message['content'])
-                        last_version = current_version  # Update last_version
+                    if self.only_send_new:
+                        current_version = latest_message['version']
+                        if current_version != last_version and latest_message['content'] is not None:
+                            # There is a new message to send
+                            message = json.dumps(latest_message['content'])
+                            last_version = current_version  # Update last_version
+                        else:
+                            continue  # No new message, skip sending
                     else:
-                        continue  # No new message, skip sending
+                        message = json.dumps(latest_message['content'])
+
                 if connected_clients:
                     coroutines = [client.send(message) for client in connected_clients]
                     await asyncio.gather(*coroutines)
@@ -81,8 +104,8 @@ if __name__ == "__main__":
         {"type": "message", "content": "Latest Message Only"}
     ]
 
-    # Start the Publisher
-    pub = Publisher(delay=0.01)
+    # Start the WebSocketPublisher
+    pub = WebSocketPublisher(delay=0.1)
     pub.start()
 
     try:
@@ -91,9 +114,9 @@ if __name__ == "__main__":
             print(f'Sending message: {datum}')
             pub.send_message(datum)
             # time.sleep(random.randint(3, 9))
-            time.sleep(0.01)
+            time.sleep(10)
     except KeyboardInterrupt:
         pass
     finally:
-        # Stop the Publisher once done
+        # Stop the WebSocketPublisher once done
         pub.stop()

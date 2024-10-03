@@ -1,5 +1,7 @@
 import time
 from pathlib import Path
+from enum import IntFlag
+from typing import Tuple
 
 import cv2
 from matplotlib import pyplot as plt
@@ -17,7 +19,7 @@ def detections_to_num(detections):
     return num
 
 
-class ScoreExtractor:
+class SingleScoreExtractor:
     """
     Given a set of numeral glyphs, a region of interest, and a full RGB image frame
     this class will extract the numerical string found inside the ROI
@@ -29,7 +31,7 @@ class ScoreExtractor:
         """
         # Load glyph paths (You need to provide actual file paths to your glyph images)
         if glyph_dir is None:
-            glyph_dir = Path(__file__).parent / 'fonts' / 'World'
+            glyph_dir = Path(__file__).parent / 'fonts' / 'World2'
         print('Loading glyphs from ', glyph_dir)
         glyph_paths = {str(ii): str(glyph_dir / f'{ii}.png') for ii in range(10)}
 
@@ -38,22 +40,71 @@ class ScoreExtractor:
         glyphs = glyph_loader.glyphs
 
         # Initialize the detector
-        self.detector = GlyphDetector(glyphs, threshold=0.8, scale_range=(0.8, 1.1))
+        self.detector = GlyphDetector(glyphs, threshold=0.7, scale_range=(0.8, 1.1))
         self.roi_bb = roi_bb
 
-        self.detector.set_optimal_scale(0.942)
+        # self.detector.set_optimal_scale(0.942)
+        self.detector.set_optimal_scale(1)
 
     def extract(self, frame_rgb, debug=False):
         target = frame_rgb[self.roi_bb[0]:self.roi_bb[0] + self.roi_bb[2], self.roi_bb[1]:self.roi_bb[1] + self.roi_bb[3], ...]
 
         # Detect glyphs
-        tic = time.time()
+        # tic = time.time()
         detected_glyphs = self.detector.detect_glyphs(target)
         detected_num = detections_to_num(detected_glyphs)
-        print(f'Extracted score in {1000*(time.time() - tic)} ms')
+        # print(f'Extracted score in {1000*(time.time() - tic)} ms')
         if debug:
             return detected_num, detected_glyphs
-        return detected_num
+        return detected_num, None
+
+
+class ScoreExtractor:
+    """
+    Given a set of numeral glyphs, a region of interest, and a full RGB image frame
+    this class will extract the numerical string found inside the ROI
+    """
+    p1_roi = [645, 160, 45, 240]
+    p2_roi = [645, 880, 45, 240]
+
+    def __init__(self, glyph_dir=None):
+        """
+        :param present: 2ple consisting of (p1_present, p2_present) bool values
+        :param glyph_dir: Location of glyph files 0.png ... 9.png. Will default to `score/fonts/World`
+        """
+        self.p1_present = True
+        self.p2_present = True
+        self.p1_extractor = SingleScoreExtractor(ScoreExtractor.p1_roi, glyph_dir=glyph_dir)
+        self.p2_extractor = SingleScoreExtractor(ScoreExtractor.p2_roi, glyph_dir=glyph_dir)
+
+    def set_presence(self, p1_present, p2_present):
+        self.p1_present = p1_present
+        self.p2_present = p2_present
+
+    def extract(self, frame_rgb, debug=False):
+        p1_score, p1_debug = None, None
+        p2_score, p2_debug = None, None
+
+        if self.p1_present is not None:
+            p1_score, p1_debug = self.p1_extractor.extract(frame_rgb, debug=debug)
+        if self.p2_present is not None:
+            p2_score, p2_debug = self.p2_extractor.extract(frame_rgb, debug=debug)
+
+        output = {
+            "data": {
+                "p1_score": p1_score,
+                "p2_score": p2_score
+            }
+        }
+
+        if debug:
+            output['debug'] = {
+                "p1_debug": p1_debug,
+                "p2_debug": p2_debug
+            }
+
+        return output
+
 
 
 if __name__ == "__main__":
@@ -74,8 +125,9 @@ if __name__ == "__main__":
 
     p1_roi = [645, 160, 45, 240]
     p2_roi = [645, 880, 45, 240]
-    p1_score = ScoreExtractor(p1_roi)
-    p2_score = ScoreExtractor(p2_roi)
+    # p1_score = SingleScoreExtractor(p1_roi)
+    # p2_score = SingleScoreExtractor(p2_roi)
+    extractor = ScoreExtractor((True, True))
 
     # for frame_idx in range(frame_start, frame_end + 1):
     for image in frames:
@@ -84,8 +136,13 @@ if __name__ == "__main__":
 
         # Detect glyphs
         # tic = time.time()
-        p1_detected_num, p1_detected_glyphs = p1_score.extract(image, debug=True)
-        p2_detected_num, p2_detected_glyphs = p2_score.extract(image, debug=True)
+        # p1_result = p1_score.extract(image, debug=True)
+        # p2_result = p2_score.extract(image, debug=True)
+        result = extractor.extract(image, debug=True)
+
+        p1_detected_num, p1_detected_glyphs = result['data']['p1_score'], result['debug']['p1_debug']
+        p2_detected_num, p2_detected_glyphs = result['data']['p2_score'], result['debug']['p2_debug']
+
         # print(detected_glyphs)
         print(p1_detected_num)
         print(p2_detected_num)

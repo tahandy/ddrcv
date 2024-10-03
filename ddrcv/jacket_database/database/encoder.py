@@ -7,7 +7,7 @@ import torch
 from PIL import Image
 from torchvision import transforms
 
-from checksum import compute_checksum, save_checksum_to_file
+from ddrcv.jacket_database.database.checksum import compute_checksum, save_checksum_to_file
 
 
 class Encoder:
@@ -57,7 +57,7 @@ class Encoder:
         self.input_shape = base_model.pretrained_cfg['input_size'][1:]
         self.preprocess = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Resize(self.input_shape),
+            transforms.Resize(self.input_shape, transforms.InterpolationMode.BILINEAR),
             transforms.Normalize(mean=base_model.pretrained_cfg['mean'], std=base_model.pretrained_cfg['std'])
         ])
 

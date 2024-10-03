@@ -108,9 +108,9 @@ class GlyphDetector:
             avg_corr = 0
             for glyph_class, (glyph, alpha) in self.glyphs.items():
                 scaled_glyph = cv2.resize(glyph, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
-                # scaled_alpha = cv2.resize(alpha, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+                scaled_alpha = cv2.resize(alpha, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
 
-                result = self._match_glyph(image, scaled_glyph)
+                result = self._match_glyph(image, scaled_glyph, mask=scaled_alpha)
                 avg_corr += result.max()
 
             avg_corr /= len(self.glyphs)
@@ -148,7 +148,6 @@ class GlyphDetector:
             for glyph_class, (glyph, alpha) in self.glyphs.items():
                 scaled_glyph = cv2.resize(glyph, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
                 # scaled_alpha = cv2.resize(alpha, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
-                print(scaled_glyph.shape)
 
                 res = self._match_glyph(image, scaled_glyph)
 
@@ -171,7 +170,7 @@ class GlyphDetector:
 
         return final_glyphs
 
-    def _match_glyph(self, image, glyph):
+    def _match_glyph(self, image, glyph, mask=None):
         """
         Perform masked template matching.
 
@@ -184,7 +183,10 @@ class GlyphDetector:
         # cv2.waitKey(0)
         # cv2.imshow('mask', mask)
         # cv2.waitKey(0)
-        return cv2.matchTemplate(image, glyph, cv2.TM_CCOEFF_NORMED)
+        if mask is not None:
+            return cv2.matchTemplate(image, glyph, cv2.TM_CCORR_NORMED)
+        else:
+            return cv2.matchTemplate(image, glyph, cv2.TM_CCOEFF_NORMED)
 
     def non_maximum_suppression(self, detections, overlap_thresh=0.3):
         """
