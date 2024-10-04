@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import cv2
+
 from ddrcv.state.state_matcher import StateMatcher
 
 
@@ -42,9 +44,42 @@ class SongPlaying(StateBase):
         super().__init__('song_playing', pkl_dir=pkl_dir)
         self.matcher = StateMatcher.load(pkl_dir / 'gameplay.pkl')
 
+        # Lane identification
+        # Each player lane is (luckily) buffered by two vertical gutters, a few pixels wide, that are black-ish. This is
+        # independent of the customizable background brightness. Knowing if the lanes are present is extremely helpful
+        # when extracting the score. This is because if the player FCs the song, there is a huge high-brightness
+        # burst effect that propagates down to the score zone and corrupts the numeral extraction. This effect
+        # is coincident with the fading of the lanes, and the gutters are gone a few frames before the numerals are
+        # corrupted. Thus, the presence of the player lanes gives us a confident prediction on the quality of the
+        # input to the score extractor (i.e. only extract the score if the gutter is present).
+        self.p1_col = 68
+        self.p2_col = 788
+        self.row_range = (115, 165)  # Use more than 1 pixel to help avoid any compression artifacts
+
+        # This should be set pretty high to give as many frames as possible to the score extractor, because the
+        # digit change isn't instantaneous -- while the UI doesn't blur the digits, it does interpolate which digit
+        # should be shown every frame. If we instantly say that gutters have disappeared (e.g. 5/100), it seems like
+        # we miss a frame or two and do not have the final score. However, if it's set too high, there's a chance that
+        # we trigger too late and get hit by that stupid rocket. However, I think triggering too late is less likely
+        # than triggering too early, as long as we're close to realtime FPS.
+        # The darklights of the BG clouds are V=~35, and the other BG elements are V > 90.
+        self.black_max = 80 / 100
+
     def match(self, rgb_image):
         is_match = self.matcher.match(rgb_image)
-        return is_match, None
+        data = None
+        if is_match:
+            gutters_present = self._is_gutter_present(rgb_image, self.p1_col) or \
+                              self._is_gutter_present(rgb_image, self.p2_col)
+            data = {'lanes_present': gutters_present}
+
+        return is_match, data
+
+    def _is_gutter_present(self, rgb_image, col):
+        hsv = cv2.cvtColor(rgb_image[self.row_range[0]:self.row_range[1], col:col+1, ...], cv2.COLOR_RGB2HSV)
+        v = hsv[..., -1] / 255  # OpenCV Val is in [0, 255]
+        v_max = v.max()
+        return v_max < self.black_max
 
 
 class SongSelect(StateBase):

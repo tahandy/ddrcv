@@ -20,20 +20,10 @@ def preprocess_image(image):
     :param image: The RGB image to be preprocessed.
     :return: The preprocessed binary image.
     """
-    # Convert to grayscale
-    # gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    # Maximize contrast
-    # contrast_maximized = maximize_contrast(gray)
-    contrast_maximized = apply_contrast(image, contrast=127)
-    binary = np.min(contrast_maximized, axis=-1) > 250
-    binary = (binary * 255).astype(np.uint8)
-
-    # Thresholding to consider only white pixels
-    # Since we're focusing on (255, 255, 255) in RGB, we look for the max value in grayscale
-    # _, binary = cv2.threshold(contrast_maximized, 254, 255, cv2.THRESH_BINARY)
-
-    return binary
+    prod = (255 * np.prod(image / 255, axis=-1)).astype(np.uint8)
+    prod[prod > 128] = 255
+    prod[prod <= 128] = 1
+    return prod
 
 
 class GlyphLoader:
@@ -146,10 +136,14 @@ class GlyphDetector:
 
         for scale in scales:
             for glyph_class, (glyph, alpha) in self.glyphs.items():
-                scaled_glyph = cv2.resize(glyph, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+                # scaled_glyph = cv2.resize(glyph, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
                 # scaled_alpha = cv2.resize(alpha, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+                scaled_glyph = glyph
+                scaled_alpha = alpha
 
-                res = self._match_glyph(image, scaled_glyph)
+                res = self._match_glyph(image, scaled_glyph, mask=scaled_alpha)
+                # res = self._match_glyph(image, scaled_glyph)
+                res = 1 - res
 
                 # Threshold the matches
                 loc = np.where(res >= self.threshold)
@@ -184,7 +178,8 @@ class GlyphDetector:
         # cv2.imshow('mask', mask)
         # cv2.waitKey(0)
         if mask is not None:
-            return cv2.matchTemplate(image, glyph, cv2.TM_CCORR_NORMED)
+            # return cv2.matchTemplate(image, glyph, cv2.TM_CCORR_NORMED, mask=mask)
+            return cv2.matchTemplate(image, glyph, cv2.TM_SQDIFF_NORMED, mask=mask)
         else:
             return cv2.matchTemplate(image, glyph, cv2.TM_CCOEFF_NORMED)
 

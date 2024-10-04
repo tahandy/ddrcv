@@ -97,8 +97,9 @@ def main(config, logger):
                     }
 
                 if state_tag == 'song_playing':
-                    score_ret = score_extractor.extract(frame_rgb, debug=False)
-                    publish_info['score'] = score_ret['data']
+                    if state_data['lanes_present']:
+                        score_ret = score_extractor.extract(frame_rgb, debug=False)
+                        publish_info['score'] = score_ret['data']
 
                 # print(publish_info)
                 publisher.send_message(publish_info)
@@ -160,7 +161,6 @@ if __name__ == "__main__":
         "driver_debug": {
             "render_frame": True
         }
-
     }
 
     # Configure logging

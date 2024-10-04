@@ -1,6 +1,7 @@
 import time
 from pathlib import Path
 from enum import IntFlag
+from pprint import pprint
 from typing import Tuple
 
 import cv2
@@ -40,7 +41,7 @@ class SingleScoreExtractor:
         glyphs = glyph_loader.glyphs
 
         # Initialize the detector
-        self.detector = GlyphDetector(glyphs, threshold=0.7, scale_range=(0.8, 1.1))
+        self.detector = GlyphDetector(glyphs, threshold=0.9, scale_range=(0.8, 1.1))
         self.roi_bb = roi_bb
 
         # self.detector.set_optimal_scale(0.942)
@@ -85,9 +86,9 @@ class ScoreExtractor:
         p1_score, p1_debug = None, None
         p2_score, p2_debug = None, None
 
-        if self.p1_present is not None:
+        if self.p1_present:
             p1_score, p1_debug = self.p1_extractor.extract(frame_rgb, debug=debug)
-        if self.p2_present is not None:
+        if self.p2_present:
             p2_score, p2_debug = self.p2_extractor.extract(frame_rgb, debug=debug)
 
         output = {
@@ -111,11 +112,12 @@ if __name__ == "__main__":
     video_file = Path(r"C:\code\ddr_ex_parser\videos\yukopi.mp4")
     output_file = 'yukopi_detected.mp4'
 
-    print(video_file.exists())
-    extractor = VideoFrameExtractor(str(video_file))
-
-    start_frame = extractor.get_frame_index_by_time(30)
-    frames = extractor.preload_frames(start_frame, start_frame + 60)
+    # print(video_file.exists())
+    # extractor = VideoFrameExtractor(str(video_file))
+    #
+    # start_frame = extractor.get_frame_index_by_time(30)
+    # frames = extractor.preload_frames(start_frame, start_frame + 60)
+    frames = [cv2.imread('../../score_p2.png')]
 
     # Crop image
     x_offset = 970
@@ -127,7 +129,8 @@ if __name__ == "__main__":
     p2_roi = [645, 880, 45, 240]
     # p1_score = SingleScoreExtractor(p1_roi)
     # p2_score = SingleScoreExtractor(p2_roi)
-    extractor = ScoreExtractor((True, True))
+    extractor = ScoreExtractor()
+    extractor.set_presence(False, True)
 
     # for frame_idx in range(frame_start, frame_end + 1):
     for image in frames:
@@ -154,6 +157,8 @@ if __name__ == "__main__":
 
         # Visualize the results
         for roi, detected_glyphs in zip([p1_roi, p2_roi], [p1_detected_glyphs, p2_detected_glyphs]):
+            if detected_glyphs is None:
+                continue
             for glyph in detected_glyphs:
                 cv2.rectangle(image, (glyph['bounding_box'][0] + roi[1], glyph['bounding_box'][1] + roi[0]),
                               (glyph['bounding_box'][2] + roi[1], glyph['bounding_box'][3] + roi[0]), (0, 255, 0), 2)
