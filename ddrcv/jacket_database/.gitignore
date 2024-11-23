@@ -1,1 +1,3 @@
 output/
+scraping/output
+*.log

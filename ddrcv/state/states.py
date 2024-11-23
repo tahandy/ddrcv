@@ -29,7 +29,11 @@ class Caution(StateBase):
         is_match = self.matcher.match(rgb_image)
         return is_match, None
 
+
 class StageRank(StateBase):
+    """
+    DEPRECATED. Old version prior to November 2024
+    """
     def __init__(self, pkl_dir=None):
         super().__init__('stage_rank', pkl_dir=pkl_dir)
         self.matcher = StateMatcher.load(self.pkl_dir / 'stage_rank.pkl')
@@ -104,10 +108,21 @@ class SongSplash(StateBase):
 
     def match(self, rgb_image):
         p1 = self.matcher_p1.match(rgb_image)
-        p2 = self.matcher_p1.match(rgb_image)
+        p2 = self.matcher_p2.match(rgb_image)
         is_match = p1 or p2
-        data = {'p1_present': p1, 'p2_present': p2}
-        return is_match, data
+        if is_match:
+            return True, {'p1_present': p1, 'p2_present': p2}
+        return False, None
+
+
+class Results(StateBase):
+    def __init__(self, pkl_dir=None):
+        super().__init__('results', pkl_dir=pkl_dir)
+        self.matcher = StateMatcher.load(self.pkl_dir / 'results.pkl')
+
+    def match(self, rgb_image):
+        is_match = self.matcher.match(rgb_image)
+        return is_match, None
 
 
 def state_factory(tag, **config):
@@ -117,7 +132,8 @@ def state_factory(tag, **config):
             'stage_rank': StageRank,
             'song_playing': SongPlaying,
             'song_select': SongSelect,
-            'song_splash': SongSplash
+            'song_splash': SongSplash,
+            'results': Results
         }
 
     constructor = state_factory.mapping.get(tag, None)
@@ -136,7 +152,8 @@ class StateRotation:
         pkl_dir = _resolve_pkl_dir(pkl_dir)
         if states is None:
             self.states = [
-                'stage_rank',
+                # 'stage_rank',
+                'results'
                 'song_playing',
                 'song_select',
                 'song_splash'
@@ -173,4 +190,14 @@ class StateRotation:
 
 
 if __name__ == "__main__":
-    pass
+    from PIL import Image
+    import numpy as np
+
+    image = Image.open('../../state_images/song_splash_updated_p2.png')
+    image = np.array(image)
+
+    state = SongSplash(_resolve_pkl_dir(None))
+
+    print(state.match(image))
+
+

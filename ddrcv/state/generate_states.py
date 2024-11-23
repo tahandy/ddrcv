@@ -28,21 +28,29 @@ if __name__ == "__main__":
     # name = 'stage_rank'
     # roi = (490, 0, 300, 50)
 
-    # file = 'song_splash.png'
-    # name = 'song_splash_p1'
-    # roi = (64, 535, 100, 25)
+    file = 'song_splash_updated.png'
+    name = 'song_splash_p1'
+    roi = (66, 542, 100, 14)
     # name = 'song_splash_p2'
-    # roi = (924, 535, 100, 25)
+    # roi = (925, 542, 100, 14)
 
     # file = 'gameplay.png'
     # name = 'gameplay'
     # roi = (570, 0, 140, 22)
 
+    # file = 'gameplay.png'
+    # name = 'gameplay'
+    # roi = (570, 0, 140, 22)
+
+    # file = 'results_updated.png'
+    # name = 'results'
+    # roi = (490, 10, 300, 58)
+
     image = Image.open(state_template_dir / file)
     image = np.array(image)
-    #
-    # plt.imshow(image)
-    # plt.show()
+
+    plt.imshow(image)
+    plt.show()
 
 
     matcher = StateMatcher(name, roi, image[roi[1]:roi[1] + roi[3], roi[0]:roi[0] + roi[2], ...], threshold_distance=5)

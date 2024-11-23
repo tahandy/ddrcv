@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from skimage.morphology import binary_erosion, binary_dilation, disk
+
 
 def apply_contrast(input_img, contrast = 0):
     buf = input_img
@@ -59,7 +61,7 @@ class GlyphLoader:
 
 
 class GlyphDetector:
-    def __init__(self, glyphs, scale_range=(0.5, 2.0), scale_steps=20, threshold=0.8):
+    def __init__(self, glyphs, threshold=0.8, scale=1.0, dilation=2):
         """
         Initialize the GlyphDetector with glyphs, scale settings, and detection threshold.
 
@@ -69,48 +71,60 @@ class GlyphDetector:
         :param threshold: Matching threshold.
         """
         self.glyphs = glyphs
-        self.scale_range = scale_range
-        self.scale_steps = scale_steps
         self.threshold = threshold
-        self.optimal_scale = None
+        self.optimal_scale = scale
+        self.dilation = dilation
 
-    def set_optimal_scale(self, optimal_scale):
-        """
-        Set the optimal scale to be used during detection.
+        for glyph_class, (glyph, alpha) in self.glyphs.items():
+            scaled_glyph = glyph
+            scaled_alpha = alpha
+            if scale != 1.0:
+                scaled_glyph = cv2.resize(glyph, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR_EXACT)
+                scaled_alpha = cv2.resize(alpha, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR_EXACT)
 
-        :param optimal_scale: The optimal scaling factor to freeze.
-        """
-        self.optimal_scale = optimal_scale
+            if dilation > 0:
+                scaled_alpha =(255 * binary_dilation(scaled_alpha, footprint=disk(dilation))).astype(np.uint8)
 
-    def find_optimal_scale(self, image):
-        """
-        Determine the optimal scale that maximizes the correlation value across multiple calls.
+            self.glyphs[glyph_class] = (scaled_glyph, scaled_alpha)
 
-        :param image: The target image to be analyzed.
-        :return: The optimal scaling factor.
-        """
-        max_corr = -np.inf
-        best_scale = None
 
-        image = preprocess_image(image)
+    # def set_optimal_scale(self, optimal_scale):
+    #     """
+    #     Set the optimal scale to be used during detection.
+    #
+    #     :param optimal_scale: The optimal scaling factor to freeze.
+    #     """
+    #     self.optimal_scale = optimal_scale
 
-        for scale in np.linspace(self.scale_range[0], self.scale_range[1], self.scale_steps):
-            avg_corr = 0
-            for glyph_class, (glyph, alpha) in self.glyphs.items():
-                scaled_glyph = cv2.resize(glyph, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
-                scaled_alpha = cv2.resize(alpha, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
-
-                result = self._match_glyph(image, scaled_glyph, mask=scaled_alpha)
-                avg_corr += result.max()
-
-            avg_corr /= len(self.glyphs)
-
-            if avg_corr > max_corr:
-                max_corr = avg_corr
-                best_scale = scale
-
-        self.optimal_scale = best_scale
-        return best_scale
+    # def find_optimal_scale(self, image):
+    #     """
+    #     Determine the optimal scale that maximizes the correlation value across multiple calls.
+    #
+    #     :param image: The target image to be analyzed.
+    #     :return: The optimal scaling factor.
+    #     """
+    #     max_corr = -np.inf
+    #     best_scale = None
+    #
+    #     image = preprocess_image(image)
+    #
+    #     for scale in np.linspace(self.scale_range[0], self.scale_range[1], self.scale_steps):
+    #         avg_corr = 0
+    #         for glyph_class, (glyph, alpha) in self.glyphs.items():
+    #             scaled_glyph = cv2.resize(glyph, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+    #             scaled_alpha = cv2.resize(alpha, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+    #
+    #             result = self._match_glyph(image, scaled_glyph, mask=scaled_alpha)
+    #             avg_corr += result.max()
+    #
+    #         avg_corr /= len(self.glyphs)
+    #
+    #         if avg_corr > max_corr:
+    #             max_corr = avg_corr
+    #             best_scale = scale
+    #
+    #     self.optimal_scale = best_scale
+    #     return best_scale
 
     def detect_glyphs(self, image):
         """
@@ -120,42 +134,29 @@ class GlyphDetector:
         :return: List of detected glyphs with their location, scale, and class.
         """
 
-        # print(self.find_optimal_scale(image))
-
         image = preprocess_image(image)
 
         # cv2.imshow('blah', image)
         # cv2.waitKey(0)
 
-        if self.optimal_scale:
-            scales = [self.optimal_scale]
-        else:
-            scales = np.linspace(self.scale_range[0], self.scale_range[1], self.scale_steps)
-
         detected_glyphs = []
 
-        for scale in scales:
-            for glyph_class, (glyph, alpha) in self.glyphs.items():
-                # scaled_glyph = cv2.resize(glyph, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
-                # scaled_alpha = cv2.resize(alpha, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
-                scaled_glyph = glyph
-                scaled_alpha = alpha
+        for glyph_class, (glyph, alpha) in self.glyphs.items():
+            res = self._match_glyph(image, glyph, mask=alpha)
+            # res = self._match_glyph(image, scaled_glyph)
+            res = 1 - res
 
-                res = self._match_glyph(image, scaled_glyph, mask=scaled_alpha)
-                # res = self._match_glyph(image, scaled_glyph)
-                res = 1 - res
+            # Threshold the matches
+            loc = np.where(res >= self.threshold)
 
-                # Threshold the matches
-                loc = np.where(res >= self.threshold)
-
-                for pt in zip(*loc[::-1]):
-                    detected_glyphs.append({
-                        'glyph_class': glyph_class,
-                        'location': pt,
-                        'scale': scale,
-                        'match_value': res[pt[1], pt[0]],
-                        'bounding_box': (pt[0], pt[1], pt[0] + scaled_glyph.shape[1], pt[1] + scaled_glyph.shape[0])
-                    })
+            for pt in zip(*loc[::-1]):
+                detected_glyphs.append({
+                    'glyph_class': glyph_class,
+                    'location': pt,
+                    'scale': self.optimal_scale,
+                    'match_value': res[pt[1], pt[0]],
+                    'bounding_box': (pt[0], pt[1], pt[0] + glyph.shape[1], pt[1] + glyph.shape[0])
+                })
 
         detected_glyphs = sorted(detected_glyphs, key=lambda x: x['match_value'], reverse=True)
 

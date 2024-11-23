@@ -1,7 +1,15 @@
 import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
+from enum import Enum, auto
+from pprint import pprint
 
-os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
+from ddrcv.discord.song_results_embed import push_song_results
+from ddrcv.misc.screenshot import Screenshot
+from ddrcv.ocr import get_ocr_singleton
+from ddrcv.state.results_parser import ResultsParser
+from ddrcv.state.splash_parser import SplashParser
+
 
 import logging
 import time
@@ -50,6 +58,12 @@ def create_publisher(pub_config, logger):
     raise ValueError(msg)
 
 
+class ResultsSubstep(Enum):
+    READY = auto()
+    PROCESS = auto()
+    DONE = auto()
+
+
 def main(config, logger):
     # Initialize and start the frame fetcher
     # fetcher = RTSPFrameFetcher(rtsp_url, hw_accel=False)
@@ -64,13 +78,20 @@ def main(config, logger):
     publisher = create_publisher(config['publish'], logger=logger)
     publisher.start()
 
+    screenshot = Screenshot(config['results']['screenshot_directory'],
+                            timestamp_fmt=config['results']['timestamp_format'])
+
+    reader = get_ocr_singleton()  # this needs to run only once to load the model into memory
+    results_parser = ResultsParser(reader, db)
+    splash_parser = SplashParser(reader, db, do_name=False)
+
     publish_info = dict()
     publish_info['state'] = 'unknown'
     publish_info['players'] = (True, True)
     publish_info['song'] = None
     publish_info['score'] = None
 
-    bb = [108, 424, 535-108, 855-424]
+    results_substep = ResultsSubstep.READY
 
     try:
         while True:
@@ -81,25 +102,73 @@ def main(config, logger):
 
                 publish_info['state'] = state_tag
 
+                # ----------------------------------------------
+                # SONG SELECT
+                # Use this as a temporal point to reset state
+                # ----------------------------------------------
                 if state_tag == 'song_select':
-                    publish_info['players'] = None
+                    publish_info['players'] = (True, True)
                     publish_info['song'] = None
                     publish_info['score'] = None
 
+                # ----------------------------------------------
+                # SONG SPLASH
+                # Determine player presence, difficulty levels, and song
+                # ----------------------------------------------
                 if state_tag == 'song_splash':
                     score_extractor.set_presence(state_data['p1_present'], state_data['p2_present'])
                     publish_info['players'] = (state_data['p1_present'], state_data['p2_present'])
 
-                    dist, song_info = db.lookup(frame_rgb[bb[0]:bb[0]+bb[2], bb[1]:bb[1]+bb[3], ::-1].copy(), count=1)
+                    ret = splash_parser.parse(frame_rgb, publish_info['players'])
                     publish_info['song'] = {
-                        'similarity': float(dist[0]),
-                        'info': str(song_info[0].song_data['Song'])
+                        'song': str(ret['song']),
+                        'confidence': ret['song_confidence'],
+                        'p1_info': ret['p1'],
+                        'p2_info': ret['p2']
                     }
 
+                # ----------------------------------------------
+                # SONG PLAYING
+                # Realtime score extraction
+                # ----------------------------------------------
                 if state_tag == 'song_playing':
                     if state_data['lanes_present']:
                         score_ret = score_extractor.extract(frame_rgb, debug=False)
                         publish_info['score'] = score_ret['data']
+                        # print(publish_info)
+
+                # ----------------------------------------------
+                # RESULTS
+                # Screenshot, parse, and publish song results
+                # ----------------------------------------------
+                if state_tag == 'results':
+                    # Need to disable any results processing if we only want duo mode and
+                    # only one player is present
+                    results_enabled = True
+                    if config['results']['only_duo']:
+                        if not (publish_info['players'][0] and publish_info['players'][1]):
+                            results_enabled = False
+                            print('Skipping results')
+
+                    if results_enabled:
+                        # There is an zoom wipe and score tally animation that we need to skip past,
+                        # so we break the results section into substeps.
+                        # Additionally, we only fully process the results screen once, or we risk getting
+                        # duplicate images if multiple processing attempts span different minutes/seconds (depending on
+                        # provided time format).
+                        if results_substep == ResultsSubstep.READY:
+                            time.sleep(config['results']['processing_delay'])
+                            results_substep = ResultsSubstep.PROCESS
+                        elif results_substep == ResultsSubstep.PROCESS:
+                            screenshot_file = screenshot.save(frame_rgb)
+                            score_results = results_parser.parse(frame_rgb)
+                            pprint(score_results)
+                            push_song_results(score_results, screenshot_path=screenshot_file)
+                            print('screenshot_file: ', screenshot_file)
+                            results_substep = ResultsSubstep.DONE
+
+                if state_tag != 'results':
+                    results_substep = ResultsSubstep.READY
 
                 # print(publish_info)
                 publisher.send_message(publish_info)
@@ -148,15 +217,22 @@ if __name__ == "__main__":
         "state": {
             "pkl_dir": None,
             "states": [
-                'stage_rank',
+                'results',
                 'song_playing',
                 'song_select',
                 'song_splash'
             ]
         },
         "jacket_database": {
-            "prebuilt_database": r'C:\code\ddr_ex_parser\ddrcv\jacket_database\output\db_mobilenetv3_small.pkl',
+            "prebuilt_database": r'C:\code\ddr_ex_parser\ddrcv\jacket_database\output\db_effnetb0.pkl',
             "cache_dir": r'C:\code\ddr_ex_parser\ddrcv\jacket_database\cache'
+        },
+        "results": {
+            "screenshot_directory": r'C:\code\ddr_ex_parser\screenshots',
+            "timestamp_format": "%Y%m%d_%H%M",
+            "processing_delay": 5,
+            "only_duo": False,
+            "discord": True
         },
         "driver_debug": {
             "render_frame": True

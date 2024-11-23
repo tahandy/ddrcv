@@ -3,7 +3,6 @@ import dill as pickle
 import time
 from copy import copy
 from pathlib import Path
-from typing import Union
 
 import numpy as np
 from PIL import Image
@@ -195,7 +194,7 @@ class DatabaseLookup:
 
 
 if __name__ == "__main__":
-    db = Database.build('../output', encoder_model='efficientnet_b0', encoder_cache='cache')
+    db = Database.build('../scraping/output', encoder_model='efficientnet_b0', encoder_cache='cache')
     db.save('../output/db_effnetb0.pkl')
     # db = Database.load('../output/db_effnetb0.pkl')
     # db = DatabaseLookup.from_prebuilt('../output/db_effnetb1.pkl')

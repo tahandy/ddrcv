@@ -41,11 +41,11 @@ class SingleScoreExtractor:
         glyphs = glyph_loader.glyphs
 
         # Initialize the detector
-        self.detector = GlyphDetector(glyphs, threshold=0.9, scale_range=(0.8, 1.1))
+        self.detector = GlyphDetector(glyphs, threshold=0.9, scale=1.0, dilation=2)
         self.roi_bb = roi_bb
 
         # self.detector.set_optimal_scale(0.942)
-        self.detector.set_optimal_scale(1)
+        # self.detector.set_optimal_scale(1)
 
     def extract(self, frame_rgb, debug=False):
         target = frame_rgb[self.roi_bb[0]:self.roi_bb[0] + self.roi_bb[2], self.roi_bb[1]:self.roi_bb[1] + self.roi_bb[3], ...]
@@ -65,8 +65,8 @@ class ScoreExtractor:
     Given a set of numeral glyphs, a region of interest, and a full RGB image frame
     this class will extract the numerical string found inside the ROI
     """
-    p1_roi = [645, 160, 45, 240]
-    p2_roi = [645, 880, 45, 240]
+    p1_roi = [645 - 1, 160, 45, 240]
+    p2_roi = [645 - 1, 880, 45, 240]
 
     def __init__(self, glyph_dir=None):
         """
