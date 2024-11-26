@@ -163,7 +163,8 @@ def main(config, logger):
                             screenshot_file = screenshot.save(frame_rgb)
                             score_results = results_parser.parse(frame_rgb)
                             pprint(score_results)
-                            push_song_results(score_results, screenshot_path=screenshot_file)
+                            if config['results'].get('discord', False):
+                                push_song_results(score_results, screenshot_path=screenshot_file)
                             print('screenshot_file: ', screenshot_file)
                             results_substep = ResultsSubstep.DONE
 
@@ -232,7 +233,7 @@ if __name__ == "__main__":
             "timestamp_format": "%Y%m%d_%H%M",
             "processing_delay": 5,
             "only_duo": False,
-            "discord": True
+            "discord": False
         },
         "driver_debug": {
             "render_frame": True
