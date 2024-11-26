@@ -24,7 +24,7 @@ class RemyParser:
         :param config: A dictionary containing configuration options.
         """
         self.url = config.get('url')
-        self.output_dir = Path(config.get('output_dir', 'output'))
+        self.output_dir = Path(config.get('output_dir'))
         self.bucket = TokenBucket(rate=config.get('rate_limit', 5), capacity=config.get('rate_limit', 5))
         self.delay = config.get('delay', 1.0)
         self.max_workers = config.get('max_workers', 5)
@@ -55,7 +55,7 @@ class RemyParser:
             logging.info(f'Output directory is ready: {self.output_dir}')
         except OSError as e:
             logging.error(f'Error creating output directory: {e}')
-            sys.exit(1)
+            raise e
 
     def scrape_song_list(self):
         """

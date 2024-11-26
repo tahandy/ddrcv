@@ -18,7 +18,7 @@ import cv2
 
 # from ddrcv.diagnostics.diagnostics_logger import DiagnosticsLogger
 # from ddrcv.diagnostics.diagnostics_wrapper import DiagnosticsWrapper
-from ddrcv.injest.rtsp_frame_fetcher import RTSPFrameFetcher
+from ddrcv.ingest.rtsp_frame_fetcher import RTSPFrameFetcher
 from ddrcv.jacket_database.database.database import DatabaseLookup
 from ddrcv.score.score_extractor import ScoreExtractor
 from ddrcv.state.states import StateRotation

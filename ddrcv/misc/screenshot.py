@@ -21,9 +21,7 @@ class Screenshot:
             suffix = '_' + suffix
 
         timestamp = self._get_timestamp()
-        print('timestamp: ', timestamp)
         png_file = Path(self.screenshot_dir) / f'{timestamp}{suffix}.png'
-        print('png_file: ', png_file)
         im = Image.fromarray(rgb_image)
         im.save(png_file)
         return png_file
