@@ -1,6 +1,6 @@
 {
     "url": "https://remywiki.com/DanceDanceRevolution_WORLD_Full_Song_List",
-    "output_dir": "output",
+    "output_dir": "/home/tim/persistent/database/songs",
     "rate_limit": 5,
     "max_workers": 5,
     "delay": 1.0

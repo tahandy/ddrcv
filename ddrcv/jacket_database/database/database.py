@@ -194,8 +194,9 @@ class DatabaseLookup:
 
 
 if __name__ == "__main__":
-    db = Database.build('../scraping/output', encoder_model='efficientnet_b0', encoder_cache='cache')
-    db.save('../output/db_effnetb0.pkl')
+    from datetime import datetime
+    db = Database.build('/home/tim/persistent/database/songs', encoder_model='efficientnet_b0', encoder_cache='/home/tim/persistent/database/cache')
+    db.save(f'/home/tim/persistent/database/db_effnetb0-{datetime.now().strftime("%Y%m%d")}.pkl')
     # db = Database.load('../output/db_effnetb0.pkl')
     # db = DatabaseLookup.from_prebuilt('../output/db_effnetb1.pkl')
     a = 1

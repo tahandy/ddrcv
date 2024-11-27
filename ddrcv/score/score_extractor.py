@@ -8,7 +8,6 @@ import cv2
 from matplotlib import pyplot as plt
 
 from ddrcv.score.glyph_detector import GlyphLoader, GlyphDetector
-from video_frame_extractor import VideoFrameExtractor
 
 
 def detections_to_num(detections):

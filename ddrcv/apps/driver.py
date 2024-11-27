@@ -198,7 +198,7 @@ if __name__ == "__main__":
     config = {
         "ingest": {
             "rtsp": {
-                "rtsp_url": r"rtsp://localhost:8554/mystream",
+                "rtsp_url": r"rtsp://192.168.1.100:8554/mystream",
                 "queue_size": 1,
                 "reconnect_delay": 5,
                 "hw_accel": False
@@ -225,18 +225,18 @@ if __name__ == "__main__":
             ]
         },
         "jacket_database": {
-            "prebuilt_database": r'C:\code\ddr_ex_parser\ddrcv\jacket_database\output\db_effnetb0.pkl',
-            "cache_dir": r'C:\code\ddr_ex_parser\ddrcv\jacket_database\cache'
+            "prebuilt_database": r'/home/tim/persistent/database/db_effnetb0-20241126.pkl',
+            "cache_dir": r'/home/tim/persistent/database/cache'
         },
         "results": {
-            "screenshot_directory": r'C:\code\ddr_ex_parser\screenshots',
+            "screenshot_directory": r'/home/tim/persistent/screenshots',
             "timestamp_format": "%Y%m%d_%H%M",
             "processing_delay": 5,
             "only_duo": False,
             "discord": False
         },
         "driver_debug": {
-            "render_frame": True
+            "render_frame": False
         }
     }
 

@@ -7,7 +7,7 @@ import websockets
 
 
 class WebSocketPublisher:
-    def __init__(self, host='127.0.0.1', port=9000, delay=0.1, only_send_new=True, logger=None):
+    def __init__(self, host='0.0.0.0', port=9000, delay=0.1, only_send_new=True, logger=None):
         if logger is None:
             self.logger = logging.getLogger('WebSocketPublisher')
         else:
@@ -53,7 +53,8 @@ class WebSocketPublisher:
         connected_clients = set()
         last_version = -1  # Initialize with an invalid version
 
-        async def handler(websocket, path):
+        #async def handler(websocket, path):
+        async def handler(websocket):
             # Register client
             connected_clients.add(websocket)
             print(f"Client connected: {websocket.remote_address}")
@@ -97,6 +98,8 @@ class WebSocketPublisher:
 if __name__ == "__main__":
     import random
 
+    logging.basicConfig(level=logging.DEBUG)
+
     # Create a list of messages to send
     data = [
         {"type": "message", "content": "Hello, World!"},
@@ -105,7 +108,7 @@ if __name__ == "__main__":
     ]
 
     # Start the WebSocketPublisher
-    pub = WebSocketPublisher(delay=0.1)
+    pub = WebSocketPublisher(host='0.0.0.0', port=9000, delay=0.1)
     pub.start()
 
     try:
@@ -114,7 +117,8 @@ if __name__ == "__main__":
             print(f'Sending message: {datum}')
             pub.send_message(datum)
             # time.sleep(random.randint(3, 9))
-            time.sleep(10)
+            # time.sleep(10)
+            time.sleep(0.1)
     except KeyboardInterrupt:
         pass
     finally:
