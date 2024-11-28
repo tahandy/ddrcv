@@ -32,6 +32,13 @@ class VideoFrameFetcher:
         self.reconnect_delay = reconnect_delay
         self.hw_accel = hw_accel
 
+    @classmethod
+    def from_config(cls, config, logger=None):
+        url = config.pop('rtsp_url', None)
+        if logger is None:
+            logger = logging.getLogger('RTSPFrameFetcher')
+        return VideoFrameFetcher(url, logger=logger, **config)
+
     def start(self):
         """
         Start the frame fetching thread.
