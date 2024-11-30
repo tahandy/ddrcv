@@ -47,7 +47,8 @@ class WebSocketPublisher:
             self.process.join()
 
     def __del__(self):
-        self.stop()
+        if self is not None:
+            self.stop()
 
     def _run_server(self, latest_message, lock):
         connected_clients = set()
