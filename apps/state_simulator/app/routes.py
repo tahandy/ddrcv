@@ -31,6 +31,7 @@ def start():
     # Start a new publisher on the specified port
     publisher = WebSocketPublisher(host='0.0.0.0', port=int(port), delay=0.1, logger=logger, only_send_new=False)
     publisher.start()
+    publisher.send_message({'state': 'unknown'})
 
     return jsonify({'status': 'success', 'message': f'WebSocketPublisher started on port {port}'})
 

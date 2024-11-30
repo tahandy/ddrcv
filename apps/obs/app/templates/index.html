@@ -48,35 +48,6 @@
         button.active {
             background-color: #ff9800;
         }
-
-        input {
-            background-color: #1e1e1e;
-            color: #ffffff;
-            border: 1px solid #444444;
-            border-radius: 5px;
-            padding: 5px 10px;
-            margin: 5px 0;
-            width: 200px;
-        }
-
-        label {
-            display: block;
-            margin-top: 15px;
-            font-weight: bold;
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 20px;
-            padding: 20px;
-            border: 1px solid #444444;
-            border-radius: 10px;
-            background-color: #1e1e1e;
-        }
-
-        .button-container {
-            text-align: center;
-        }
     </style>
     <script>
         async function switchScene(sceneName) {
@@ -88,64 +59,47 @@
             if (response.ok) location.reload();
         }
 
-        async function updateText(element, value) {
-            const response = await fetch("/update_text", {
+        async function toggleOverride() {
+            const response = await fetch("/toggle_override", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text_element: element, value }),
             });
-            if (!response.ok) alert("Failed to update text");
+            const data = await response.json();
+            alert(`Manual Override: ${data.manual_override ? 'Enabled' : 'Disabled'}`);
+            location.reload();
+        }
+
+        async function wsControl(action) {
+            const response = await fetch("/ws_control", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action }),
+            });
+            location.reload();
         }
     </script>
 </head>
 <body>
-    <div class="container">
-        <h1>OBS Scene Controller</h1>
-        <div>
-            <h2>Scenes</h2>
-            <ul>
-                {% for scene in scenes %}
-                    <li>
-                        <button
-                            class="{% if active_scene == scene['sceneName'] %}active{% endif %}"
-                            onclick="switchScene('{{ scene['sceneName'] }}')">
-                            {{ scene['sceneName'] }}
-                        </button>
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
-        <div>
-            <h2>Text Controls</h2>
-            <label for="player1">Player 1:</label>
-            <input id="player1" type="text" oninput="updateText('Player1', this.value)" />
-            <label for="player2">Player 2:</label>
-            <input id="player2" type="text" oninput="updateText('Player2', this.value)" />
-            <label for="stage">Tournament Stage:</label>
-            <input id="stage" type="text" oninput="updateText('Stage', this.value)" />
-        </div>
-        <div>
-            <h2>WebSocket Server Connection</h2>
-            <div>
-                <span
-                    style="display:inline-block; width: 20px; height: 20px; border-radius: 50%; background-color: {{ 'green' if ws_connected else 'red' }};">
-                </span>
-                <span>{{ 'Connected' if ws_connected else 'Disconnected' }}</span>
-            </div>
-            <button onclick="wsControl('start')">Start Connection</button>
-            <button onclick="wsControl('stop')">Stop Connection</button>
-            <button onclick="wsControl('restart')">Restart Connection</button>
-        </div>
-        <script>
-            async function wsControl(action) {
-                const response = await fetch("/ws_control", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action }),
-                });
-                location.reload();
-            }
-        </script>
-    </div>
+    <h1>OBS Scene Controller</h1>
+    <h2>Scenes</h2>
+    <ul>
+        {% for scene in scenes %}
+            <li>
+                <button
+                    class="{% if active_scene == scene %}active{% endif %}"
+                    onclick="switchScene('{{ scene }}')">
+                    {{ scene }}
+                </button>
+            </li>
+        {% endfor %}
+    </ul>
+    <h2>WebSocket</h2>
+    <p>WebSocket Status: <span style="color: {{ 'green' if ws_connected else 'red' }};">{{ 'Connected' if ws_connected else 'Disconnected' }}</span></p>
+    <button onclick="wsControl('start')">Start WebSocket</button>
+    <button onclick="wsControl('stop')">Stop WebSocket</button>
+    <h2>Manual Override</h2>
+    <button onclick="toggleOverride()">Toggle Manual Override</button>
+    <h2>Current State</h2>
+    <p>State: {{ current_state }}</p>
 </body>
 </html>

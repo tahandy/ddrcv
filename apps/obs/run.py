@@ -1,6 +1,11 @@
-from app import create_app
+from flask import Flask
+from app.obs_controller import obs_blueprint
 
-app = create_app()
+# Initialize Flask app
+app = Flask(__name__)
 
-if __name__ == '__main__':
+# Register the OBS blueprint
+app.register_blueprint(obs_blueprint, url_prefix="/")
+
+if __name__ == "__main__":
     app.run(port=5001, debug=True)
