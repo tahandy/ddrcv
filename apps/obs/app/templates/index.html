@@ -48,44 +48,25 @@
         button.active {
             background-color: #ff9800;
         }
+
+        .status {
+            margin: 10px 0;
+        }
+
+        .status span {
+            font-weight: bold;
+        }
     </style>
-    <script>
-        async function switchScene(sceneName) {
-            const response = await fetch("/switch_scene", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ scene_name: sceneName }),
-            });
-            if (response.ok) location.reload();
-        }
-
-        async function toggleOverride() {
-            const response = await fetch("/toggle_override", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-            });
-            const data = await response.json();
-            alert(`Manual Override: ${data.manual_override ? 'Enabled' : 'Disabled'}`);
-            location.reload();
-        }
-
-        async function wsControl(action) {
-            const response = await fetch("/ws_control", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action }),
-            });
-            location.reload();
-        }
-    </script>
 </head>
 <body>
     <h1>OBS Scene Controller</h1>
+
     <h2>Scenes</h2>
     <ul>
         {% for scene in scenes %}
             <li>
                 <button
+                    data-scene="{{ scene }}"
                     class="{% if active_scene == scene %}active{% endif %}"
                     onclick="switchScene('{{ scene }}')">
                     {{ scene }}
@@ -93,13 +74,78 @@
             </li>
         {% endfor %}
     </ul>
-    <h2>WebSocket</h2>
-    <p>WebSocket Status: <span style="color: {{ 'green' if ws_connected else 'red' }};">{{ 'Connected' if ws_connected else 'Disconnected' }}</span></p>
+
+    <h2>Status</h2>
+    <div class="status">
+        <p>WebSocket Status: <span id="ws-status" style="color: {{ 'green' if ws_connected else 'red' }};">
+            {{ 'Connected' if ws_connected else 'Disconnected' }}</span></p>
+        <p>Manual Override: <span id="override-status">{{ 'Enabled' if manual_override else 'Disabled' }}</span></p>
+    </div>
+
+    <h2>Controls</h2>
+    <button onclick="toggleOverride()">Toggle Manual Override</button>
     <button onclick="wsControl('start')">Start WebSocket</button>
     <button onclick="wsControl('stop')">Stop WebSocket</button>
-    <h2>Manual Override</h2>
-    <button onclick="toggleOverride()">Toggle Manual Override</button>
-    <h2>Current State</h2>
-    <p>State: {{ current_state }}</p>
+
+    <script>
+        // Function to switch scenes
+        async function switchScene(sceneName) {
+            const response = await fetch("/obs/switch_scene", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ scene_name: sceneName }),
+            });
+            if (!response.ok) {
+                alert("Failed to switch scene.");
+            }
+        }
+
+        // Function to toggle manual override
+        async function toggleOverride() {
+            const response = await fetch("/obs/toggle_override", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+            });
+            const data = await response.json();
+            alert(`Manual Override: ${data.manual_override ? 'Enabled' : 'Disabled'}`);
+        }
+
+        // Function to control WebSocket connection
+        async function wsControl(action) {
+            const response = await fetch("/obs/ws_control", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action }),
+            });
+            if (!response.ok) {
+                alert("Failed to update WebSocket connection.");
+            }
+        }
+
+        // Set up Server-Sent Events (SSE) for real-time updates
+        const eventSource = new EventSource("/obs/events");
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            // Update active scene button highlighting
+            document.querySelectorAll("button.active").forEach((btn) => btn.classList.remove("active"));
+            const activeButton = document.querySelector(`button[data-scene="${data.active_scene}"]`);
+            if (activeButton) activeButton.classList.add("active");
+
+            // Update WebSocket status
+            const wsStatus = document.getElementById("ws-status");
+            wsStatus.textContent = data.ws_connected ? "Connected" : "Disconnected";
+            wsStatus.style.color = data.ws_connected ? "green" : "red";
+
+            // Update manual override status
+            const overrideStatus = document.getElementById("override-status");
+            overrideStatus.textContent = data.manual_override ? "Enabled" : "Disabled";
+        };
+
+        eventSource.onerror = function() {
+            console.error("EventSource error occurred.");
+        };
+    </script>
 </body>
 </html>

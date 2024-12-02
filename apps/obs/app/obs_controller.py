@@ -3,7 +3,7 @@ import asyncio
 import time
 import websockets
 import json
-from flask import Blueprint, request, jsonify, render_template
+from flask import Blueprint, request, jsonify, render_template, Response
 from obsws_python import ReqClient
 
 # OBS WebSocket Configuration
@@ -133,6 +133,7 @@ def start_polling():
 def index():
     global manual_override, ws_connected, active_scene, current_state
     scenes = obs_client.get_scene_list().scenes
+    scenes = reversed(scenes)
     with lock:
         current_active_scene = active_scene
     return render_template(
@@ -155,6 +156,24 @@ def switch_scene():
         except Exception as e:
             return jsonify(success=False, error=str(e)), 500
     return jsonify(success=False, error="No scene name provided"), 400
+
+
+# Streaming function for Server-Sent Events
+def event_stream():
+    global manual_override, ws_connected, active_scene
+    while True:
+        with lock:
+            data = {
+                "active_scene": active_scene,
+                "ws_connected": ws_connected,
+                "manual_override": manual_override,
+            }
+        yield f"data: {json.dumps(data)}\n\n"
+        time.sleep(1)  # Send updates every second
+
+@obs_blueprint.route("/events")
+def events():
+    return Response(event_stream(), content_type="text/event-stream")
 
 
 @obs_blueprint.route("/toggle_override", methods=["POST"])

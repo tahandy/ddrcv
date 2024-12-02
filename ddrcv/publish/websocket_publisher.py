@@ -42,7 +42,7 @@ class WebSocketPublisher:
                 self.latest_message['version'] %= 32000
 
     def stop(self):
-        if self.process and self.process.is_alive():
+        if self.process is not None and self.process.is_alive():
             self.process.terminate()
             self.process.join()
 
