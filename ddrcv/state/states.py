@@ -125,6 +125,16 @@ class Results(StateBase):
         return is_match, None
 
 
+class TotalResult(StateBase):
+    def __init__(self, pkl_dir=None):
+        super().__init__('total_result', pkl_dir=pkl_dir)
+        self.matcher = StateMatcher.load(self.pkl_dir / 'total_result.pkl')
+
+    def match(self, rgb_image):
+        is_match = self.matcher.match(rgb_image)
+        return is_match, None
+
+
 def state_factory(tag, **config):
     if not hasattr(state_factory, "mapping"):
         state_factory.mapping = {
@@ -133,7 +143,8 @@ def state_factory(tag, **config):
             'song_playing': SongPlaying,
             'song_select': SongSelect,
             'song_splash': SongSplash,
-            'results': Results
+            'results': Results,
+            'total_result': TotalResult
         }
 
     constructor = state_factory.mapping.get(tag, None)
@@ -151,12 +162,13 @@ class StateRotation:
         # unless necessary.
         pkl_dir = _resolve_pkl_dir(pkl_dir)
         if states is None:
-            self.states = [
+            states = [
                 # 'stage_rank',
-                'results'
+                'results',
                 'song_playing',
                 'song_select',
-                'song_splash'
+                'song_splash',
+                'total_result'
             ]
 
         self.states = list()
@@ -194,9 +206,11 @@ if __name__ == "__main__":
     import numpy as np
 
     image = Image.open('../../state_images/song_splash_updated_p2.png')
+    image = Image.open('../../state_images/total_result_updated.png')
     image = np.array(image)
 
-    state = SongSplash(_resolve_pkl_dir(None))
+    # state = SongSplash(_resolve_pkl_dir(None))
+    state = StateRotation()
 
     print(state.match(image))
 

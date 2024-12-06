@@ -28,9 +28,16 @@ if __name__ == "__main__":
     # name = 'stage_rank'
     # roi = (490, 0, 300, 50)
 
-    file = 'song_splash_updated.png'
-    name = 'song_splash_p1'
-    roi = (66, 542, 100, 14)
+    # file = 'song_splash_updated.png'
+    # name = 'song_splash_p1'
+    # roi = (66, 542, 100, 14)
+    # name = 'song_splash_p2'
+    # roi = (925, 542, 100, 14)
+
+
+    file = 'total_result_updated.png'
+    name = 'total_result'
+    roi = (1018, 6, 150, 20)
     # name = 'song_splash_p2'
     # roi = (925, 542, 100, 14)
 
@@ -52,8 +59,12 @@ if __name__ == "__main__":
     plt.imshow(image)
     plt.show()
 
+    chip = image[roi[1]:roi[1] + roi[3], roi[0]:roi[0] + roi[2], ...]
 
-    matcher = StateMatcher(name, roi, image[roi[1]:roi[1] + roi[3], roi[0]:roi[0] + roi[2], ...], threshold_distance=5)
+    plt.imshow(chip)
+    plt.show()
+
+    matcher = StateMatcher(name, roi, chip, threshold_distance=5)
     matcher.save()
 
 
