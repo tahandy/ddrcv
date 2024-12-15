@@ -40,7 +40,7 @@ class DiagnosticsLogger:
             self.log_buffer.append(msg)
 
     def _load_prev_logs(self, log_file):
-        """ Load the last 10 logs from the log file. """
+        """ Load the last self.buffer log messages from the log file. """
         try:
             with open(log_file, 'r') as f:
                 lines = f.readlines()
