@@ -1,7 +1,8 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog
+from tkinter import ttk, filedialog, messagebox, simpledialog
 from PIL import Image, ImageTk
 import numpy as np
+import pickle
 from pathlib import Path
 from ddrcv.state.state_matcher import StateMatcher
 
@@ -11,20 +12,45 @@ class ImageChipExtractorApp:
         self.root = root
         self.root.title("Image Chip Extractor")
 
+        # Notebook for tabs
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill=tk.BOTH, expand=True)
+
+        # Tab 1: Extract ROI
+        self.extract_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.extract_frame, text="Extract ROI")
+
+        # Tab 2: View Saved Chip
+        self.view_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.view_frame, text="View Saved Chip")
+
+        # Tab 1: Extract ROI
+        self.init_extract_tab()
+
+        # Tab 2: View Saved Chip
+        self.init_view_tab()
+
+    def run(self):
+        """Start the Tkinter main event loop."""
+        self.root.mainloop()
+
+    #######################
+    # Tab 1: Extract ROI #
+    #######################
+    def init_extract_tab(self):
+        """Initialize the 'Extract ROI' tab."""
         # Canvas for image display
-        self.canvas = tk.Canvas(root, bg="gray")
+        self.canvas = tk.Canvas(self.extract_frame, bg="gray")
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
         # Variables for image and ROI
         self.image = None  # PIL Image object
         self.image_tk = None  # Tkinter-compatible image
-        self.image_array = None  # Numpy array representation of the image
+        self.image_array = None  # NumPy array representation of the image
         self.image_path = None
+        self.output_dir = None  # Last used output directory
 
-        # Last used output directory
-        self.output_dir = None
-
-        # Variables for ROI (Region of Interest)
+        # ROI coordinates
         self.start_x = None
         self.start_y = None
         self.end_x = None
@@ -32,188 +58,184 @@ class ImageChipExtractorApp:
         self.rect_id = None
 
         # Add buttons
-        self.add_buttons()
+        self.add_buttons_extract_tab()
 
         # Bind mouse events for ROI selection
         self.canvas.bind("<ButtonPress-1>", self.on_mouse_press)
         self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_mouse_release)
 
-    def add_buttons(self):
+    def add_buttons_extract_tab(self):
+        """Add buttons to the 'Extract ROI' tab."""
         # Frame for buttons
-        button_frame = tk.Frame(self.root)
+        button_frame = tk.Frame(self.extract_frame)
         button_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Load Image Button
+        # Button to load image
         load_button = tk.Button(button_frame, text="Load Image", command=self.load_image)
         load_button.pack(side=tk.LEFT, padx=5, pady=5)
 
-        # Save Chip Button
+        # Button to save chip
         save_button = tk.Button(button_frame, text="Save Chip", command=self.prompt_save_chip)
         save_button.pack(side=tk.LEFT, padx=5, pady=5)
 
-        # Quit Button
+        # Quit button
         quit_button = tk.Button(button_frame, text="Quit", command=self.root.quit)
         quit_button.pack(side=tk.RIGHT, padx=5, pady=5)
 
     def load_image(self):
-        # Open a file dialog to select an image
+        """Load and display an image on the canvas."""
         file_path = filedialog.askopenfilename(
+            title="Select an Image",
             filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.bmp"), ("All files", "*.*")]
         )
         if not file_path:
             return
 
-        # Load image using PIL and convert to a NumPy array
+        # Load image, convert to NumPy array
         self.image_path = Path(file_path)
         self.image = Image.open(self.image_path)
         self.image_array = np.array(self.image)
 
-        # Resize the window to fit the image dimensions
+        # Resize the canvas and window to fit the image
         self.resize_window_to_image()
-
-        # Display the loaded image
         self.update_image()
 
     def resize_window_to_image(self):
-        """Resize the window to fit the dimensions of the loaded image."""
-        if self.image is None:
+        """Resize the window and canvas to fit the image dimensions."""
+        if not self.image:
             return
 
-        # Get the dimensions of the loaded image
         image_width, image_height = self.image.size
-
-        # Add some padding to account for buttons/frame
-        padding_height = 50  # Adjust for button height
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-
-        # Ensure the window does not exceed the screen dimensions
-        window_width = min(image_width, screen_width)
-        window_height = min(image_height + padding_height, screen_height)
-
-        # Resize the window
-        self.root.geometry(f"{window_width}x{window_height}")
-
-        # Adjust the canvas to fit the image
+        padding_height = 50  # Account for buttons
+        self.root.geometry(f"{image_width}x{image_height + padding_height}")
         self.canvas.config(width=image_width, height=image_height)
 
     def update_image(self):
-        if self.image is None:
+        """Update the canvas with the loaded image."""
+        if not self.image:
             return
 
-        # Convert the image to a Tkinter-compatible object
         self.image_tk = ImageTk.PhotoImage(self.image)
-
-        # Display the image on the canvas
         self.canvas.delete("all")
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.image_tk)
 
     def prompt_save_chip(self):
+        """Prompt user to save the selected ROI."""
         if self.image_array is None:
-            messagebox.showwarning("No Image", "Please load an image before saving.")
+            messagebox.showwarning("No Image", "Please load an image first.")
             return
 
         if not self.rect_id:
-            messagebox.showwarning("No ROI", "Please select a region of interest (ROI) before saving.")
+            messagebox.showwarning("No ROI", "Please select a region of interest (ROI) first.")
             return
 
-        # Select output directory
         selected_dir = self.output_dir or filedialog.askdirectory(title="Select Output Directory")
         if not selected_dir:
             return
 
-        self.output_dir = Path(selected_dir)  # Remember the directory
+        self.output_dir = Path(selected_dir)
 
-        # Prompt for the state name
-        state_name = simpledialog.askstring("Enter State Name", "Enter the state name:", parent=self.root)
+        state_name = simpledialog.askstring("Enter State Name", "Enter name for the state:")
         if not state_name:
             return
 
-        # Save the chip
         self.save_chip(state_name)
 
     def save_chip(self, state_name):
-        if self.start_x is None or self.start_y is None or self.end_x is None or self.end_y is None:
-            messagebox.showerror("Error", "The ROI coordinates are not properly defined.")
+        """Save the selected ROI to a pickle file."""
+        if None in (self.start_x, self.start_y, self.end_x, self.end_y):
+            messagebox.showerror("Error", "The ROI coordinates are empty or undefined.")
             return
 
-        # Convert canvas ROI to image coordinates
-        x0, x1 = sorted([self.start_x, self.end_x])
-        y0, y1 = sorted([self.start_y, self.end_y])
+        # Normalize coordinates to ensure valid ROI selection
+        x0 = min(self.start_x, self.end_x)
+        y0 = min(self.start_y, self.end_y)
+        x1 = max(self.start_x, self.end_x)
+        y1 = max(self.start_y, self.end_y)
 
-        # Calculate width and height of ROI
-        w, h = x1 - x0, y1 - y0
-        roi = (x0, y0, w, h)
+        # Clamp coordinates to image bounds
+        x0, x1 = max(0, x0), min(self.image_array.shape[1], x1)
+        y0, y1 = max(0, y0), min(self.image_array.shape[0], y1)
 
-        # Validate ROI boundaries
-        if x0 < 0 or y0 < 0 or x1 > self.image_array.shape[1] or y1 > self.image_array.shape[0]:
-            messagebox.showerror("Error", "ROI coordinates are out of bounds.")
-            return
-
-        # Extract the chip as a NumPy array
+        # Extract the ROI (chip)
         chip = self.image_array[y0:y1, x0:x1, :]
 
-        # Create the target file path
         pkl_file_path = self.output_dir / f"{state_name}.pkl"
-
-        # Check if the file already exists
         if pkl_file_path.exists():
-            overwrite = messagebox.askyesno(
-                "File Exists",
-                f"The file '{pkl_file_path.name}' already exists.\nDo you want to overwrite it?",
-            )
+            overwrite = messagebox.askyesno("File Exists", f"{pkl_file_path.name} already exists. Overwrite?")
             if not overwrite:
-                return  # Do not proceed with saving
+                return
 
+        # Save using StateMatcher
         try:
-            # Create StateMatcher and save
             matcher = StateMatcher(
                 name=state_name,
-                roi=roi,
-                rgb_glyph=chip,
-                threshold_distance=5
+                roi=(x0, y0, x1 - x0, y1 - y0),  # x, y, width, height
+                rgb_glyph=chip
             )
             matcher.save(pkl_dir=self.output_dir)
-
-            messagebox.showinfo("Success", f"Chip and ROI successfully saved to: {self.output_dir}")
+            messagebox.showinfo("Success", f"State saved to {pkl_file_path}")
         except Exception as e:
-            messagebox.showerror("Error", f"An error occurred while saving the chip: {e}")
+            messagebox.showerror("Error", f"Failed to save chip: {e}")
 
     def on_mouse_press(self, event):
-        # Start drawing the ROI rectangle
-        self.start_x = event.x
-        self.start_y = event.y
-
-        # Remove any existing rectangle
+        """Start tracking mouse press for ROI selection."""
+        self.start_x, self.start_y = event.x, event.y
         if self.rect_id:
             self.canvas.delete(self.rect_id)
-        self.rect_id = self.canvas.create_rectangle(
-            event.x, event.y, event.x, event.y, outline='red'
-        )
+        self.rect_id = self.canvas.create_rectangle(event.x, event.y, event.x, event.y, outline="red")
 
     def on_mouse_drag(self, event):
-        # Update the rectangle while dragging
+        """Track mouse movement during ROI selection."""
+        self.end_x, self.end_y = event.x, event.y
         if self.rect_id:
-            self.end_x = event.x
-            self.end_y = event.y
-            self.canvas.coords(
-                self.rect_id,
-                self.start_x,
-                self.start_y,
-                event.x,
-                event.y,
-            )
+            self.canvas.coords(self.rect_id, self.start_x, self.start_y, event.x, event.y)
 
     def on_mouse_release(self, event):
-        # Finalize the rectangle
-        if self.rect_id:
-            self.end_x = event.x
-            self.end_y = event.y
+        """Finalize ROI selection."""
+        self.end_x, self.end_y = event.x, event.y
 
-    def run(self):
-        # Start the Tkinter main loop
-        self.root.mainloop()
+    #################
+    # Tab 2: View Saved Chip #
+    #################
+    def init_view_tab(self):
+        """Initialize the 'View Saved Chip' tab."""
+        self.view_chip_canvas = tk.Canvas(self.view_frame, bg="gray", height=400, width=400)
+        self.view_chip_canvas.pack(pady=10)
+
+        load_pickle_button = tk.Button(self.view_frame, text="Load Pickle File", command=self.load_pickled_chip)
+        load_pickle_button.pack(pady=10)
+
+        self.roi_label = tk.Label(self.view_frame, text="ROI Details: None", anchor="w", justify="left")
+        self.roi_label.pack(fill=tk.X, padx=10, pady=5)
+
+    def load_pickled_chip(self):
+        """Load chip image and display its metadata."""
+        file_path = filedialog.askopenfilename(
+            title="Select Pickle File",
+            filetypes=[("Pickle files", "*.pkl")]
+        )
+        if not file_path:
+            return
+
+        try:
+            matcher = StateMatcher.load(file_path)
+
+            if not isinstance(matcher, StateMatcher):
+                raise ValueError("Expected a StateMatcher object.")
+
+            chip_image = Image.fromarray(matcher.glyph)
+            chip_image_tk = ImageTk.PhotoImage(chip_image)
+
+            self.view_chip_canvas.delete("all")
+            self.view_chip_canvas.create_image(0, 0, anchor=tk.NW, image=chip_image_tk)
+            self.view_chip_canvas.image_tk = chip_image_tk  # Prevent garbage collection
+
+            roi_details = f"ROI: X={matcher.roi[0]}, Y={matcher.roi[1]}, Width={matcher.roi[2]}, Height={matcher.roi[3]}"
+            self.roi_label.config(text=roi_details)
+        except Exception as e:
+            messagebox.showerror("Error", f"Error loading pickled file: {e}")
 
 
 if __name__ == "__main__":
