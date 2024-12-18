@@ -2,12 +2,22 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
 from PIL import Image, ImageTk
 import numpy as np
-import pickle
 from pathlib import Path
 from ddrcv.state.state_matcher import StateMatcher
 
 
 class ImageChipExtractorApp:
+    """
+    This class provides a graphical user interface (GUI) for the extraction and
+    viewing of image chips from a larger image. The application contains two
+    tabs: one for extracting regions of interest (ROIs) from images, and another
+    for viewing saved ROIs stored as pickle files.
+
+    The `ImageChipExtractorApp` facilitates the loading and processing of images,
+    ROI selection using mouse interactions, and saving of extracted chips
+    along with associated metadata. The second tab allows users to view previously
+    saved image chips and their metadata.
+    """
     def __init__(self, root):
         self.root = root
         self.root.title("Image Chip Extractor")
