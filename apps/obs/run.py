@@ -8,4 +8,4 @@ app = Flask(__name__)
 app.register_blueprint(obs_blueprint, url_prefix="/obs")
 
 if __name__ == "__main__":
-    app.run(port=5001, debug=True)
+    app.run(host='0.0.0.0', port=4999, debug=True)

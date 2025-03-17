@@ -25,3 +25,4 @@ torch
 torchvision
 tqdm
 websockets
+cv2-enumerate-cameras
