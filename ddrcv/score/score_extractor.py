@@ -40,7 +40,7 @@ class SingleScoreExtractor:
         glyphs = glyph_loader.glyphs
 
         # Initialize the detector
-        self.detector = GlyphDetector(glyphs, threshold=0.9, scale=1.0, dilation=2)
+        self.detector = GlyphDetector(glyphs, threshold=0.8, scale=1.0, dilation=4)
         self.roi_bb = roi_bb
 
         # self.detector.set_optimal_scale(0.942)
