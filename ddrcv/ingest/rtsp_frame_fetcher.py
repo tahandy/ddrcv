@@ -180,9 +180,9 @@ if __name__ == "__main__":
         datefmt='%H:%M:%S'
     )
 
-    """
-    'C:\Program Files\VideoLAN\VLC\vlc.exe' -vvv '.\videos\video.mp4' --rtsp-tcp --sout '#rtp{sdp=rtsp://:8554/stream}'
-    """
+    # """
+    # 'C:\Program Files\VideoLAN\VLC\vlc.exe' -vvv '.\videos\video.mp4' --rtsp-tcp --sout '#rtp{sdp=rtsp://:8554/stream}'
+    # """
 
     # Replace with your RTSP stream URL
     rtsp_url = 'rtsp://localhost:8554/mystream'

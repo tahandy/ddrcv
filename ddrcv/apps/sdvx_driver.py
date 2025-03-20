@@ -1,3 +1,4 @@
+import argparse
 import os
 
 from ddrcv.ingest.simple_frame_fetcher import SimpleFrameFetcher
@@ -5,14 +6,8 @@ from ddrcv.ingest.simple_frame_fetcher import SimpleFrameFetcher
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 from enum import Enum, auto
-from pprint import pprint
 
-from ddrcv.discord.song_results_embed import push_song_results
 from ddrcv.misc.screenshot import Screenshot
-from ddrcv.ocr import get_ocr_singleton
-from ddrcv.state.results_parser import ResultsParser
-from ddrcv.state.splash_parser import SplashParser
-
 
 import logging
 import time
@@ -20,8 +15,6 @@ import time
 import cv2
 
 from ddrcv.ingest.rtsp_frame_fetcher import RTSPFrameFetcher
-from ddrcv.jacket_database.database.database import DatabaseLookup
-from ddrcv.score.score_extractor import ScoreExtractor
 from ddrcv.state.sdvx_states import StateRotation
 from ddrcv.publish.websocket_publisher import WebSocketPublisher
 
@@ -79,9 +72,6 @@ def main(config, logger):
     publisher = create_publisher(config['publish'], logger=logger)
     publisher.start()
 
-    screenshot = Screenshot(config['results']['screenshot_directory'],
-                            timestamp_fmt=config['results']['timestamp_format'])
-
     publish_info = dict()
     publish_info['state'] = 'unknown'
 
@@ -90,19 +80,9 @@ def main(config, logger):
             frame = fetcher.get_frame()
             if frame is not None:
                 frame_rgb = frame[..., ::-1].copy()
-                state_tag, state_data = state_determination.match(frame[..., ::-1])
-
+                state_tag, state_data = state_determination.match(frame_rgb)
                 publish_info['state'] = state_tag
-
-                # print(publish_info)
                 publisher.send_message(publish_info)
-
-                print(publish_info)
-
-                # # Display the frame (optional)
-                # cv2.imshow('RTSP Stream', frame)
-                # if cv2.waitKey(1) & 0xFF == ord('q'):
-                #     break
             else:
                 # Wait until a frame is available
                 time.sleep(0.01)
@@ -112,18 +92,42 @@ def main(config, logger):
         # Clean up
         fetcher.stop()
         publisher.stop()
-        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
-    # 1. Set up frame source
-    # 2. Set up score publisher
-    # 3. Set up state determination
-    # 4. Set up score extractor
+    parser = argparse.ArgumentParser(description='TBD5 DDR Driver')
+    parser.add_argument('--choose-camera', action='store_true',
+                        help='Choose the camera to use from a list of available cameras')
+    parser.add_argument('--debug', action='store_true',
+                        help='Turn on debug options')
+    args = parser.parse_args()
+
+    camera_uri = 0
+    if args.choose_camera:
+        from cv2_enumerate_cameras import enumerate_cameras
+        valid_indices = []
+        print('Available cameras:')
+        for camera_info in enumerate_cameras(cv2.CAP_DSHOW):
+            print(f'{camera_info.index}: {camera_info.name}')
+            valid_indices.append(camera_info.index)
+
+        while True:
+            user_input = input("Enter camera index: ")
+            value = None
+            try:
+                value = int(user_input)
+            except ValueError:
+                print("Invalid input. Please enter a valid integer.")
+            else:
+                if value in valid_indices:
+                    camera_uri = value
+                    break
+                print(f"Invalid input. Please enter a valid camera index from the list {valid_indices}.")
+
     config = {
         "ingest": {
             "simple": {
-                "uri": 1,
+                "uri": camera_uri,
                 "queue_size": 1,
                 "reconnect_delay": 5,
                 "width": 1920,
@@ -147,7 +151,7 @@ if __name__ == "__main__":
             "states": [
                 'entry',
                 'song_select',
-                'gameplay',
+                'song_playing',
                 'song_result',
                 'total_result'
             ]

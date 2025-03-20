@@ -42,8 +42,8 @@ class StateMatcher:
             pickle.dump(self.serialize(), fid)
 
     @classmethod
-    def load(cls, pkl_file):
+    def load(cls, pkl_file, threshold_distance=10):
         with open(pkl_file, 'rb') as fid:
             params = pickle.load(fid)
         # return StateMatcher(params['name'], params['roi'], params['glyph'], threshold_distance=params['threshold'])
-        return StateMatcher(params['name'], params['roi'], params['glyph'], threshold_distance=10)
+        return StateMatcher(params['name'], params['roi'], params['glyph'], threshold_distance=threshold_distance)

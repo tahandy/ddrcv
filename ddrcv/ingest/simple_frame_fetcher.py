@@ -93,8 +93,8 @@ class SimpleFrameFetcher:
 
     def connect(self):
         try:
-            self.logger.info("Attempting to use CAP_ANY.")
-            self.capture = cv2.VideoCapture(self.device_idx, cv2.CAP_ANY)
+            self.logger.info("Attempting to use CAP_DSHOW.")
+            self.capture = cv2.VideoCapture(self.device_idx, cv2.CAP_DSHOW)
             self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             if self.width is not None:
                 self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)  # Set width to 1280 pixels
@@ -102,7 +102,7 @@ class SimpleFrameFetcher:
                 self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height) # Set height to 720 pixels
 
             if self.capture.isOpened():
-                self.logger.info("Successfully connected using CAP_ANY.")
+                self.logger.info("Successfully connected using CAP_DSHOW.")
                 return
             else:
                 self.logger.warning(f"Failed to connect to device with index {device_idx}")

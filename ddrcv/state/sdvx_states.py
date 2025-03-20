@@ -40,9 +40,9 @@ class Entry(SimpleState):
 #         super().__init__('gameplay', 'gameplay.pkl', pkl_dir=pkl_dir)
 
 
-class Gameplay(StateBase):
+class SongPlaying(StateBase):
     def __init__(self, pkl_dir=None):
-        super().__init__('gameplay', pkl_dir=pkl_dir)
+        super().__init__('song_playing', pkl_dir=pkl_dir)
         self.matchers = [StateMatcher.load(self.pkl_dir / 'gameplay.pkl'),
                          StateMatcher.load(self.pkl_dir / 'gameplay_finishing.pkl'),
                          StateMatcher.load(self.pkl_dir / 'gameplay_finishing_2.pkl'),
@@ -90,7 +90,7 @@ def state_factory(tag, **config):
             'song_result': SongResult,
             'total_result': TotalResult,
             'song_select': SongSelect,
-            'gameplay': Gameplay
+            'song_playing': SongPlaying
         }
 
     constructor = state_factory.mapping.get(tag, None)
@@ -113,7 +113,7 @@ class StateRotation:
                 'song_result',
                 'total_result',
                 'song_select',
-                'gameplay'
+                'song_playing'
             ]
 
         self.states = list()

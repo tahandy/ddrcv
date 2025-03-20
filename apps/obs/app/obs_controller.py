@@ -3,19 +3,22 @@ import asyncio
 import time
 import websockets
 import json
-from flask import Blueprint, request, jsonify, render_template, Response
+from flask import Blueprint, request, jsonify, render_template, Response, current_app
 from obsws_python import ReqClient
 
-# OBS WebSocket Configuration
-OBS_HOST = "localhost"
-OBS_PORT = 4455
-OBS_PASSWORD = "6s0sjd7n1M1ybhb1"
-
-# External WebSocket Server
-STATE_SERVER_URI = "ws://localhost:9000"
+# # OBS WebSocket Configuration
+# OBS_HOST = "localhost"
+# OBS_PORT = 4455
+# OBS_PASSWORD = "6s0sjd7n1M1ybhb1"
+#
+# # External WebSocket Server
+# STATE_SERVER_URI = "ws://localhost:9000"
 
 # OBS Client Initialization
-obs_client = ReqClient(host=OBS_HOST, port=OBS_PORT, password=OBS_PASSWORD)
+# obs_client = ReqClient(host=OBS_HOST, port=OBS_PORT, password=OBS_PASSWORD)
+obs_client = None
+STATE_SERVER_URI = None
+
 
 # Shared State
 manual_override = False
@@ -25,15 +28,28 @@ polling_thread = None
 previous_state = {"state": "unknown"}
 current_state = {"state": "unknown"}
 active_scene = None
+handle_state_change = lambda *x: print('Handler not implemented')
 lock = threading.Lock()
 
 # Define the blueprint
 obs_blueprint = Blueprint("obs", __name__, template_folder="templates")
 
+@obs_blueprint.record_once
+def on_load(state):
+    global STATE_SERVER_URI
+    global obs_client
+    global handle_state_change
+    app = state.app
+    obs_client = ReqClient(host=app.config.get('OBS_HOST'),
+                           port=app.config.get('OBS_PORT'),
+                           password=app.config.get('OBS_PASSWORD'))
+    STATE_SERVER_URI = app.config.get('STATE_SERVER_URI')
+    handle_state_change = app.config.get('state_handler')
 
 # Function to connect to the external WebSocket server
 async def connect_to_websocket():
-    global ws_connected, previous_state, current_state
+    global ws_connected, previous_state, current_state, STATE_SERVER_URI
+    global obs_client, manual_override
     try:
         async with websockets.connect(STATE_SERVER_URI) as websocket:
             ws_connected = True
@@ -54,7 +70,7 @@ async def connect_to_websocket():
                         with lock:
                             previous_state = current_state
                             current_state = message
-                        handle_state_change(previous_state, current_state)
+                        handle_state_change(previous_state, current_state, obs_client, override=manual_override)
                     else:
                         print(f"Missing 'state' key in message: {message}")
                 except json.JSONDecodeError as e:
@@ -65,38 +81,38 @@ async def connect_to_websocket():
         ws_connected = False
 
 
-# Function to handle state changes and update OBS
-def handle_state_change(prev, curr):
-    global obs_client, manual_override
-    prev_tag = prev.get("state", "unknown")
-    curr_tag = curr.get("state", "unknown")
-
-    # State-to-Scene Mapping
-    # target_scene = None
-    # if prev_tag == "song_select" and prev_tag != curr_tag:
-    #     target_scene = "Gameplay"
-    # elif prev_tag == "results" and prev_tag != curr_tag:
-    #     target_scene = "Commentator"
-    scene_map = {'unknown': 'Scene - Unknown',
-                 'entry': 'Scene - Entry',
-                 'gameplay': 'Scene - Gameplay',
-                 'song_select': 'Scene - Song Select',
-                 'song_result': 'Scene - Song Result',
-                 'total_result': 'Scene - Total Result'}
-
-    target_scene = scene_map.get(curr_tag, None)
-
-    # If a target scene is found, respect the manual override
-    if target_scene:
-        if manual_override:
-            print("Manual override enabled; ignoring WebSocket state changes.")
-            return
-
-        try:
-            obs_client.set_current_program_scene(target_scene)
-            print(f"Scene switched to: {target_scene}")
-        except Exception as e:
-            print(f"Error switching scene: {e}")
+# # Function to handle state changes and update OBS
+# def handle_state_change(prev, curr, client, override=False):
+#     print('handling state change: ', prev, curr)
+#     prev_tag = prev.get("state", "unknown")
+#     curr_tag = curr.get("state", "unknown")
+#
+#     # State-to-Scene Mapping
+#     # target_scene = None
+#     # if prev_tag == "song_select" and prev_tag != curr_tag:
+#     #     target_scene = "Gameplay"
+#     # elif prev_tag == "results" and prev_tag != curr_tag:
+#     #     target_scene = "Commentator"
+#     scene_map = {'unknown': 'Scene - Unknown',
+#                  'entry': 'Scene - Entry',
+#                  'song_playing': 'Scene - Gameplay',
+#                  'song_select': 'Scene - Song Select',
+#                  'song_result': 'Scene - Song Result',
+#                  'total_result': 'Scene - Total Result'}
+#
+#     target_scene = scene_map.get(curr_tag, None)
+#
+#     # If a target scene is found, respect the manual override
+#     if target_scene:
+#         if override:
+#             print("Manual override enabled; ignoring WebSocket state changes.")
+#             return
+#
+#         try:
+#             client.set_current_program_scene(target_scene)
+#             print(f"Scene switched to: {target_scene}")
+#         except Exception as e:
+#             print(f"Error switching scene: {e}")
 
 
 # Function to start the WebSocket connection in a background thread

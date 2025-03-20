@@ -1,17 +1,10 @@
+import argparse
 import os
 
-from ddrcv.ingest.simple_frame_fetcher import SimpleFrameFetcher
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 from enum import Enum, auto
-from pprint import pprint
-
-from ddrcv.discord.song_results_embed import push_song_results
-from ddrcv.misc.screenshot import Screenshot
-from ddrcv.ocr import get_ocr_singleton
-from ddrcv.state.results_parser import ResultsParser
-from ddrcv.state.splash_parser import SplashParser
 
 
 import logging
@@ -19,12 +12,11 @@ import time
 
 import cv2
 
-# from ddrcv.diagnostics.diagnostics_logger import DiagnosticsLogger
-# from ddrcv.diagnostics.diagnostics_wrapper import DiagnosticsWrapper
+from ddrcv.misc.screenshot import Screenshot
 from ddrcv.ingest.rtsp_frame_fetcher import RTSPFrameFetcher
-from ddrcv.jacket_database.database.database import DatabaseLookup
+from ddrcv.ingest.simple_frame_fetcher import SimpleFrameFetcher
 from ddrcv.score.score_extractor import ScoreExtractor
-from ddrcv.state.states import StateRotation
+from ddrcv.state.tbd5_states import StateRotation
 from ddrcv.publish.websocket_publisher import WebSocketPublisher
 
 
@@ -105,7 +97,7 @@ def main(config, logger):
             frame = fetcher.get_frame()
             if frame is not None:
                 frame_rgb = frame[..., ::-1].copy()
-                state_tag, state_data = state_determination.match(frame[..., ::-1])
+                state_tag, state_data = state_determination.match(frame_rgb)
 
                 publish_info['state'] = state_tag
 
@@ -126,13 +118,13 @@ def main(config, logger):
                     score_extractor.set_presence(state_data['p1_present'], state_data['p2_present'])
                     publish_info['players'] = (state_data['p1_present'], state_data['p2_present'])
 
-                    ret = splash_parser.parse(frame_rgb, publish_info['players'])
-                    publish_info['song'] = {
-                        'song': str(ret['song']),
-                        'confidence': ret['song_confidence'],
-                        'p1_info': ret['p1'],
-                        'p2_info': ret['p2']
-                    }
+                    # ret = splash_parser.parse(frame_rgb, publish_info['players'])
+                    # publish_info['song'] = {
+                    #     'song': str(ret['song']),
+                    #     'confidence': ret['song_confidence'],
+                    #     'p1_info': ret['p1'],
+                    #     'p2_info': ret['p2']
+                    # }
 
                 # ----------------------------------------------
                 # SONG PLAYING
@@ -148,43 +140,44 @@ def main(config, logger):
                 # RESULTS
                 # Screenshot, parse, and publish song results
                 # ----------------------------------------------
-                if state_tag == 'results':
-                    # Need to disable any results processing if we only want duo mode and
-                    # only one player is present
-                    results_enabled = True
-                    if config['results']['only_duo']:
-                        if not (publish_info['players'][0] and publish_info['players'][1]):
-                            results_enabled = False
-                            print('Skipping results')
-
-                    if results_enabled:
-                        # There is an zoom wipe and score tally animation that we need to skip past,
-                        # so we break the results section into substeps.
-                        # Additionally, we only fully process the results screen once, or we risk getting
-                        # duplicate images if multiple processing attempts span different minutes/seconds (depending on
-                        # provided time format).
-                        if results_substep == ResultsSubstep.READY:
-                            time.sleep(config['results']['processing_delay'])
-                            results_substep = ResultsSubstep.PROCESS
-                        elif results_substep == ResultsSubstep.PROCESS:
-                            screenshot_file = screenshot.save(frame_rgb)
-                            score_results = results_parser.parse(frame_rgb)
-                            pprint(score_results)
-                            if config['results'].get('discord', False):
-                                push_song_results(score_results, screenshot_path=screenshot_file)
-                            print('screenshot_file: ', screenshot_file)
-                            results_substep = ResultsSubstep.DONE
-
-                if state_tag != 'results':
-                    results_substep = ResultsSubstep.READY
+                # if state_tag == 'results':
+                #     # Need to disable any results processing if we only want duo mode and
+                #     # only one player is present
+                #     results_enabled = True
+                #     if config['results']['only_duo']:
+                #         if not (publish_info['players'][0] and publish_info['players'][1]):
+                #             results_enabled = False
+                #             print('Skipping results')
+                #
+                #     if results_enabled:
+                #         # There is an zoom wipe and score tally animation that we need to skip past,
+                #         # so we break the results section into substeps.
+                #         # Additionally, we only fully process the results screen once, or we risk getting
+                #         # duplicate images if multiple processing attempts span different minutes/seconds (depending on
+                #         # provided time format).
+                #         if results_substep == ResultsSubstep.READY:
+                #             time.sleep(config['results']['processing_delay'])
+                #             results_substep = ResultsSubstep.PROCESS
+                #         elif results_substep == ResultsSubstep.PROCESS:
+                #             screenshot_file = screenshot.save(frame_rgb)
+                #             score_results = results_parser.parse(frame_rgb)
+                #             pprint(score_results)
+                #             if config['results'].get('discord', False):
+                #                 push_song_results(score_results, screenshot_path=screenshot_file)
+                #             print('screenshot_file: ', screenshot_file)
+                #             results_substep = ResultsSubstep.DONE
+                #
+                # if state_tag != 'results':
+                #     results_substep = ResultsSubstep.READY
 
                 # print(publish_info)
                 publisher.send_message(publish_info)
 
                 # Display the frame (optional)
-                cv2.imshow('RTSP Stream', frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
+                if config['driver_debug']['render_frame']:
+                    cv2.imshow('RTSP Stream', frame)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
             else:
                 # Wait until a frame is available
                 time.sleep(0.01)
@@ -194,23 +187,49 @@ def main(config, logger):
         # Clean up
         fetcher.stop()
         publisher.stop()
-        cv2.destroyAllWindows()
+        if config['driver_debug']['render_frame']:
+            cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
-    # 1. Set up frame source
-    # 2. Set up score publisher
-    # 3. Set up state determination
-    # 4. Set up score extractor
+    parser = argparse.ArgumentParser(description='TBD5 DDR Driver')
+    parser.add_argument('--choose-camera', action='store_true',
+                        help='Choose the camera to use from a list of available cameras')
+    parser.add_argument('--debug', action='store_true',
+                        help='Turn on debug options')
+    args = parser.parse_args()
+
+    camera_uri = 0
+    if args.choose_camera:
+        from cv2_enumerate_cameras import enumerate_cameras
+        valid_indices = []
+        print('Available cameras:')
+        for camera_info in enumerate_cameras(cv2.CAP_DSHOW):
+            print(f'{camera_info.index}: {camera_info.name}')
+            valid_indices.append(camera_info.index)
+
+        while True:
+            user_input = input("Enter camera index: ")
+            value = None
+            try:
+                value = int(user_input)
+            except ValueError:
+                print("Invalid input. Please enter a valid integer.")
+            else:
+                if value in valid_indices:
+                    camera_uri = value
+                    break
+                print(f"Invalid input. Please enter a valid camera index from the list {valid_indices}.")
+
     config = {
         "ingest": {
             "simple": {
-                "uri": 0,
+                "uri": camera_uri,
                 "queue_size": 1,
                 "reconnect_delay": 5,
-                "width": 1920,
-                "height": 1080,
-                "query_delay": 0.03333
+                "width": 1280,
+                "height": 720,
+                "query_delay": 0.01
             }
         },
         "publish": {
@@ -238,14 +257,14 @@ if __name__ == "__main__":
             "cache_dir": r'/home/tim/persistent/database/cache'
         },
         "results": {
-            "screenshot_directory": r'/home/tim/persistent/screenshots',
+            "screenshot_directory": r'C:\Users\tim\Desktop\screenshots',
             "timestamp_format": "%Y%m%d_%H%M",
             "processing_delay": 5,
             "only_duo": False,
             "discord": False
         },
         "driver_debug": {
-            "render_frame": False
+            "render_frame": args.debug
         }
     }
 
