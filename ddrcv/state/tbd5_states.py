@@ -111,7 +111,7 @@ class SongSplash(StateBase):
 
 class Results(StateBase):
     def __init__(self, pkl_dir=None):
-        super().__init__('results', pkl_dir=pkl_dir)
+        super().__init__('song_result', pkl_dir=pkl_dir)
         self.matchers = [StateMatcher.load(self.pkl_dir / 'results_eng_1.pkl'),
                          StateMatcher.load(self.pkl_dir / 'results_header.pkl'),
                          StateMatcher.load(self.pkl_dir / 'results_p1_slow_1.pkl'),
@@ -143,7 +143,7 @@ def state_factory(tag, **config):
             'song_playing': SongPlaying,
             'song_select': SongSelect,
             'song_splash': SongSplash,
-            'results': Results,
+            'song_result': Results,
             'total_result': TotalResult,
             'login': Login
         }
@@ -165,7 +165,7 @@ class StateRotation:
         if states is None:
             states = [
                 # 'stage_rank',
-                'results',
+                'song_result',
                 'song_playing',
                 'song_select',
                 'song_splash',

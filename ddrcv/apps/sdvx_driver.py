@@ -149,7 +149,7 @@ if __name__ == "__main__":
         "state": {
             "pkl_dir": None,
             "states": [
-                'entry',
+                'login',
                 'song_select',
                 'song_playing',
                 'song_result',

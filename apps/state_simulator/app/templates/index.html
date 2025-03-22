@@ -74,15 +74,17 @@
     <h1>WebSocket Controller</h1>
     <div>
         <label for="port">WebSocket Server Port:</label>
-        <input type="text" id="port" placeholder="9000">
+        <input type="text" id="port" value="9000">
         <button onclick="startPublisher()">Start</button>
         <button onclick="stopPublisher()">Stop</button>
     </div>
     <div>
+        <button class="state-button" data-state="Login" onclick="sendState('login')">Login</button>
         <button class="state-button" data-state="Song Select" onclick="sendState('song_select')">Song Select</button>
         <button class="state-button" data-state="Song Splash" onclick="sendState('song_splash')">Song Splash</button>
-        <button class="state-button" data-state="Game Play" onclick="sendState('song_playing')">Game Play</button>
-        <button class="state-button" data-state="Results" onclick="sendState('results')">Results</button>
+        <button class="state-button" data-state="Song Playing" onclick="sendState('song_playing')">Song Playing</button>
+        <button class="state-button" data-state="Song Result" onclick="sendState('song_result')">Song Result</button>
+        <button class="state-button" data-state="Total Result" onclick="sendState('total_result')">Total Result</button>
         <button class="state-button" data-state="Unknown" onclick="sendState('unknown')">Unknown</button>
     </div>
 </body>

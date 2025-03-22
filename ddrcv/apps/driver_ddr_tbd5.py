@@ -140,7 +140,7 @@ def main(config, logger):
                 # RESULTS
                 # Screenshot, parse, and publish song results
                 # ----------------------------------------------
-                # if state_tag == 'results':
+                # if state_tag == 'song_result':
                 #     # Need to disable any results processing if we only want duo mode and
                 #     # only one player is present
                 #     results_enabled = True
@@ -167,7 +167,7 @@ def main(config, logger):
                 #             print('screenshot_file: ', screenshot_file)
                 #             results_substep = ResultsSubstep.DONE
                 #
-                # if state_tag != 'results':
+                # if state_tag != 'song_result':
                 #     results_substep = ResultsSubstep.READY
 
                 # print(publish_info)
@@ -246,10 +246,12 @@ if __name__ == "__main__":
         "state": {
             "pkl_dir": None,
             "states": [
-                'results',
+                'song_result',
                 'song_playing',
                 'song_select',
-                'song_splash'
+                'song_splash',
+                'total_result',
+                'login'
             ]
         },
         "jacket_database": {

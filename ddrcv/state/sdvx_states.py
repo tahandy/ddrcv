@@ -32,7 +32,7 @@ class SimpleState(StateBase):
 
 class Entry(SimpleState):
     def __init__(self, pkl_dir=None):
-        super().__init__('entry', 'entry.pkl', pkl_dir=pkl_dir)
+        super().__init__('login', 'entry.pkl', pkl_dir=pkl_dir)
 
 
 # class Gameplay(SimpleState):
@@ -86,7 +86,7 @@ class SongSelect(StateBase):
 def state_factory(tag, **config):
     if not hasattr(state_factory, "mapping"):
         state_factory.mapping = {
-            'entry': Entry,
+            'login': Entry,
             'song_result': SongResult,
             'total_result': TotalResult,
             'song_select': SongSelect,
@@ -109,11 +109,11 @@ class StateRotation:
         pkl_dir = _resolve_pkl_dir(pkl_dir)
         if states is None:
             states = [
-                'entry',
-                'song_result',
-                'total_result',
+                'login',
                 'song_select',
-                'song_playing'
+                'song_playing',
+                'song_result',
+                'total_result'
             ]
 
         self.states = list()
