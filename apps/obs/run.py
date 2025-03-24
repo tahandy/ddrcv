@@ -29,8 +29,8 @@ else:
     raise NotImplementedError(f"Unexpected game: {app.config['GAME']}. Expected 'ddr' or 'sdvx'.")
 
 # Register the OBS blueprint
-# app.register_blueprint(obs_blueprint, url_prefix="/obs")
-app.register_blueprint(obs_blueprint)
+app.register_blueprint(obs_blueprint, url_prefix="/obs")
+# app.register_blueprint(obs_blueprint)
 
 if __name__ == "__main__":
     app.run(host=args.host, port=args.port, debug=args.debug)
