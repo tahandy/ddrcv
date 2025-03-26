@@ -190,36 +190,58 @@ def push_song_results(results, screenshot_path=None):
     print('response: ', response)
 
 
+def push_song_results_screenshot(title=None, screenshot_path=None, webhook_url=None):
+    webhook = DiscordWebhook(url=_get_webhook_url() if webhook_url is None else webhook_url)
+    embed = DiscordEmbed(title='' if title is None else title)
+    embed.set_footer(text="Generated")
+    embed.set_timestamp()
+
+    if screenshot_path is not None:
+        screenshot_path = Path(screenshot_path)
+        if not screenshot_path.is_file():
+            embed.add_embed_field(name='Runtime Error', value=f'File {str(screenshot_path)} does not exist')
+        else:
+            with open(screenshot_path, "rb") as f:
+                webhook.add_file(file=f.read(), filename=screenshot_path.name)
+                # embed.set_thumbnail(url=f"attachment://{screenshot_path.name}")
+                embed.set_image(url=f"attachment://{screenshot_path.name}")
+
+    webhook.add_embed(embed)
+    response = webhook.execute()
+    print('response: ', response)
+
+
 if __name__ == "__main__":
+    # # results = {
+    # #     "song": "So Deep",
+    # #     "p1": create_null_player(),
+    # #     "p2": create_null_player()
+    # # }
+    #
     # results = {
-    #     "song": "So Deep",
-    #     "p1": create_null_player(),
-    #     "p2": create_null_player()
+    #     "song": "Macho Gang",
+    #     "stage": "1",
+    #     "p1":
+    #     {
+    #         "name": "ZVIDUN",
+    #         "difficulty": "Expert",
+    #         "max_combo": 123,
+    #         "step_grades": [69, 42, 17, 9, 3, 0],  # [marvelous, perfect, great, good, ok, miss]
+    #         "ex_score": 3142
+    #     },
+    #     "p2":
+    #     {
+    #         "name": "DUSK",
+    #         "difficulty": "Beginner",
+    #         "max_combo": 9,
+    #         "step_grades": [1, 2, 3, 4, 5, 6],  # [marvelous, perfect, great, good, ok, miss]
+    #         "ex_score": 13
+    #     }
     # }
-
-    results = {
-        "song": "Macho Gang",
-        "stage": "1",
-        "p1":
-        {
-            "name": "ZVIDUN",
-            "difficulty": "Expert",
-            "max_combo": 123,
-            "step_grades": [69, 42, 17, 9, 3, 0],  # [marvelous, perfect, great, good, ok, miss]
-            "ex_score": 3142
-        },
-        "p2":
-        {
-            "name": "DUSK",
-            "difficulty": "Beginner",
-            "max_combo": 9,
-            "step_grades": [1, 2, 3, 4, 5, 6],  # [marvelous, perfect, great, good, ok, miss]
-            "ex_score": 13
-        }
-    }
-
-    push_song_results(results, screenshot_path='../../state_images/stage_rank.png')
-
+    #
+    # push_song_results(results, screenshot_path='../../state_images/stage_rank.png')
+    whurl = '{KEY}'
+    push_song_results_screenshot(title='Test', screenshot_path='../../state_images/stage_rank.png', webhook_url=whurl)
 
 
 

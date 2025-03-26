@@ -207,6 +207,32 @@ def toggle_override():
         manual_override = not manual_override
     return jsonify(success=True, manual_override=manual_override)
 
+@obs_blueprint.route("/report_override", methods=["GET"])
+def report_override():
+    global manual_override
+    with lock:
+        if manual_override:
+            return jsonify(success=True, automation_on=0)
+        else:
+            return jsonify(success=True, automation_on=1)
+
+
+@obs_blueprint.route("/report_websocket", methods=["GET"])
+def report_websocket():
+    global ws_connected
+    with lock:
+        return jsonify(success=True, ws_connected=ws_connected)
+
+
+@obs_blueprint.route("/toggle_websocket", methods=["POST"])
+def toggle_websocket():
+    global ws_connected
+    with lock:
+        if ws_connected:
+            stop_websocket_connection()
+        else:
+            start_websocket_connection()
+    return jsonify(success=True, connected=manual_override)
 
 @obs_blueprint.route("/ws_control", methods=["POST"])
 def ws_control():

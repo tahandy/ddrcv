@@ -1,6 +1,8 @@
 import argparse
 import os
+from pathlib import Path
 
+from ddrcv.discord.song_results_embed import push_song_results, push_song_results_screenshot
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
@@ -77,8 +79,12 @@ def main(config, logger):
     publisher = create_publisher(config['publish'], logger=logger)
     publisher.start()
 
-    screenshot = Screenshot(config['results']['screenshot_directory'],
-                            timestamp_fmt=config['results']['timestamp_format'])
+    screenshot = None
+    if 'results' in config and config['results'].get('enabled', False):
+        screenshot = Screenshot(config['results']['screenshot_directory'],
+                                timestamp_fmt=config['results']['timestamp_format'])
+        Path(config['results']['screenshot_directory']).mkdir(parents=True, exist_ok=True)
+
 
     # reader = get_ocr_singleton()  # this needs to run only once to load the model into memory
     # results_parser = ResultsParser(reader, db)
@@ -140,35 +146,36 @@ def main(config, logger):
                 # RESULTS
                 # Screenshot, parse, and publish song results
                 # ----------------------------------------------
-                # if state_tag == 'song_result':
-                #     # Need to disable any results processing if we only want duo mode and
-                #     # only one player is present
-                #     results_enabled = True
-                #     if config['results']['only_duo']:
-                #         if not (publish_info['players'][0] and publish_info['players'][1]):
-                #             results_enabled = False
-                #             print('Skipping results')
-                #
-                #     if results_enabled:
-                #         # There is an zoom wipe and score tally animation that we need to skip past,
-                #         # so we break the results section into substeps.
-                #         # Additionally, we only fully process the results screen once, or we risk getting
-                #         # duplicate images if multiple processing attempts span different minutes/seconds (depending on
-                #         # provided time format).
-                #         if results_substep == ResultsSubstep.READY:
-                #             time.sleep(config['results']['processing_delay'])
-                #             results_substep = ResultsSubstep.PROCESS
-                #         elif results_substep == ResultsSubstep.PROCESS:
-                #             screenshot_file = screenshot.save(frame_rgb)
-                #             score_results = results_parser.parse(frame_rgb)
-                #             pprint(score_results)
-                #             if config['results'].get('discord', False):
-                #                 push_song_results(score_results, screenshot_path=screenshot_file)
-                #             print('screenshot_file: ', screenshot_file)
-                #             results_substep = ResultsSubstep.DONE
-                #
-                # if state_tag != 'song_result':
-                #     results_substep = ResultsSubstep.READY
+                if screenshot is not None and state_tag == 'song_result':
+                    # Need to disable any results processing if we only want duo mode and
+                    # only one player is present
+                    results_enabled = True
+                    if config['results']['only_duo']:
+                        if not (publish_info['players'][0] and publish_info['players'][1]):
+                            results_enabled = False
+                            print('Skipping results')
+
+                    if results_enabled:
+                        # There is an zoom wipe and score tally animation that we need to skip past,
+                        # so we break the results section into substeps.
+                        # Additionally, we only fully process the results screen once, or we risk getting
+                        # duplicate images if multiple processing attempts span different minutes/seconds (depending on
+                        # provided time format).
+                        if results_substep == ResultsSubstep.READY:
+                            time.sleep(config['results']['processing_delay'])
+                            results_substep = ResultsSubstep.PROCESS
+                        elif results_substep == ResultsSubstep.PROCESS:
+                            screenshot_file = screenshot.save(frame_rgb)
+                            # score_results = results_parser.parse(frame_rgb)
+                            # pprint(score_results)
+                            if config['results'].get('discord', False):
+                                # push_song_results(score_results, screenshot_path=screenshot_file)
+                                push_song_results_screenshot(title='Test', screenshot_path=screenshot_file, webhook_url=config['results'].get('webhook', None))
+                            print('screenshot_file: ', screenshot_file)
+                            results_substep = ResultsSubstep.DONE
+
+                if state_tag != 'song_result':
+                    results_substep = ResultsSubstep.READY
 
                 # print(publish_info)
                 publisher.send_message(publish_info)
@@ -259,11 +266,13 @@ if __name__ == "__main__":
             "cache_dir": r'/home/tim/persistent/database/cache'
         },
         "results": {
-            "screenshot_directory": r'C:\Users\tim\Desktop\screenshots',
+            "enabled": False,
+            "screenshot_directory": r'D:\TBD5\screenshots',
             "timestamp_format": "%Y%m%d_%H%M",
             "processing_delay": 5,
             "only_duo": False,
-            "discord": False
+            "discord": True,
+            'webhook': None
         },
         "driver_debug": {
             "render_frame": args.debug
