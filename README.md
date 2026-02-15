@@ -1,5 +1,8 @@
 # ddrcv
 
+If you use this for streaming, credit `Zvidun`.
+
+
 # Connecting to OBS from Pi
 
 Make Ethernet-to-USB a private connection
