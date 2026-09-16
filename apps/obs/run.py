@@ -20,8 +20,8 @@ with open(args.config, "r") as f:
     app.config.update(config_data)
 
 if args.game == "ddr":
-    from handler_ddr import handle_state_change
-    app.config["state_handler"] = handle_state_change
+    from handler_ddr import build_handler
+    app.config["state_handler"] = build_handler(app.config)
 elif args.game == "sdvx":
     from handler_sdvx import handle_state_change
     app.config["state_handler"] = handle_state_change

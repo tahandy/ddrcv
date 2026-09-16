@@ -31,19 +31,16 @@ class SimpleState(StateBase):
 
 
 class SongPlaying(StateBase):
-    def __init__(self, pkl_dir=None):
+    def __init__(self, pkl_dir=None, measure_gutters=False):
         super().__init__('song_playing', pkl_dir=pkl_dir)
+        # Optional diagnostic only; dark background videos make this unreliable.
+        self.measure_gutters = measure_gutters
         self.p1_matcher = StateMatcher.load(self.pkl_dir / 'gameplay_1.pkl', threshold_distance=20)
         self.p2_matcher = StateMatcher.load(self.pkl_dir / 'gameplay_2.pkl', threshold_distance=20)
 
-        # Lane identification
-        # Each player lane is (luckily) buffered by two vertical gutters, a few pixels wide, that are black-ish. This is
-        # independent of the customizable background brightness. Knowing if the lanes are present is extremely helpful
-        # when extracting the score. This is because if the player FCs the song, there is a huge high-brightness
-        # burst effect that propagates down to the score zone and corrupts the numeral extraction. This effect
-        # is coincident with the fading of the lanes, and the gutters are gone a few frames before the numerals are
-        # corrupted. Thus, the presence of the player lanes gives us a confident prediction on the quality of the
-        # input to the score extractor (i.e. only extract the score if the gutter is present).
+        # Historical gutter diagnostic for the end-of-song rocket effect.
+        # Background videos can also make these pixels dark, so this is off
+        # by default and is never used to gate tournament score extraction.
         self.p1_col = 68
         self.p2_col = 788
         self.row_range = (115, 165)  # Use more than 1 pixel to help avoid any compression artifacts
@@ -61,10 +58,9 @@ class SongPlaying(StateBase):
     def match(self, rgb_image):
         is_match = self.p1_matcher.match(rgb_image) or self.p2_matcher.match(rgb_image)
         data = None
-        if is_match:
+        if is_match and self.measure_gutters:
             gutters_present = self._is_gutter_present(rgb_image, self.p1_col) or \
                               self._is_gutter_present(rgb_image, self.p2_col)
-            print(f'Gutters present: {gutters_present}')
             data = {'lanes_present': gutters_present}
 
         return is_match, data

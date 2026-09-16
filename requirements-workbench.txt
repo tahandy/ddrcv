@@ -1,0 +1,2 @@
+-r requirements-tournament.txt
+pygame==2.6.1

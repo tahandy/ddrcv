@@ -162,3 +162,5 @@ cython_debug/
 #.idea/
 
 *.mkv
+# Local rehearsal settings, credentials, logs, and snapshots
+.workbench/

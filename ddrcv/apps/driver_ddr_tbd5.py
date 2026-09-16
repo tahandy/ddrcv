@@ -1,12 +1,14 @@
 import argparse
 import os
+import json
 from pathlib import Path
 
-from ddrcv.discord.song_results_embed import push_song_results, push_song_results_screenshot
+from ddrcv.discord.song_results_embed import push_song_results_screenshot
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
-from enum import Enum, auto
+from ddrcv.apps.recognition_engine import RecognitionEngine
+from ddrcv.ingest.file_source import FileSource
 
 
 import logging
@@ -26,27 +28,29 @@ from ddrcv.publish.websocket_publisher import WebSocketPublisher
 def create_frame_fetcher(ingest_config, logger):
     keys = list(ingest_config.keys())
 
-    if len(keys) > 1:
-        msg = f'[create_frame_fetcher] Too many ingest type specifiers {keys}. Valid options are one of ["rtsp"].'
+    if len(keys) != 1:
+        msg = f'[create_frame_fetcher] Expected exactly one type specifier; got {keys}. Valid options are one of ["simple", "rtsp", "video", "image"].'
         logger.error(msg)
         raise ValueError(msg)
 
+    if keys[0] in ('video', 'image'):
+        return FileSource(kind=keys[0], **ingest_config[keys[0]])
     if 'simple' in keys:
-        logger.info('[create_frame_fetcher] Creating RTSPFrameFetcher')
-        return SimpleFrameFetcher.from_config(ingest_config['simple'], logger=logger)
+        logger.info('[create_frame_fetcher] Creating SimpleFrameFetcher')
+        return SimpleFrameFetcher.from_config(dict(ingest_config['simple']), logger=logger)
     elif 'rtsp' in keys:
         logger.info('[create_frame_fetcher] Creating RTSPFrameFetcher')
-        return RTSPFrameFetcher.from_config(ingest_config['rtsp'], logger=logger)
+        return RTSPFrameFetcher.from_config(dict(ingest_config['rtsp']), logger=logger)
 
-    msg = f'[create_frame_fetcher] Failed to find implemented frame fetcher for ingest mode {keys[0]}. Valid options are one of ["rtsp"].'
+    msg = f'[create_frame_fetcher] Failed to find implemented frame fetcher for ingest mode {keys[0]}. Valid options are one of ["simple", "rtsp", "video", "image"].'
     logger.error(msg)
     raise ValueError(msg)
 
 
 def create_publisher(pub_config, logger):
     keys = list(pub_config.keys())
-    if len(keys) > 1:
-        msg = f'[create_publisher] Too many ingest type specifiers {keys}. Valid options are one of ["websocket"].'
+    if len(keys) != 1:
+        msg = f'[create_publisher] Expected exactly one type specifier; got {keys}. Valid options are one of ["websocket"].'
         logger.error(msg)
         raise ValueError(msg)
 
@@ -59,151 +63,91 @@ def create_publisher(pub_config, logger):
     raise ValueError(msg)
 
 
-class ResultsSubstep(Enum):
-    READY = auto()
-    PROCESS = auto()
-    DONE = auto()
-
-
 def main(config, logger):
-    # Initialize and start the frame fetcher
-    # fetcher = RTSPFrameFetcher(rtsp_url, hw_accel=False)
-    fetcher = create_frame_fetcher(config['ingest'], logger)
-    fetcher.start()
-
+    # Construct everything before starting background work, so configuration or
+    # missing-template errors cannot leave a camera thread running.
     state_determination = StateRotation(**config['state'])
     score_extractor = ScoreExtractor(config['score_extractor']['glyph_dir'])
-    # db = DatabaseLookup.from_prebuilt('../jacket_database/output/db_effnetb0.pkl')
-    # db = DatabaseLookup.from_prebuilt(config['jacket_database']['prebuilt_database'],
-    #                                   encoder_cache=config['jacket_database']['cache_dir'])
+    engine = RecognitionEngine(config, matcher=state_determination, extractor=score_extractor)
+    session = engine.session
+    fetcher = create_frame_fetcher(config['ingest'], logger)
     publisher = create_publisher(config['publish'], logger=logger)
-    publisher.start()
-
+    result_config = config.get('results', {})
     screenshot = None
-    if 'results' in config and config['results'].get('enabled', False):
-        screenshot = Screenshot(config['results']['screenshot_directory'],
-                                timestamp_fmt=config['results']['timestamp_format'])
-        Path(config['results']['screenshot_directory']).mkdir(parents=True, exist_ok=True)
-
-
-    # reader = get_ocr_singleton()  # this needs to run only once to load the model into memory
-    # results_parser = ResultsParser(reader, db)
-    # splash_parser = SplashParser(reader, db, do_name=False)
-
-    publish_info = dict()
-    publish_info['state'] = 'unknown'
-    publish_info['players'] = (True, True)
-    publish_info['song'] = None
-    publish_info['score'] = None
-
-    results_substep = ResultsSubstep.READY
-
+    if result_config.get('enabled', False) and result_config.get('discord', False) and not result_config.get('webhook'):
+        raise ValueError('Set results.webhook explicitly before enabling Discord publication')
+    if result_config.get('enabled', False):
+        screenshot = Screenshot(result_config['screenshot_directory'],
+                                timestamp_fmt=result_config['timestamp_format'])
+    previous_state = 'unknown'
     try:
+        fetcher.start()
+        publisher.start()
         while True:
             frame = fetcher.get_frame()
-            if frame is not None:
-                frame_rgb = frame[..., ::-1].copy()
-                state_tag, state_data = state_determination.match(frame_rgb)
-
-                publish_info['state'] = state_tag
-
-                # ----------------------------------------------
-                # SONG SELECT
-                # Use this as a temporal point to reset state
-                # ----------------------------------------------
-                if state_tag == 'song_select':
-                    publish_info['players'] = (True, True)
-                    publish_info['song'] = None
-                    publish_info['score'] = None
-
-                # ----------------------------------------------
-                # SONG SPLASH
-                # Determine player presence, difficulty levels, and song
-                # ----------------------------------------------
-                if state_tag == 'song_splash':
-                    score_extractor.set_presence(state_data['p1_present'], state_data['p2_present'])
-                    publish_info['players'] = (state_data['p1_present'], state_data['p2_present'])
-
-                    # ret = splash_parser.parse(frame_rgb, publish_info['players'])
-                    # publish_info['song'] = {
-                    #     'song': str(ret['song']),
-                    #     'confidence': ret['song_confidence'],
-                    #     'p1_info': ret['p1'],
-                    #     'p2_info': ret['p2']
-                    # }
-
-                # ----------------------------------------------
-                # SONG PLAYING
-                # Realtime score extraction
-                # ----------------------------------------------
-                if state_tag == 'song_playing':
-                    if state_data['lanes_present']:
-                        score_ret = score_extractor.extract(frame_rgb, debug=False)
-                        publish_info['score'] = score_ret['data']
-                        # print(publish_info)
-
-                # ----------------------------------------------
-                # RESULTS
-                # Screenshot, parse, and publish song results
-                # ----------------------------------------------
-                if screenshot is not None and state_tag == 'song_result':
-                    # Need to disable any results processing if we only want duo mode and
-                    # only one player is present
-                    results_enabled = True
-                    if config['results']['only_duo']:
-                        if not (publish_info['players'][0] and publish_info['players'][1]):
-                            results_enabled = False
-                            print('Skipping results')
-
-                    if results_enabled:
-                        # There is an zoom wipe and score tally animation that we need to skip past,
-                        # so we break the results section into substeps.
-                        # Additionally, we only fully process the results screen once, or we risk getting
-                        # duplicate images if multiple processing attempts span different minutes/seconds (depending on
-                        # provided time format).
-                        if results_substep == ResultsSubstep.READY:
-                            time.sleep(config['results']['processing_delay'])
-                            results_substep = ResultsSubstep.PROCESS
-                        elif results_substep == ResultsSubstep.PROCESS:
-                            screenshot_file = screenshot.save(frame_rgb)
-                            # score_results = results_parser.parse(frame_rgb)
-                            # pprint(score_results)
-                            if config['results'].get('discord', False):
-                                # push_song_results(score_results, screenshot_path=screenshot_file)
-                                push_song_results_screenshot(title='Test', screenshot_path=screenshot_file, webhook_url=config['results'].get('webhook', None))
-                            print('screenshot_file: ', screenshot_file)
-                            results_substep = ResultsSubstep.DONE
-
-                if state_tag != 'song_result':
-                    results_substep = ResultsSubstep.READY
-
-                # print(publish_info)
-                publisher.send_message(publish_info)
-
-                # Display the frame (optional)
-                if config['driver_debug']['render_frame']:
-                    cv2.imshow('RTSP Stream', frame)
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
-                        break
-            else:
-                # Wait until a frame is available
+            if frame is None:
+                if isinstance(fetcher, FileSource) and fetcher.ended:
+                    break
                 time.sleep(0.01)
+                continue
+            now = fetcher.source_time if isinstance(fetcher, FileSource) else time.monotonic()
+            still = isinstance(fetcher, FileSource) and fetcher.kind == 'image'
+            result = engine.process(frame, now, diagnostics=still, stateless=still)
+            frame_rgb = frame[..., ::-1].copy()
+            info = result['published']
+            if still:
+                logger.info('Image diagnostics: %s', result)
+            if info['state'] != previous_state:
+                logger.info('Confirmed state: %s -> %s', previous_state, info['state'])
+                previous_state = info['state']
+            # Publish before optional screenshot/Discord work. The settling
+            # delay is a deadline, not a sleep that stalls screen detection.
+            publisher.send_message(info)
+            if (screenshot is not None
+                    and session.screenshot_due(now, result_config['processing_delay'])
+                    and (not result_config.get('only_duo', False) or all(info['players']))):
+                screenshot_file = screenshot.save(frame_rgb)
+                session.results_saved = True
+                logger.info('Results screenshot: %s', screenshot_file)
+                if result_config.get('discord', False):
+                    try:
+                        push_song_results_screenshot(title='Results', screenshot_path=screenshot_file,
+                                                     webhook_url=result_config.get('webhook'))
+                    except Exception:
+                        logger.exception('Discord publication failed; screenshot remains saved')
+            if config['driver_debug']['render_frame']:
+                cv2.imshow('DDR Capture', frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
     except KeyboardInterrupt:
         pass
     finally:
-        # Clean up
         fetcher.stop()
         publisher.stop()
         if config['driver_debug']['render_frame']:
             cv2.destroyAllWindows()
 
 
-if __name__ == "__main__":
+def merge_config(defaults, overrides):
+    for key, value in overrides.items():
+        if key != 'ingest' and isinstance(value, dict) and isinstance(defaults.get(key), dict):
+            merge_config(defaults[key], value)
+        else:
+            defaults[key] = value
+    return defaults
+
+
+def cli():
     parser = argparse.ArgumentParser(description='TBD5 DDR Driver')
-    parser.add_argument('--choose-camera', action='store_true',
+    sources = parser.add_mutually_exclusive_group()
+    sources.add_argument('--video', type=str, help='Replay a local video at normal speed')
+    sources.add_argument('--image', type=str, help='Inspect a still image without temporal confirmation')
+    parser.add_argument('--resize-to-720p', action='store_true', help='Resize full 16:9 file footage to 720p')
+    sources.add_argument('--choose-camera', action='store_true',
                         help='Choose the camera to use from a list of available cameras')
     parser.add_argument('--debug', action='store_true',
                         help='Turn on debug options')
+    parser.add_argument('--config', type=Path, help='JSON overrides for driver settings')
     args = parser.parse_args()
 
     camera_uri = 0
@@ -247,6 +191,8 @@ if __name__ == "__main__":
                 "only_send_new": True
             }
         },
+        "debounce": {"confirm_seconds": 0.2, "min_frames": 3, "unknown_seconds": 1.0, "max_frame_gap": 0.5, "min_fraction": 0.75},
+        "score_filter": {"game_fps": 60, "max_per_frame": 12},
         "score_extractor": {
             "glyph_dir": None
         },
@@ -271,13 +217,25 @@ if __name__ == "__main__":
             "timestamp_format": "%Y%m%d_%H%M",
             "processing_delay": 5,
             "only_duo": False,
-            "discord": True,
+            "discord": False,
             'webhook': None
         },
         "driver_debug": {
             "render_frame": args.debug
         }
     }
+
+    if args.config:
+        with args.config.open(encoding='utf-8') as stream:
+            merge_config(config, json.load(stream))
+    if args.video or args.image:
+        kind = 'video' if args.video else 'image'
+        config['ingest'] = {kind: {'path': args.video or args.image, 'resize_to_720p': args.resize_to_720p}}
+    if args.debug:
+        config['driver_debug']['render_frame'] = True
+    if args.choose_camera:
+        config['ingest'] = {'simple': {**config['ingest'].get('simple', {}), 'uri': camera_uri,
+                                       'width': 1280, 'height': 720}}
 
     # Configure logging
     logging.basicConfig(
@@ -289,3 +247,7 @@ if __name__ == "__main__":
     logger = logging.getLogger('Driver')
 
     main(config, logger)
+
+
+if __name__ == "__main__":
+    cli()

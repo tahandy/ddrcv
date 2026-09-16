@@ -1,0 +1,22 @@
+{
+    "debounce": {
+        "confirm_seconds": 0.2,
+        "min_frames": 3,
+        "min_fraction": 0.75,
+        "unknown_seconds": 1.0,
+        "max_frame_gap": 0.5
+    },
+    "score_filter": {
+        "game_fps": 60,
+        "max_per_frame": 12
+    },
+    "results": {
+        "enabled": false,
+        "screenshot_directory": "screenshots",
+        "timestamp_format": "%Y%m%d_%H%M%S",
+        "processing_delay": 5,
+        "only_duo": false,
+        "discord": false,
+        "webhook": null
+    }
+}

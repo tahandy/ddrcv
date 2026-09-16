@@ -67,7 +67,12 @@ class RTSPFrameFetcher:
                     self.logger.info("Successfully connected to the RTSP stream.")
                     print("Successfully connected to the RTSP stream.")
 
-            ret, frame = self.capture.read()
+            capture = self.capture
+            if not self.running or capture is None:
+                continue
+            ret, frame = capture.read()
+            if not self.running:
+                break
             if not ret or frame is None:
                 self.logger.error("Failed to read frame from the stream.")
                 # Stream might have dropped, attempt reconnection
@@ -160,7 +165,7 @@ class RTSPFrameFetcher:
         """
         self.running = False
         if self.thread is not None:
-            self.thread.join()
+            self.thread.join(timeout=2)
             self.thread = None
             self.logger.info("Frame fetching thread stopped.")
         if self.capture is not None:

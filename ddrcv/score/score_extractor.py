@@ -32,6 +32,7 @@ class SingleScoreExtractor:
         # Load glyph paths (You need to provide actual file paths to your glyph images)
         if glyph_dir is None:
             glyph_dir = Path(__file__).parent / 'fonts' / 'World2'
+        glyph_dir = Path(glyph_dir)
         print('Loading glyphs from ', glyph_dir)
         glyph_paths = {str(ii): str(glyph_dir / f'{ii}.png') for ii in range(10)}
 

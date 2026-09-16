@@ -5,18 +5,15 @@ import websockets
 import json
 from flask import Blueprint, request, jsonify, render_template, Response, current_app
 from obsws_python import ReqClient
+from ddrcv.publish.obs_service import OBSService
 
-# # OBS WebSocket Configuration
-# OBS_HOST = "localhost"
-# OBS_PORT = 4455
-# OBS_PASSWORD = "6s0sjd7n1M1ybhb1"
-#
-# # External WebSocket Server
-# STATE_SERVER_URI = "ws://localhost:9000"
+try:
+    from ..state_stream import consume_states
+except ImportError:  # apps/obs is the import root for the command-line launcher.
+    from state_stream import consume_states
 
-# OBS Client Initialization
-# obs_client = ReqClient(host=OBS_HOST, port=OBS_PORT, password=OBS_PASSWORD)
 obs_client = None
+obs_service = None
 STATE_SERVER_URI = None
 
 
@@ -29,7 +26,10 @@ previous_state = {"state": "unknown"}
 current_state = {"state": "unknown"}
 active_scene = None
 handle_state_change = lambda *x: print('Handler not implemented')
-lock = threading.Lock()
+lock = threading.RLock()
+obs_lock = threading.RLock()
+ws_stop = threading.Event()
+ws_enabled = False
 
 # Define the blueprint
 obs_blueprint = Blueprint("obs", __name__, template_folder="templates")
@@ -37,7 +37,7 @@ obs_blueprint = Blueprint("obs", __name__, template_folder="templates")
 @obs_blueprint.record_once
 def on_load(state):
     global STATE_SERVER_URI
-    global obs_client
+    global obs_client, obs_service
     global handle_state_change
     app = state.app
     obs_client = ReqClient(host=app.config.get('OBS_HOST'),
@@ -45,89 +45,58 @@ def on_load(state):
                            password=app.config.get('OBS_PASSWORD'))
     STATE_SERVER_URI = app.config.get('STATE_SERVER_URI')
     handle_state_change = app.config.get('state_handler')
+    obs_service = OBSService(client=obs_client, policy=handle_state_change)
 
-# Function to connect to the external WebSocket server
-async def connect_to_websocket():
-    global ws_connected, previous_state, current_state, STATE_SERVER_URI
-    global obs_client, manual_override
-    try:
-        async with websockets.connect(STATE_SERVER_URI) as websocket:
-            ws_connected = True
-            while ws_connected:
-                raw_message = await websocket.recv()
-                try:
-                    # Ensure the message is a dictionary
-                    if isinstance(raw_message, str):
-                        message = json.loads(raw_message)
-                    elif isinstance(raw_message, dict):
-                        message = raw_message
-                    else:
-                        print(f"Invalid message format: {raw_message}")
-                        continue
-
-                    # Process the new state
-                    if "state" in message:
-                        with lock:
-                            previous_state = current_state
-                            current_state = message
-                        handle_state_change(previous_state, current_state, obs_client, override=manual_override)
-                    else:
-                        print(f"Missing 'state' key in message: {message}")
-                except json.JSONDecodeError as e:
-                    print(f"Error decoding WebSocket message: {e}")
-    except Exception as e:
-        print(f"WebSocket Error: {e}")
-    finally:
-        ws_connected = False
+def receive_state(message):
+    global previous_state, current_state
+    # Share the lock with manual controls, so an automatic switch cannot race
+    # a desk operator's request to pause automation.
+    with lock:
+        previous_state, current_state = current_state, message
+        with obs_lock:
+            obs_service.update(current_state, enabled=not manual_override)
 
 
-# # Function to handle state changes and update OBS
-# def handle_state_change(prev, curr, client, override=False):
-#     print('handling state change: ', prev, curr)
-#     prev_tag = prev.get("state", "unknown")
-#     curr_tag = curr.get("state", "unknown")
-#
-#     # State-to-Scene Mapping
-#     # target_scene = None
-#     # if prev_tag == "song_select" and prev_tag != curr_tag:
-#     #     target_scene = "Gameplay"
-#     # elif prev_tag == "results" and prev_tag != curr_tag:
-#     #     target_scene = "Commentator"
-#     scene_map = {'unknown': 'Scene - Unknown',
-#                  'entry': 'Scene - Entry',
-#                  'song_playing': 'Scene - Gameplay',
-#                  'song_select': 'Scene - Song Select',
-#                  'song_result': 'Scene - Song Result',
-#                  'total_result': 'Scene - Total Result'}
-#
-#     target_scene = scene_map.get(curr_tag, None)
-#
-#     # If a target scene is found, respect the manual override
-#     if target_scene:
-#         if override:
-#             print("Manual override enabled; ignoring WebSocket state changes.")
-#             return
-#
-#         try:
-#             client.set_current_program_scene(target_scene)
-#             print(f"Scene switched to: {target_scene}")
-#         except Exception as e:
-#             print(f"Error switching scene: {e}")
-
-
-# Function to start the WebSocket connection in a background thread
-def start_websocket_connection():
-    global ws_thread
-    if ws_thread and ws_thread.is_alive():
-        return
-    ws_thread = threading.Thread(target=asyncio.run, args=(connect_to_websocket(),), daemon=True)
-    ws_thread.start()
-
-
-# Function to stop the WebSocket connection
-def stop_websocket_connection():
+def set_connection_status(connected):
     global ws_connected
-    ws_connected = False
+    with lock:
+        ws_connected = connected
+
+
+async def connect_to_websocket():
+    await consume_states(websockets.connect, STATE_SERVER_URI, ws_stop,
+                         receive_state, set_connection_status)
+
+
+def run_state_feed():
+    global ws_thread
+    try:
+        asyncio.run(connect_to_websocket())
+    finally:
+        with lock:
+            ws_thread = None
+            # A quick Stop/Start can arrive while the previous worker exits.
+            if ws_enabled:
+                start_websocket_connection()
+
+
+def start_websocket_connection():
+    global ws_thread, ws_enabled
+    with lock:
+        ws_enabled = True
+        ws_stop.clear()
+        if ws_thread and ws_thread.is_alive():
+            return
+        ws_thread = threading.Thread(target=run_state_feed, daemon=True)
+        ws_thread.start()
+
+
+def stop_websocket_connection():
+    global ws_connected, ws_enabled
+    with lock:
+        ws_enabled = False
+        ws_connected = False
+        ws_stop.set()
 
 
 # Function to poll OBS for the active scene
@@ -135,7 +104,8 @@ def poll_active_scene():
     global active_scene
     while True:
         try:
-            scene_info = obs_client.get_current_program_scene()
+            with obs_lock:
+                scene_info = obs_client.get_current_program_scene()
             with lock:
                 active_scene = scene_info.current_program_scene_name
         except Exception as e:
@@ -156,7 +126,8 @@ def start_polling():
 @obs_blueprint.route("/")
 def index():
     global manual_override, ws_connected, active_scene, current_state
-    scenes = obs_client.get_scene_list().scenes
+    with obs_lock:
+        scenes = obs_client.get_scene_list().scenes
     scenes = reversed(scenes)
     with lock:
         current_active_scene = active_scene
@@ -172,11 +143,15 @@ def index():
 
 @obs_blueprint.route("/switch_scene", methods=["POST"])
 def switch_scene():
+    global manual_override
     scene_name = request.json.get("scene_name")
     if scene_name:
         try:
-            obs_client.set_current_program_scene(scene_name)
-            return jsonify(success=True)
+            with lock:
+                manual_override = True
+                with obs_lock:
+                    obs_service.manual_scene(scene_name)
+            return jsonify(success=True, manual_override=True)
         except Exception as e:
             return jsonify(success=False, error=str(e)), 500
     return jsonify(success=False, error="No scene name provided"), 400
@@ -191,6 +166,9 @@ def event_stream():
                 "active_scene": active_scene,
                 "ws_connected": ws_connected,
                 "manual_override": manual_override,
+                "state": current_state.get("state", "unknown"),
+                "ws_enabled": ws_enabled,
+                "automation_error": getattr(handle_state_change, "last_error", None),
             }
         yield f"data: {json.dumps(data)}\n\n"
         time.sleep(1)  # Send updates every second
@@ -228,11 +206,11 @@ def report_websocket():
 def toggle_websocket():
     global ws_connected
     with lock:
-        if ws_connected:
+        if ws_enabled:
             stop_websocket_connection()
         else:
             start_websocket_connection()
-    return jsonify(success=True, connected=manual_override)
+    return jsonify(success=True, connected=ws_connected, enabled=ws_enabled)
 
 @obs_blueprint.route("/ws_control", methods=["POST"])
 def ws_control():
@@ -248,3 +226,5 @@ def ws_control():
 @obs_blueprint.record_once
 def start_background_tasks(state):
     start_polling()
+    if state.app.config.get("AUTO_CONNECT", True):
+        start_websocket_connection()

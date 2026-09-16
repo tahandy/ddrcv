@@ -79,11 +79,13 @@
     <div class="status">
         <p>WebSocket Status: <span id="ws-status" style="color: {{ 'green' if ws_connected else 'red' }};">
             {{ 'Connected' if ws_connected else 'Disconnected' }}</span></p>
-        <p>Manual Override: <span id="override-status">{{ 'Enabled' if manual_override else 'Disabled' }}</span></p>
+        <p>Automation: <span id="override-status">{{ 'Paused' if manual_override else 'Enabled' }}</span></p>
+        <p>Game screen: <span id="game-state">{{ current_state }}</span></p>
+        <p id="automation-error" role="alert" style="color: #ff8080;"></p>
     </div>
 
     <h2>Controls</h2>
-    <button onclick="toggleOverride()">Toggle Manual Override</button>
+    <button id="automation-toggle" onclick="toggleOverride()">{{ 'Resume automation' if manual_override else 'Pause automation' }}</button>
     <button onclick="wsControl('start')">Start WebSocket</button>
     <button onclick="wsControl('stop')">Stop WebSocket</button>
 
@@ -107,7 +109,7 @@
                 headers: { "Content-Type": "application/json" },
             });
             const data = await response.json();
-            alert(`Manual Override: ${data.manual_override ? 'Enabled' : 'Disabled'}`);
+            updateAutomation(data.manual_override);
         }
 
         // Function to control WebSocket connection
@@ -120,6 +122,11 @@
             if (!response.ok) {
                 alert("Failed to update WebSocket connection.");
             }
+        }
+
+        function updateAutomation(paused) {
+            document.getElementById('override-status').textContent = paused ? 'Paused' : 'Enabled';
+            document.getElementById('automation-toggle').textContent = paused ? 'Resume automation' : 'Pause automation';
         }
 
         // Set up Server-Sent Events (SSE) for real-time updates
@@ -135,12 +142,13 @@
 
             // Update WebSocket status
             const wsStatus = document.getElementById("ws-status");
-            wsStatus.textContent = data.ws_connected ? "Connected" : "Disconnected";
+            wsStatus.textContent = data.ws_connected ? "Connected" : (data.ws_enabled ? "Reconnecting" : "Stopped");
             wsStatus.style.color = data.ws_connected ? "green" : "red";
 
             // Update manual override status
-            const overrideStatus = document.getElementById("override-status");
-            overrideStatus.textContent = data.manual_override ? "Enabled" : "Disabled";
+            updateAutomation(data.manual_override);
+            document.getElementById("game-state").textContent = data.state;
+            document.getElementById("automation-error").textContent = data.automation_error || "";
         };
 
         eventSource.onerror = function() {

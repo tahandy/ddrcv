@@ -1,0 +1,130 @@
+"""Small local Flask surface; plain forms/JSON and JPEG previews."""
+import threading
+import time
+
+from flask import Flask, Response, jsonify, render_template, request
+
+from ddrcv.workbench.controller import Workbench, redact
+
+
+def create_app(workbench=None):
+    app = Flask(__name__)
+    wb = workbench or Workbench()
+    app.config['WORKBENCH'] = wb
+    integration_lock = threading.RLock()
+
+    @app.errorhandler(Exception)
+    def error(error):
+        from werkzeug.exceptions import HTTPException
+        return jsonify(error=str(error)), error.code if isinstance(error, HTTPException) else 400
+
+    @app.before_request
+    def local_controls():
+        if request.method == 'POST' and request.headers.get('X-Rehearsal') != '1':
+            return jsonify(error='Use the local rehearsal panel for control requests'), 403
+
+    @app.get('/')
+    def index():
+        return render_template('index.html')
+
+    @app.get('/api/status')
+    def status():
+        return jsonify(wb.status())
+
+    @app.post('/api/action')
+    def action():
+        args = dict(request.get_json())
+        action = args.pop('action')
+        return jsonify(wb.submit(action, **args))
+
+    @app.get('/api/cameras')
+    def cameras():
+        import cv2
+        from cv2_enumerate_cameras import enumerate_cameras
+        return jsonify([dict(index=camera.index, name=camera.name) for camera in enumerate_cameras(cv2.CAP_DSHOW)])
+
+    @app.get('/api/logs')
+    def logs():
+        lines = list(wb.logs.lines)
+        renderer_log = wb.data_dir / 'renderer.log'
+        if renderer_log.exists():
+            lines += ['--- Renderer ---'] + renderer_log.read_text(encoding='utf-8', errors='replace').splitlines()[-80:]
+        secret = wb.settings['obs'].get('password', '')
+        if secret:
+            lines = [line.replace(secret, '[redacted]') for line in lines]
+        return jsonify(redact(lines))
+
+    @app.post('/api/browse')
+    def browse():
+        return jsonify(path=wb.browse_path(request.get_json().get('directory', False)))
+
+    @app.get('/frame.jpg')
+    def frame():
+        image, sequence = wb.image(request.args.get('view', 'annotated'))
+        if image is None:
+            return Response(status=204)
+        return Response(image, mimetype='image/jpeg', headers={'Cache-Control': 'no-store', 'X-Frame-Sequence': str(sequence)})
+
+    @app.get('/stream.mjpg')
+    def stream():
+        def generate():
+            import cv2
+            import numpy as np
+            blank = cv2.imencode('.jpg', np.zeros((720, 1280, 3), dtype=np.uint8))[1].tobytes()
+            while not wb.closed.is_set():
+                image, sequence = wb.image('clean')
+                image = image if image is not None else blank
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\nX-Frame-Sequence: ' + str(sequence).encode()
+                       + b'\r\nContent-Length: ' + str(len(image)).encode() + b'\r\n\r\n' + image + b'\r\n')
+                time.sleep(1 / 30)
+        return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame', headers={'Cache-Control': 'no-store'})
+
+    @app.get('/video')
+    def video():
+        return '<!doctype html><html><head><title>DDRCV clean video</title><style>html,body{margin:0;background:black;overflow:hidden;width:100%;height:100%}img{width:100%;height:100%;object-fit:contain}</style></head><body><img src="/stream.mjpg" alt=""></body></html>'
+
+    @app.post('/api/snapshot')
+    def snapshot():
+        return jsonify(wb.submit('snapshot'))
+
+    @app.post('/api/checks')
+    def checks():
+        return jsonify(wb.checks())
+
+    @app.post('/api/renderer')
+    def renderer():
+        values = request.get_json()
+        with integration_lock:
+            if values['action'] == 'start':
+                return jsonify(wb.start_renderer(values.get('path')))
+            wb.stop_renderer()
+        return jsonify(ok=True)
+
+    @app.route('/api/obs', methods=['GET', 'POST'])
+    def obs():
+        if request.method == 'GET':
+            return jsonify(wb.obs.status)
+        values = dict(request.get_json())
+        action = values.pop('action')
+        if action == 'connect':
+            return jsonify(wb.configure_obs(values))
+        if action == 'automation':
+            wb.obs.automate(bool(values['enabled']))
+        elif action == 'scene':
+            wb.obs.manual_scene(values['name'])
+        elif action == 'disconnect':
+            wb.obs.disconnect()
+        elif action == 'check':
+            return jsonify(wb.obs.validate())
+        else:
+            raise ValueError('Unknown OBS control')
+        return jsonify(wb.obs.status)
+
+    @app.post('/api/shutdown')
+    def shutdown():
+        callback = app.config.get('SHUTDOWN')
+        if callback:
+            threading.Thread(target=callback, daemon=True).start()
+        return jsonify(ok=True)
+
+    return app

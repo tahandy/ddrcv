@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='ddrcv',
@@ -9,6 +9,7 @@ setup(
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/tahandy/ddrcv',
-    packages=['ddrcv'],
+    packages=find_packages(),
+    package_data={'ddrcv.score': ['fonts/*/*.png'], 'ddrcv.state': ['tbd5/*.pkl'], 'ddrcv.workbench': ['templates/*.html', 'static/*']},
     python_requires='>=3.10',
 )

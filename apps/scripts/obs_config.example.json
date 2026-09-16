@@ -1,0 +1,16 @@
+{
+    "OBS_HOST": "localhost",
+    "OBS_PORT": 4455,
+    "OBS_PASSWORD": "",
+    "STATE_SERVER_URI": "ws://localhost:9000",
+    "DDR_SCENE_MAP": {
+        "song_select": "Commentator",
+        "song_splash": "Gameplay",
+        "song_playing": "Gameplay",
+        "song_result": "Gameplay",
+        "total_result": "Commentator",
+        "login": "Commentator"
+    },
+    "SCENE_RETRY_SECONDS": 0.5,
+    "AUTO_CONNECT": true
+}

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DDRCV</title>
+  <link rel="stylesheet" href="/static/workbench.css">
+</head>
+<body>
+<header>
+  <h1>DDRCV</h1>
+  <div class="actions"><button id="checks">Check setup</button><button id="snapshot" disabled>Save snapshot</button></div>
+</header>
+<div class="feedback" id="notice" hidden><span id="notice-text" role="status"></span><button id="notice-dismiss" aria-label="Dismiss status message">Dismiss</button></div>
+<div class="feedback error" id="error" hidden><span id="error-text" role="alert"></span><button id="error-dismiss" aria-label="Dismiss error">Dismiss</button></div>
+<section class="source" aria-label="Source settings">
+  <form id="source-form">
+    <label>Source<select id="kind"><option value="video">Video file</option><option value="image">Still image</option><option value="camera">Camera</option><option value="rtsp">RTSP stream</option></select></label>
+    <label class="grow"><span id="path-label">File path</span><input id="path" placeholder="Choose a local recording" required></label>
+    <button type="button" id="browse">Browse…</button>
+    <button type="button" id="cameras" hidden>Find cameras</button>
+    <button class="primary">Open source</button>
+    <label class="score-mode">Score mode<select id="score-mode" aria-describedby="mode-help"><option value="money">Money</option><option value="ex">EX</option></select></label>
+  </form>
+  <div id="camera-list" class="camera-list" aria-live="polite" hidden></div>
+  <div class="source-options">
+    <label class="check"><input id="resize" type="checkbox">Resize 16:9 input to 720p</label>
+    <span id="mode-help" class="muted">Money: no upward score limit.</span>
+  </div>
+</section>
+<main>
+  <section class="viewer" aria-label="Playback and score crops">
+    <div class="view-heading"><strong id="phase">No source</strong><span id="source-info" class="muted">Open a recording to begin</span></div>
+    <div class="screen"><img id="preview" alt="Current gameplay frame" hidden><p id="preview-empty">Choose a video or image, then open the source.</p></div>
+    <div class="transport">
+      <button id="play-toggle" disabled>Play</button><button data-action="restart" disabled>Restart</button><button data-action="step" disabled>Next frame</button>
+      <label>Speed<select id="speed" disabled><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label>
+      <label class="check"><input type="checkbox" id="loop" disabled>Loop</label><button data-action="stop" class="close-source" disabled>Close source</button>
+    </div>
+    <div class="seek">
+      <input type="range" id="timeline" aria-label="Playback position" min="0" max="1" step="0.001" value="0" disabled>
+      <output id="position">00:00.000 / 00:00.000</output>
+      <label class="seek-label" for="seek-time">Seek to</label><input type="text" id="seek-time" inputmode="decimal" placeholder="mm:ss.mmm" aria-describedby="seek-help" disabled><button id="seek" disabled>Go</button>
+      <span id="seek-help" class="sr-only">Enter seconds or minutes:seconds, including decimal milliseconds.</span>
+    </div>
+    <p id="performance" class="muted">Playback is silent. Every recorded frame is processed.</p>
+    <div class="crops">
+      <section><h2>P1 score crop</h2><div class="crop"><img id="p1-crop" alt="Player 1 score crop with digit detections" hidden></div><p id="p1-glyphs" class="muted">No frame</p></section>
+      <section><h2>P2 score crop</h2><div class="crop"><img id="p2-crop" alt="Player 2 score crop with digit detections" hidden></div><p id="p2-glyphs" class="muted">No frame</p></section>
+    </div>
+  </section>
+  <aside aria-label="Recognition and connections">
+    <h2>Recognition</h2>
+    <dl><dt>Detected screen</dt><dd id="raw-state">—</dd><dt>Confirmed screen</dt><dd id="confirmed-state">Unknown</dd><dt>Frame</dt><dd id="frame-index">—</dd></dl>
+    <p id="confirmation" class="muted" hidden></p>
+    <table class="scores"><caption class="sr-only">Player presence, read scores, published scores, and filter decisions</caption><thead><tr><th scope="col"></th><th scope="col">P1 <span id="p1-presence" class="presence">—</span></th><th scope="col">P2 <span id="p2-presence" class="presence">—</span></th></tr></thead>
+      <tbody><tr><th scope="row">Read score</th><td id="p1-raw">—</td><td id="p2-raw">—</td></tr><tr class="published"><th scope="row">Published score</th><td id="p1-published">—</td><td id="p2-published">—</td></tr><tr class="decisions"><th scope="row">Filter</th><td id="p1-decision">—</td><td id="p2-decision">—</td></tr></tbody>
+    </table>
+    <details class="read-help"><summary>About these readings</summary><p class="muted">Read scores are diagnostic. Only confirmed gameplay readings that pass the filter are published.</p></details>
+    <section class="connections"><h2>Connections</h2><p id="feed-status">Score feed: checking…</p><p id="renderer-status">Renderer: stopped</p><p id="obs-status">OBS: not connected</p><p id="capture-age" class="muted"></p><a href="/video" target="_blank" rel="noopener">Open clean video view</a></section>
+    <details class="message"><summary>Published message</summary><pre id="message"></pre></details>
+  </aside>
+</main>
+<section id="check-results" class="setup-results" hidden><div class="section-heading"><h2>Setup checks</h2><button id="checks-dismiss">Close checks</button></div><div id="check-list"></div></section>
+<details class="section" id="renderer-panel"><summary>Renderer and score feed</summary>
+  <div class="row"><label class="grow">Renderer repository<input id="renderer-path"></label><button id="renderer-browse">Browse folder…</button><button id="renderer-start">Start renderer</button><button id="renderer-stop" disabled>Stop renderer</button></div>
+  <div class="row"><label>Score feed port<input id="port" type="number" value="9000" min="1" max="65535"></label><button id="publisher-start">Apply port / restart feed</button></div>
+  <p class="muted">Restart the renderer after changing the port. Check the actual renderer window: a running process or connected subscriber does not confirm correct output.</p>
+</details>
+<details class="section" id="obs-panel"><summary>OBS connection and scenes</summary>
+  <p class="muted">Connecting checks your setup. Scene changes begin only after you enable automation. Selecting a manual scene pauses it.</p>
+  <div class="row"><label>Host<input id="obs-host" value="localhost"></label><label>Port<input id="obs-port" type="number" value="4455"></label><label class="grow">Password<input id="obs-password" type="password" autocomplete="off" placeholder="Leave blank to keep saved password"></label></div>
+  <div id="scene-map" class="mapping"></div><datalist id="obs-scenes"></datalist>
+  <div class="row"><button id="obs-connect">Connect / apply mapping</button><button id="obs-check" disabled>Check scene names</button><button id="obs-enable" disabled>Enable automation</button><button id="obs-pause" disabled>Pause automation</button><button id="obs-disconnect" disabled>Disconnect</button></div>
+  <div class="row"><label>Manual scene<select id="manual-scene" disabled></select></label><button id="obs-manual" disabled>Show scene</button></div><p id="obs-detail" class="muted"></p>
+  <p>OBS Browser Source: <code id="clean-url"></code> at 1280 × 720. This view follows playback, including pauses and seeks.</p>
+</details>
+<details class="section" id="simulation-panel"><summary>Simulate scores and screen state</summary>
+  <p class="muted">Simulation closes the current source and publishes the values below without recognition.</p>
+  <div class="row"><label>Screen<select id="sim-state"></select></label><label class="check"><input id="sim-p1-present" type="checkbox" checked>P1 present</label><label>P1 score<input id="sim-p1" type="number" value="1234" min="-1"></label><label class="check"><input id="sim-p2-present" type="checkbox" checked>P2 present</label><label>P2 score<input id="sim-p2" type="number" value="1200" min="-1"></label><button id="simulate">Start / update simulation</button></div>
+</details>
+<details class="section"><summary>Logs</summary><button id="logs-refresh">Refresh logs</button><pre id="logs"></pre></details>
+<div class="shutdown"><button id="shutdown">Shut down workbench</button></div>
+<script src="/static/workbench.js"></script>
+</body>
+</html>

@@ -1,23 +1,13 @@
-# Function to handle state changes and update OBS
-def handle_state_change(prev, curr, client, override=False):
-    prev_tag = prev.get("state", "unknown")
-    curr_tag = curr.get("state", "unknown")
+"""DDR scene policy, configurable through the OBS JSON settings."""
 
-    # State-to-Scene Mapping
-    target_scene = None
-    if prev_tag == "song_select" and prev_tag != curr_tag:
-        target_scene = "Gameplay"
-    elif prev_tag == "results" and prev_tag != curr_tag:
-        target_scene = "Commentator"
+try:
+    from .scene_policy import ScenePolicy
+except ImportError:  # Also used by `python -m run` from apps/obs.
+    from scene_policy import ScenePolicy
 
-    # If a target scene is found, respect the manual override
-    if target_scene:
-        if override:
-            print("Manual override enabled; ignoring WebSocket state changes.")
-            return
 
-        try:
-            client.set_current_program_scene(target_scene)
-            print(f"Scene switched to: {target_scene}")
-        except Exception as e:
-            print(f"Error switching scene: {e}")
+def build_handler(config):
+    return ScenePolicy(config.get('DDR_SCENE_MAP'), config.get('SCENE_RETRY_SECONDS', 0.5))
+
+
+handle_state_change = ScenePolicy()
