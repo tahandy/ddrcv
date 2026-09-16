@@ -61,6 +61,17 @@ workbench on the same port. Restart the renderer after changing the port.
    show where digits were matched. A plausible diagnostic reading is not proof
    the production pipeline accepted it.
 
+Enable **Show monitored regions** above the preview to see the areas actually
+checked on that frame. Solid blue marks matching state markers and score reads
+used by the production filter. Dashed gray marks state checks that did not
+match; dashed amber marks score reads used only for diagnostics. Each score box
+states whether the filter accepted or rejected the reading. Overlapping checks
+of exactly the same area are grouped, with the matched/checked counts shown.
+The classifier stops when it finds a matching state, so later candidates are
+not shown as though they were checked. A matching marker still needs temporal
+confirmation. The toggle also works on paused frames and images, and affects
+only the inspection preview; the OBS browser source stays clean.
+
 Recognition uses **source timestamps**, independent of playback speed. Pausing
 adds no observations. Seeking, restarting, looping, and changing source clear
 scores and confirmation history; a paused seek therefore stays **warming up**
@@ -132,6 +143,8 @@ the output folder under `.workbench/snapshots/`. It contains the exact frame,
 both original score crops, frame number/source timestamp, raw and published
 results, digit match details, filter decisions, effective parser settings, and
 recent logs. Exports remove credentials from settings and authenticated URLs.
+`monitored.png` includes the monitored-region overlay, while `frame.png` remains
+unaltered. The diagnostic JSON records every checked region and its outcome.
 A snapshot taken while playing is serialized with playback so its frame and
 metadata refer to one position. Share that folder, not local settings.
 

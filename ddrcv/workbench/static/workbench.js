@@ -12,6 +12,12 @@ const reasons = {
 const errors = new Map(), dismissedErrors = new Map();
 let initialized = false, lastSequence = -1, lastImages = 0, polling = false, obsPolling = false;
 let shutdown = false, current = null, noticeTimer = null, stickyNotice = false;
+try { $('show-regions').checked = localStorage.getItem('ddrcv.show-regions') === 'true'; } catch {}
+$('show-regions').onchange = () => {
+  try { localStorage.setItem('ddrcv.show-regions', String($('show-regions').checked)); } catch {}
+  lastSequence = -1;
+  poll();
+};
 const text = (id, value) => { $(id).textContent = value ?? '—'; };
 const screenName = state => stateNames[state] || state || '—';
 const scoreText = value => value === -1 ? 'Unread' : value ?? '—';
@@ -186,6 +192,8 @@ function playbackControls(s) {
   document.querySelector('[data-action="stop"]').disabled = !kind;
   for (const id of ['speed', 'loop', 'timeline', 'seek-time', 'seek']) $(id).disabled = !video;
   $('snapshot').disabled = !hasFrame;
+  $('show-regions').disabled = !hasFrame;
+  $('regions-legend').hidden = !hasFrame || !$('show-regions').checked;
   $('renderer-stop').disabled = !s.renderer.running;
   if (document.activeElement !== $('speed')) $('speed').value = String(s.speed);
   $('loop').checked = s.loop;
@@ -234,7 +242,7 @@ async function poll() {
     if (s.error) fail(s.error, 'server'); else clearError('server');
     if (s.sequence !== lastSequence && performance.now() - lastImages > 90) {
       lastSequence = s.sequence; lastImages = performance.now();
-      for (const [id, view] of [['preview', 'clean'], ['p1-crop', 'p1'], ['p2-crop', 'p2']]) {
+      for (const [id, view] of [['preview', $('show-regions').checked ? 'monitored' : 'clean'], ['p1-crop', 'p1'], ['p2-crop', 'p2']]) {
         $(id).hidden = !s.diagnostics;
         if (s.diagnostics) $(id).src = `/frame.jpg?view=${view}&sequence=${s.sequence}`; else $(id).removeAttribute('src');
       }

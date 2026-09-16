@@ -2,6 +2,7 @@ import pickle
 from pathlib import Path
 
 from ddrcv.state.hash_matcher import HashMatcher
+from ddrcv.state.region_monitor import record_match
 
 
 class StateMatcher:
@@ -19,7 +20,9 @@ class StateMatcher:
         self.hash_matcher = HashMatcher(self.glyph, threshold_distance=self.threshold_distance)
 
     def match(self, rgb_image):
-        return self.hash_matcher.match_roi(rgb_image, self.roi)
+        matched = self.hash_matcher.match_roi(rgb_image, self.roi)
+        record_match(self.name, self.roi, matched)
+        return matched
 
     def serialize(self):
         output = {

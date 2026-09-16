@@ -30,7 +30,7 @@
 </section>
 <main>
   <section class="viewer" aria-label="Playback and score crops">
-    <div class="view-heading"><strong id="phase">No source</strong><span id="source-info" class="muted">Open a recording to begin</span></div>
+    <div class="view-heading"><strong id="phase">No source</strong><label class="check"><input id="show-regions" type="checkbox" aria-describedby="regions-legend" disabled>Show monitored regions</label><span id="source-info" class="muted">Open a recording to begin</span></div>
     <div class="screen"><img id="preview" alt="Current gameplay frame" hidden><p id="preview-empty">Choose a video or image, then open the source.</p></div>
     <div class="transport">
       <button id="play-toggle" disabled>Play</button><button data-action="restart" disabled>Restart</button><button data-action="step" disabled>Next frame</button>
@@ -44,6 +44,12 @@
       <span id="seek-help" class="sr-only">Enter seconds or minutes:seconds, including decimal milliseconds.</span>
     </div>
     <p id="performance" class="muted">Playback is silent. Every recorded frame is processed.</p>
+    <div id="regions-legend" hidden>
+      <span class="region-active">Solid blue: matched marker / score read</span>
+      <span class="region-missed">Dashed gray: checked, no match</span>
+      <span class="region-diagnostic">Dashed amber: diagnostic score read</span>
+      <p class="muted">Only checks run on this frame are shown. A matched marker still needs temporal confirmation. Repeated checks of the same area are grouped.</p>
+    </div>
     <div class="crops">
       <section><h2>P1 score crop</h2><div class="crop"><img id="p1-crop" alt="Player 1 score crop with digit detections" hidden></div><p id="p1-glyphs" class="muted">No frame</p></section>
       <section><h2>P2 score crop</h2><div class="crop"><img id="p2-crop" alt="Player 2 score crop with digit detections" hidden></div><p id="p2-glyphs" class="muted">No frame</p></section>

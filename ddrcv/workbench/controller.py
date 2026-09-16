@@ -27,6 +27,7 @@ from ddrcv.publish.websocket_publisher import WebSocketPublisher
 from ddrcv.publish.obs_service import OBSService
 from ddrcv.score.score_extractor import ScoreExtractor
 from ddrcv.publish.obs_policy import DEFAULT_SCENE_MAP
+from ddrcv.workbench.regions import draw_monitored_regions
 
 ROOT = Path(__file__).resolve().parents[2]
 STATES = ['unknown', 'login', 'song_select', 'song_splash', 'song_playing', 'song_result', 'total_result']
@@ -384,6 +385,8 @@ class Workbench:
                 x1, y1, x2, y2 = glyph['bounding_box']
                 cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 1)
             frame = cv2.resize(frame, (720, 135), interpolation=cv2.INTER_NEAREST)
+        elif view == 'monitored' and result:
+            draw_monitored_regions(frame, result.get('monitored_regions', []))
         elif view == 'annotated' and result:
             for top, left, height, width in (ScoreExtractor.p1_roi, ScoreExtractor.p2_roi):
                 cv2.rectangle(frame, (left, top), (left + width, top + height), (0, 255, 0), 2)
@@ -413,6 +416,8 @@ class Workbench:
         folder = self.data_dir / 'snapshots' / (datetime.now().strftime('%Y%m%d_%H%M%S') + '_' + uuid4().hex[:8])
         folder.mkdir(parents=True)
         cv2.imwrite(str(folder / 'frame.png'), frame)
+        cv2.imwrite(str(folder / 'monitored.png'), draw_monitored_regions(
+            frame.copy(), (evidence['diagnostics'] or {}).get('monitored_regions', [])))
         for name, roi in (('p1', ScoreExtractor.p1_roi), ('p2', ScoreExtractor.p2_roi)):
             top, left, height, width = roi
             cv2.imwrite(str(folder / f'{name}_crop.png'), frame[top:top + height, left:left + width])

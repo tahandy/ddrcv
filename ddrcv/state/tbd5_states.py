@@ -3,6 +3,7 @@ from pathlib import Path
 import cv2
 
 from ddrcv.state.state_matcher import StateMatcher
+from ddrcv.state.region_monitor import monitor_state
 
 
 def _resolve_pkl_dir(pkl_dir):
@@ -184,7 +185,8 @@ class StateRotation:
         state_tag = 'unknown'
 
         for ii, matcher in enumerate(self.states):
-            is_match, data = matcher.match(rgb_image)
+            with monitor_state(matcher.tag):
+                is_match, data = matcher.match(rgb_image)
             if is_match:
                 best_idx = ii
                 state_tag = matcher.tag

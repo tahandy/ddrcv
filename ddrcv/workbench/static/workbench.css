@@ -39,6 +39,7 @@ header { margin-bottom: 12px; }
 main { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 24px; align-items: start; }
 .viewer, aside { min-width: 0; }
 .view-heading { margin-bottom: 8px; min-height: 21px; }
+.view-heading .check { flex-shrink: 0; }
 #phase { white-space: nowrap; }
 #phase.simulation { color: #f3c678; }
 #source-info { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -54,6 +55,11 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 24px; al
 #position { font-variant-numeric: tabular-nums; white-space: nowrap; }
 #seek-time { width: 106px; font-variant-numeric: tabular-nums; }
 #performance { margin-top: 8px; min-height: 21px; }
+#regions-legend { display: flex; gap: 4px 16px; flex-wrap: wrap; margin-top: 8px; }
+#regions-legend p { flex-basis: 100%; }
+.region-active { color: #73befa; }
+.region-missed { color: #b9b9b9; }
+.region-diagnostic { color: #f5c36e; }
 aside { border-left: 1px solid var(--line); padding-left: 20px; }
 dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 12px 0; }
 dt { color: var(--muted); }
@@ -111,6 +117,8 @@ code { overflow-wrap: anywhere; }
   .scores th:first-child { width: 40%; }
   .scores td { text-align: left; }
   .mapping { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .view-heading { flex-wrap: wrap; }
+  #source-info { flex-basis: 100%; }
 }
 @media (max-width: 540px) {
   body { padding: 12px; }

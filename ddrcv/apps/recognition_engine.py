@@ -1,10 +1,12 @@
 """The same per-frame recognizer for live operation and local rehearsal."""
 from copy import deepcopy
+from contextlib import nullcontext
 
 from ddrcv.apps.tournament_session import TournamentSession
 from ddrcv.score.score_extractor import ScoreExtractor
 from ddrcv.state.tbd5_states import StateRotation
 from ddrcv.ingest.file_source import normalize_frame
+from ddrcv.state.region_monitor import collect_regions
 
 
 class RecognitionEngine:
@@ -27,7 +29,8 @@ class RecognitionEngine:
     def process(self, frame, timestamp, frame_index=None, diagnostics=False, stateless=False):
         frame = normalize_frame(frame)
         rgb = frame[..., ::-1].copy()
-        raw_state, data = self.matcher.match(rgb)
+        with collect_regions() if diagnostics else nullcontext([]) as regions:
+            raw_state, data = self.matcher.match(rgb)
         if not stateless:
             self.session.observe(raw_state, data, timestamp)
         info = self.session.info
@@ -42,7 +45,12 @@ class RecognitionEngine:
         for key, tracker, present in zip(('p1_score', 'p2_score'), self.session.trackers, players):
             reasons[key] = ('diagnostic_only' if stateless else 'not_gameplay' if not self.session.needs_scores
                             else 'absent' if not present else tracker.last_reason)
+            if diagnostics and present:
+                top, left, height, width = ScoreExtractor.p1_roi if key == 'p1_score' else ScoreExtractor.p2_roi
+                regions.append(dict(kind='score', player=key[:2], roi=[left, top, width, height],
+                                    use='production' if not stateless and self.session.needs_scores else 'diagnostic',
+                                    decision=reasons[key]))
         return dict(frame_index=frame_index, timestamp=timestamp, raw_state=raw_state,
                     confirmed_state=info['state'], warming_up=not stateless and raw_state != info['state'],
                     stateless=stateless, raw_scores=raw['data'], glyphs=raw.get('debug', {}),
-                    decisions=reasons, published=deepcopy(info))
+                    decisions=reasons, monitored_regions=regions, published=deepcopy(info))
