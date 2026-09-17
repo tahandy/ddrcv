@@ -191,7 +191,7 @@ def push_song_results(results, screenshot_path=None):
 
 
 def push_song_results_screenshot(title=None, screenshot_path=None, webhook_url=None):
-    webhook = DiscordWebhook(url=_get_webhook_url() if webhook_url is None else webhook_url)
+    webhook = DiscordWebhook(url=_get_webhook_url() if webhook_url is None else webhook_url, timeout=10)
     embed = DiscordEmbed(title='' if title is None else title)
     embed.set_footer(text="Generated")
     embed.set_timestamp()

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DDRCV Tournament</title>
+  <link rel="stylesheet" href="/static/desk.css">
+  <script defer src="/static/desk.js"></script>
+</head>
+<body>
+<header>
+  <div class="app-state"><h1>DDRCV</h1><span id="phase" class="badge">Connecting</span></div>
+  <div class="toolbar"><button id="start" class="primary">Start</button><button id="stop">Stop</button><button id="apply">Apply configuration</button></div>
+</header>
+<div id="error" role="alert" hidden></div>
+<div class="profile-bar">
+  <div class="profile-name"><span class="quiet">Profile:</span><span id="profile">Unsaved configuration</span></div>
+  <div class="toolbar"><button id="open-config">Open…</button><button id="save-config">Save</button><button id="save-as">Save as…</button></div>
+  <span id="pending" class="quiet">Configuration ready</span>
+</div>
+<nav class="tabs" role="tablist" aria-label="Tournament controls">
+  <button id="tab-session" role="tab" aria-selected="true" aria-controls="panel-session">Status &amp; configuration</button>
+  <button id="tab-obs" role="tab" aria-selected="false" aria-controls="panel-obs" tabindex="-1">OBS</button>
+  <button id="tab-renderer" role="tab" aria-selected="false" aria-controls="panel-renderer" tabindex="-1">Renderer</button>
+</nav>
+<main>
+<div id="panel-session" role="tabpanel" aria-labelledby="tab-session">
+  <section aria-labelledby="status-heading">
+    <div class="section-title"><h2 id="status-heading">Session</h2><span class="quiet">Score mode: <span id="mode">EX</span></span></div>
+    <div class="session-grid">
+      <table class="scores" aria-label="Accepted player scores">
+        <thead><tr><th scope="col">Player</th><th scope="col">Present</th><th scope="col" class="number">Accepted score</th><th scope="col">Last accepted read</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Player 1</th><td id="p1-presence">Unknown</td><td id="p1" class="number">—</td><td id="p1-age">No accepted read</td></tr>
+          <tr><th scope="row">Player 2</th><td id="p2-presence">Unknown</td><td id="p2" class="number">—</td><td id="p2-age">No accepted read</td></tr>
+        </tbody>
+      </table>
+      <div class="session-state"><span class="quiet">Confirmed state</span><strong id="state">Unknown</strong><span id="raw-state" class="quiet">Waiting for capture</span></div>
+    </div>
+    <div class="session-bottom">
+      <div class="health"><span id="capture">Capture stopped</span><span id="publisher">Publisher stopped</span><span id="throughput">0 frames processed</span></div>
+      <div class="snapshot-bar"><button id="snapshot">View stream</button><span class="quiet">Snapshot on request</span><span id="snapshot-time"></span></div>
+    </div>
+    <figure id="preview" hidden><img id="frame" alt="Requested capture frame"><figcaption id="frame-caption"></figcaption><button id="hide-preview">Close snapshot</button></figure>
+    <details><summary>Read details &amp; recent errors</summary><pre id="read-details"></pre><pre id="logs" aria-label="Recent logs"></pre></details>
+  </section>
+  <section aria-labelledby="config-heading">
+    <div class="section-title"><h2 id="config-heading">Configuration</h2></div>
+    <div class="form-grid">
+      <label>Source<select id="source-kind"><option value="simple">Capture camera</option><option value="rtsp">RTSP stream</option><option value="video">Local video</option><option value="image">Still image diagnostics</option></select></label>
+      <label>Score mode<select id="score-mode"><option value="ex">EX score</option><option value="money">Money score</option><option value="custom">Custom filter</option></select></label>
+      <div class="camera-controls wide">
+        <label class="source-simple camera-index">Camera index<input id="camera-index" type="number" min="0" step="1"></label>
+        <label class="source-simple camera-picker">Camera<select id="cameras" aria-label="Available cameras"><option value="">Scan to list cameras</option></select></label>
+        <button id="scan" class="source-simple">Scan</button>
+        <label class="source-rtsp stream-url">Stream URL<input id="rtsp-url" type="password" autocomplete="off" placeholder="rtsp://host/stream"></label>
+        <button id="switch-source" disabled>Switch camera</button>
+      </div>
+      <label class="source-file wide">Local media<div class="inline"><input id="media-path" type="text"><button id="browse-media">Browse…</button></div></label>
+      <label class="source-file check wide"><input id="resize" type="checkbox"> Resize full 16:9 file to 720p</label>
+      <label>Publisher address<input data-path="publish.websocket.host" type="text"></label>
+      <label>Publisher port<input data-path="publish.websocket.port" type="number" min="1" max="65535"></label>
+    </div>
+    <div class="source-actions"><span id="active-source" class="quiet">Capture stopped</span><span id="source-feedback" role="status" class="quiet"></span></div>
+    <p class="quiet source-note">Switch camera applies only the source and resets score tracking once ready. Other edits stay pending until Apply and Restart.</p>
+    <details id="advanced"><summary>Advanced driver configuration</summary><p class="quiet">Complete shared CLI JSON, including result screenshots and custom recognition settings. Secret placeholders preserve existing values.</p><textarea id="config-json" spellcheck="false" aria-label="Advanced driver JSON"></textarea><button id="use-json">Use edited JSON</button></details>
+  </section>
+</div>
+<div id="panel-obs" role="tabpanel" aria-labelledby="tab-obs" hidden>
+  <section class="integration-panel" aria-labelledby="obs-heading">
+    <div class="section-title"><h2 id="obs-heading">OBS Studio <span id="obs-status" class="badge">Disconnected</span></h2><span class="quiet">Settings apply with the driver configuration</span></div>
+    <div class="form-grid">
+      <label class="check"><input data-path="obs.enabled" type="checkbox"> Connect on Start</label>
+      <label class="check"><input data-path="obs.automation" type="checkbox"> Enable scene automation on Start</label>
+      <label>Host<input data-path="obs.host" type="text"></label><label>Port<input data-path="obs.port" type="number"></label>
+      <label class="wide">Password<input data-path="obs.password" type="password" autocomplete="off"></label>
+    </div>
+    <label class="mapping">State → scene mapping<textarea id="scene-map" rows="6" spellcheck="false" aria-label="OBS scene mapping"></textarea></label>
+    <div class="toolbar wrap"><button data-action="obs_connect">Connect</button><button data-action="obs_disconnect">Disconnect</button><button data-action="obs_check">Check scenes</button><button id="automation">Enable automation</button></div>
+    <div class="inline scene-choice"><select id="scene" aria-label="Manual OBS scene"></select><button id="manual-scene">Switch scene &amp; pause automation</button></div>
+    <p id="obs-detail" class="quiet">OBS itself is never closed by this app.</p>
+  </section>
+</div>
+<div id="panel-renderer" role="tabpanel" aria-labelledby="tab-renderer" hidden>
+  <section class="integration-panel" aria-labelledby="renderer-heading">
+    <div class="section-title"><h2 id="renderer-heading">Score renderer <span id="renderer-status" class="badge">Stopped</span></h2><span class="quiet">Settings apply with the driver configuration</span></div>
+    <label class="check"><input data-path="renderer.enabled" type="checkbox"> Launch on Start</label>
+    <label>Renderer repository<div class="inline"><input data-path="renderer.path" type="text"><button id="browse-renderer">Browse…</button></div></label>
+    <div class="toolbar"><button data-action="renderer_start">Launch renderer</button><button data-action="renderer_stop">Stop renderer</button></div>
+    <p id="renderer-detail" class="quiet">Capture its window in OBS after checking the output.</p>
+  </section>
+</div>
+</main>
+<footer><span id="connection">Local desktop session</span><span class="background-note">Closing the panel keeps capture running.</span><button id="exit" class="danger">Exit application…</button></footer>
+</body>
+</html>

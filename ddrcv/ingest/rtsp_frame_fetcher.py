@@ -29,6 +29,7 @@ class RTSPFrameFetcher:
         self.capture = None
         self.thread = None
         self.running = False
+        self.stopping = threading.Event()
         self.reconnect_delay = reconnect_delay
         self.hw_accel = hw_accel
 
@@ -43,6 +44,7 @@ class RTSPFrameFetcher:
         """
         Start the frame fetching thread.
         """
+        self.stopping.clear()
         self.running = True
         self.thread = threading.Thread(target=self.update_frame, daemon=True)
         self.thread.start()
@@ -61,7 +63,7 @@ class RTSPFrameFetcher:
                     self.logger.warning(
                         f"Connection failed. Retrying in {self.reconnect_delay} seconds."
                     )
-                    time.sleep(self.reconnect_delay)
+                    self.stopping.wait(self.reconnect_delay)
                     continue
                 else:
                     self.logger.info("Successfully connected to the RTSP stream.")
@@ -81,7 +83,7 @@ class RTSPFrameFetcher:
                 self.logger.info(
                     f"Reconnecting to the stream in {self.reconnect_delay} seconds."
                 )
-                time.sleep(self.reconnect_delay)
+                self.stopping.wait(self.reconnect_delay)
                 continue
 
             # Clear the queue to keep only the latest frame
@@ -164,6 +166,7 @@ class RTSPFrameFetcher:
         Stop the frame fetching thread and release resources.
         """
         self.running = False
+        self.stopping.set()
         if self.thread is not None:
             self.thread.join(timeout=2)
             self.thread = None

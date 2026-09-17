@@ -10,6 +10,6 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/tahandy/ddrcv',
     packages=find_packages(),
-    package_data={'ddrcv.ocr': ['README.md'], 'ddrcv.score': ['fonts/*/*.png'], 'ddrcv.state': ['tbd5/*.pkl'], 'ddrcv.workbench': ['templates/*.html', 'static/*']},
+    package_data={'ddrcv.desktop': ['templates/*.html', 'static/*'], 'ddrcv.ocr': ['README.md'], 'ddrcv.score': ['fonts/*/*.png'], 'ddrcv.state': ['tbd5/*.pkl'], 'ddrcv.workbench': ['templates/*.html', 'static/*']},
     python_requires='>=3.10',
 )

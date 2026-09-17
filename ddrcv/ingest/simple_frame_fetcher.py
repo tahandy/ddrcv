@@ -25,6 +25,7 @@ class SimpleFrameFetcher:
         self.capture = None
         self.thread = None
         self.running = False
+        self.stopping = threading.Event()
         self.reconnect_delay = reconnect_delay
         self.width = width
         self.height = height
@@ -41,6 +42,7 @@ class SimpleFrameFetcher:
         """
         Start the frame fetching thread.
         """
+        self.stopping.clear()
         self.running = True
         self.thread = threading.Thread(target=self.update_frame, daemon=True)
         self.thread.start()
@@ -59,7 +61,7 @@ class SimpleFrameFetcher:
                     self.logger.warning(
                         f"Connection failed. Retrying in {self.reconnect_delay} seconds."
                     )
-                    time.sleep(self.reconnect_delay)
+                    self.stopping.wait(self.reconnect_delay)
                     continue
                 else:
                     self.logger.info("Successfully connected to the device stream.")
@@ -79,7 +81,7 @@ class SimpleFrameFetcher:
                 self.logger.info(
                     f"Reconnecting to the stream in {self.reconnect_delay} seconds."
                 )
-                time.sleep(self.reconnect_delay)
+                self.stopping.wait(self.reconnect_delay)
                 continue
 
             # Clear the queue to keep only the latest frame
@@ -93,7 +95,7 @@ class SimpleFrameFetcher:
             self.frame_queue.put(frame)
             self.logger.debug("New frame fetched and added to the queue.")
             if self.query_delay > 0:
-                time.sleep(self.query_delay)
+                self.stopping.wait(self.query_delay)
 
 
     def connect(self):
@@ -136,6 +138,7 @@ class SimpleFrameFetcher:
         Stop the frame fetching thread and release resources.
         """
         self.running = False
+        self.stopping.set()
         if self.thread is not None:
             self.thread.join(timeout=2)
             self.thread = None

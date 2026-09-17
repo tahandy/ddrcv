@@ -16,3 +16,7 @@ OBS integration, live capture, and the maintained TBD5 CLI.
 
 Optional persistent, thread-safe crop OCR is documented in
 [ddrcv/ocr/README.md](ddrcv/ocr/README.md), including installation and offline use.
+
+For event operation, the [tournament desktop app](doc/tournament_desktop.md) adds
+a persistent tray backend, a disposable WebView2 panel, shared CLI configs, and
+on-demand frame snapshots. Run `setup_desktop.bat`, then `launch_desktop.vbs`.

@@ -183,3 +183,7 @@ Desktop.ini
 
 # Local rehearsal settings, credentials, logs, and snapshots
 .workbench/
+
+# Local tournament app state and validation artifacts
+.tournament/
+.desktop-validation/

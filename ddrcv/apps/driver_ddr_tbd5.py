@@ -1,6 +1,5 @@
 import argparse
 import os
-import json
 from pathlib import Path
 
 from ddrcv.discord.song_results_embed import push_song_results_screenshot
@@ -63,78 +62,28 @@ def create_publisher(pub_config, logger):
     raise ValueError(msg)
 
 
-def main(config, logger):
-    # Construct everything before starting background work, so configuration or
-    # missing-template errors cannot leave a camera thread running.
-    state_determination = StateRotation(**config['state'])
-    score_extractor = ScoreExtractor(config['score_extractor']['glyph_dir'])
-    engine = RecognitionEngine(config, matcher=state_determination, extractor=score_extractor)
-    session = engine.session
+def create_runtime(config, logger, data_dir=None, desktop=False):
+    from ddrcv.apps.tournament_runtime import TournamentRuntime
+    matcher = StateRotation(**config['state'])
+    extractor = ScoreExtractor(config['score_extractor']['glyph_dir'])
+    engine = RecognitionEngine(config, matcher=matcher, extractor=extractor)
     fetcher = create_frame_fetcher(config['ingest'], logger)
-    publisher = create_publisher(config['publish'], logger=logger)
-    result_config = config.get('results', {})
-    screenshot = None
-    if result_config.get('enabled', False) and result_config.get('discord', False) and not result_config.get('webhook'):
-        raise ValueError('Set results.webhook explicitly before enabling Discord publication')
-    if result_config.get('enabled', False):
-        screenshot = Screenshot(result_config['screenshot_directory'],
-                                timestamp_fmt=result_config['timestamp_format'])
-    previous_state = 'unknown'
     try:
-        fetcher.start()
-        publisher.start()
-        while True:
-            frame = fetcher.get_frame()
-            if frame is None:
-                if isinstance(fetcher, FileSource) and fetcher.ended:
-                    break
-                time.sleep(0.01)
-                continue
-            now = fetcher.source_time if isinstance(fetcher, FileSource) else time.monotonic()
-            still = isinstance(fetcher, FileSource) and fetcher.kind == 'image'
-            result = engine.process(frame, now, diagnostics=still, stateless=still)
-            frame_rgb = frame[..., ::-1].copy()
-            info = result['published']
-            if still:
-                logger.info('Image diagnostics: %s', result)
-            if info['state'] != previous_state:
-                logger.info('Confirmed state: %s -> %s', previous_state, info['state'])
-                previous_state = info['state']
-            # Publish before optional screenshot/Discord work. The settling
-            # delay is a deadline, not a sleep that stalls screen detection.
-            publisher.send_message(info)
-            if (screenshot is not None
-                    and session.screenshot_due(now, result_config['processing_delay'])
-                    and (not result_config.get('only_duo', False) or all(info['players']))):
-                screenshot_file = screenshot.save(frame_rgb)
-                session.results_saved = True
-                logger.info('Results screenshot: %s', screenshot_file)
-                if result_config.get('discord', False):
-                    try:
-                        push_song_results_screenshot(title='Results', screenshot_path=screenshot_file,
-                                                     webhook_url=result_config.get('webhook'))
-                    except Exception:
-                        logger.exception('Discord publication failed; screenshot remains saved')
-            if config['driver_debug']['render_frame']:
-                cv2.imshow('DDR Capture', frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-    except KeyboardInterrupt:
-        pass
-    finally:
+        publisher = create_publisher(config['publish'], logger=logger)
+        return TournamentRuntime(config, engine, fetcher, publisher, logger,
+                                 data_dir=data_dir, clock=time, desktop=desktop,
+                                 screenshot_factory=Screenshot,
+                                 discord_callback=push_song_results_screenshot)
+    except BaseException:
         fetcher.stop()
-        publisher.stop()
-        if config['driver_debug']['render_frame']:
-            cv2.destroyAllWindows()
+        raise
 
 
-def merge_config(defaults, overrides):
-    for key, value in overrides.items():
-        if key != 'ingest' and isinstance(value, dict) and isinstance(defaults.get(key), dict):
-            merge_config(defaults[key], value)
-        else:
-            defaults[key] = value
-    return defaults
+def main(config, logger):
+    create_runtime(config, logger).run()
+
+
+from ddrcv.apps.driver_config import default_config, merge_config, read_config, validate_config
 
 
 def cli():
@@ -172,62 +121,10 @@ def cli():
                     break
                 print(f"Invalid input. Please enter a valid camera index from the list {valid_indices}.")
 
-    config = {
-        "ingest": {
-            "simple": {
-                "uri": camera_uri,
-                "queue_size": 1,
-                "reconnect_delay": 5,
-                "width": 1280,
-                "height": 720,
-                "query_delay": 0.01
-            }
-        },
-        "publish": {
-            "websocket": {
-                "host": 'localhost',
-                "port": 9000,
-                "delay": 0.1,
-                "only_send_new": True
-            }
-        },
-        "debounce": {"confirm_seconds": 0.2, "min_frames": 3, "unknown_seconds": 1.0, "max_frame_gap": 0.5, "min_fraction": 0.75},
-        "score_filter": {"game_fps": 60, "max_per_frame": 12},
-        "score_extractor": {
-            "glyph_dir": None
-        },
-        "state": {
-            "pkl_dir": None,
-            "states": [
-                'song_result',
-                'song_playing',
-                'song_select',
-                'song_splash',
-                'total_result',
-                'login'
-            ]
-        },
-        "jacket_database": {
-            "prebuilt_database": r'/home/tim/persistent/database/db_effnetb0-20241126.pkl',
-            "cache_dir": r'/home/tim/persistent/database/cache'
-        },
-        "results": {
-            "enabled": False,
-            "screenshot_directory": r'D:\TBD5\screenshots',
-            "timestamp_format": "%Y%m%d_%H%M",
-            "processing_delay": 5,
-            "only_duo": False,
-            "discord": False,
-            'webhook': None
-        },
-        "driver_debug": {
-            "render_frame": args.debug
-        }
-    }
+    config = default_config()
 
     if args.config:
-        with args.config.open(encoding='utf-8') as stream:
-            merge_config(config, json.load(stream))
+        merge_config(config, read_config(args.config))
     if args.video or args.image:
         kind = 'video' if args.video else 'image'
         config['ingest'] = {kind: {'path': args.video or args.image, 'resize_to_720p': args.resize_to_720p}}
@@ -246,7 +143,7 @@ def cli():
 
     logger = logging.getLogger('Driver')
 
-    main(config, logger)
+    main(validate_config(config), logger)
 
 
 if __name__ == "__main__":

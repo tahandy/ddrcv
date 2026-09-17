@@ -1,0 +1,4 @@
+-r requirements-tournament.txt
+pygame==2.6.1
+pywebview==6.2.1
+pystray==0.19.5
