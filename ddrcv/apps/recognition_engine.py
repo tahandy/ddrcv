@@ -12,9 +12,7 @@ from ddrcv.state.region_monitor import collect_regions
 
 class RecognitionEngine:
     def __init__(self, config=None, matcher=None, extractor=None):
-        # Small, fixed 720p/ROI operations don't benefit from a machine-wide
-        # OpenCV pool. In particular, parallel color conversion burns CPU
-        # without improving frame latency on the rehearsal workload.
+        # Small, fixed ROI operations don't benefit from a machine-wide OpenCV pool.
         cv2.setNumThreads(1)
         self.config = deepcopy(config or {})
         self.config['debounce'] = {**dict(confirm_seconds=.2, min_frames=3, unknown_seconds=1.0, max_frame_gap=.5, min_fraction=.75), **self.config.get('debounce', {})}
@@ -33,7 +31,9 @@ class RecognitionEngine:
 
     def process(self, frame, timestamp, frame_index=None, diagnostics=False, stateless=False):
         frame = normalize_frame(frame)
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # Consumers only read small crops and support strided input. Reorder the
+        # channels as a view instead of allocating/converting the entire frame.
+        rgb = frame[..., ::-1]
         with collect_regions() if diagnostics else nullcontext([]) as regions:
             raw_state, data = self.matcher.match(rgb)
         if not stateless:

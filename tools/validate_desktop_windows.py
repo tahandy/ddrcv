@@ -5,6 +5,7 @@ calls pywebview's own lifecycle methods. No hardware/OBS/network services used.
 Artifacts and all config state stay in --out; no probe API ships in the app.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -17,6 +18,8 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+# Optional probe dependencies stay separate from the application environment.
+sys.path.insert(0, str(ROOT / '.desktop-validation/test-deps'))
 
 
 def write(path, value):
@@ -255,6 +258,257 @@ def acceptance(out, seconds):
     print(json.dumps(report,indent=2))
 
 
+def gameplay_trial(args, out):
+    """Measure the real runtime; all instrumentation and state are probe-local."""
+    from collections import defaultdict
+    from contextlib import ExitStack
+    from copy import deepcopy
+    import logging
+    import secrets
+    import socket
+    from unittest.mock import patch
+    import cv2
+    import numpy as np
+    import psutil
+    from werkzeug.serving import make_server
+    from ddrcv.apps.driver_config import validate_config
+    from ddrcv.apps import driver_ddr_tbd5 as driver
+    from ddrcv.desktop.controller import Desk
+    from ddrcv.desktop.app import create_app
+    from ddrcv.desktop.host import Panel
+
+    if (out / 'report.json').exists() or list((out / 'results').glob('*/result.json')):
+        raise ValueError('Choose a fresh output directory; prior results would affect replay deduplication')
+    out.mkdir(parents=True, exist_ok=True)
+    engine_source = (ROOT / 'ddrcv/apps/recognition_engine.py').read_bytes()
+    engine_class = driver.RecognitionEngine
+    if args.reference_revision:
+        engine_source = subprocess.check_output(['git', 'show',
+            f'{args.reference_revision}:ddrcv/apps/recognition_engine.py'], cwd=ROOT)
+        reference = {'__name__': 'probe_reference_engine'}
+        exec(compile(engine_source, 'probe_reference_engine.py', 'exec'), reference)
+        engine_class = reference['RecognitionEngine']
+    saved = read(args.config) if args.config else {}
+    saved = saved.get('applied', saved)
+    cfg = {key: deepcopy(saved[key]) for key in ('debounce', 'score_filter', 'score_mode',
+           'state', 'score_extractor', 'player_names', 'results') if key in saved}
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1', 0))
+        port = sock.getsockname()[1]
+    cfg.update(ingest={'video': {'path': str(args.video.resolve())}},
+               obs={'enabled': False}, renderer={'enabled': args.condition == 'renderer',
+                                                'path': str(args.renderer_path.resolve())},
+               publish={'websocket': {'host': '127.0.0.1', 'port': port}},
+               driver_debug={'render_frame': False})
+    cfg.setdefault('results', {}).update(enabled=True, discord=False, webhook=None,
+        outbox_directory=str(out / 'results'), output_directory=str(out / 'screenshots'))
+    cfg.setdefault('player_names', {})['enabled'] = True
+    for key in ('player_names', 'results'):
+        cfg[key].setdefault('ocr', {})['allow_download'] = False
+    cfg = validate_config(cfg)
+    rows, stages, trace = [], defaultdict(float), []
+    current = dict(started=None, thread=None, timestamp=None, index=None)
+    runtime = None
+    main_thread = None
+    children_cpu = {}
+    cpu_stop = threading.Event()
+
+    def cpu_monitor():
+        root = psutil.Process()
+        while not cpu_stop.wait(.25):
+            for process in [root] + root.children(recursive=True):
+                try:
+                    t = process.cpu_times()
+                    total = t.user + t.system
+                    key = str(process.pid)
+                    previous = children_cpu.setdefault(key, dict(name=process.name(), first=total, last=total))
+                    previous['last'] = total
+                except psutil.Error:
+                    pass
+
+    def timed(original, name):
+        def call(*a, **kw):
+            if threading.get_ident() != main_thread or current['started'] is None:
+                return original(*a, **kw)
+            began = time.perf_counter()
+            try:
+                return original(*a, **kw)
+            finally:
+                stages[name] += (time.perf_counter() - began) * 1000
+        return call
+
+    class TimedLock:
+        def __init__(self, lock): self.lock = lock
+        def __enter__(self):
+            began = time.perf_counter()
+            self.lock.acquire()
+            if threading.get_ident() == main_thread and current['started'] is not None:
+                stages['lock_wait'] += (time.perf_counter() - began) * 1000
+            return self
+        def __exit__(self, *exc): self.lock.release()
+
+    def factory(config):
+        nonlocal runtime
+        with patch.object(driver, 'RecognitionEngine', engine_class):
+            runtime = driver.create_runtime(config, logging.getLogger('gameplay-probe'), out, desktop=True)
+        source = runtime.fetcher
+        source.seek(max(0, args.start - 5))
+        original_get = source.get_frame
+
+        def next_frame():
+            nonlocal main_thread
+            main_thread = threading.get_ident()
+            wall = time.perf_counter()
+            if current['started'] is not None:
+                row = dict(timestamp=current['timestamp'], index=current['index'],
+                    active_ms=runtime.processing_ms,
+                    thread_ms=(time.thread_time() - current['thread']) * 1000,
+                    completion=runtime.frame_wall, stages=dict(stages),
+                    names_ready=runtime.player_names.ready, state=runtime.result['confirmed_state'])
+                rows.append(row)
+                # Exclude event IDs/wall clocks, which intentionally differ between runs.
+                trace.append({key: deepcopy(runtime.result[key]) for key in
+                              ('timestamp', 'raw_state', 'confirmed_state', 'raw_scores', 'decisions', 'published')})
+            current['started'] = None
+            if source.index / source.fps >= args.end:
+                source.ended = True
+                return None
+            frame = original_get()
+            if frame is not None:
+                stages.clear()
+                current.update(started=time.perf_counter(), thread=time.thread_time(),
+                               timestamp=source.source_time, index=source.index - 1)
+                stages['decode_and_pacing'] = (current['started'] - wall) * 1000
+            return frame
+        source.get_frame = next_frame
+        return runtime
+
+    desk = Desk(out / 'desk', runtime_factory=factory)
+    desk.draft = deepcopy(cfg)
+    token = secrets.token_urlsafe(24)
+    server = make_server('127.0.0.1', 0, create_app(desk, token), threaded=True)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    panel = Panel(f'http://127.0.0.1:{server.server_port}', token, out, {})
+    original_launch = subprocess.Popen
+    def launch(command, *a, **kw):
+        return original_launch([sys.executable, '-B', str(Path(__file__).resolve()),
+                                '--window', '--out', str(out)], *a, **kw)
+    panel.launcher = launch
+    try:
+        if args.condition != 'recognition':
+            panel.open()
+            wait_for(lambda: read(out / 'window-state.json').get('ready'), 40)
+        # Prepare without starting so wrappers are installed before the first frame.
+        desk.apply()
+        with ExitStack() as stack:
+            if args.profile_stages:
+                from ddrcv.score import glyph_detector, score_extractor
+                for owner, attr, name in (
+                    (runtime.engine, 'process', 'recognition_total'),
+                    (runtime.engine.matcher, 'match', 'state_recognition'),
+                    (runtime.engine.extractor, 'extract', 'scores_total'),
+                    (cv2, 'cvtColor', 'color_conversion'),
+                    (glyph_detector, 'preprocess_image', 'score_preprocessing'),
+                    (glyph_detector.GlyphDetector, '_match_glyph', 'template_matching'),
+                    (glyph_detector.GlyphDetector, 'non_maximum_suppression', 'suppression'),
+                    (score_extractor, 'detections_to_num', 'number_assembly'),
+                    (runtime, '_publish', 'publication'),
+                ):
+                    stack.enter_context(patch.object(owner, attr, timed(getattr(owner, attr), name)))
+                from ddrcv.state.player_names import PlayerNameService
+                from ddrcv.results.service import ResultsService
+                for cls, name in ((PlayerNameService, 'name_submission'), (ResultsService, 'results_submission')):
+                    stack.enter_context(patch.object(cls, 'submit', timed(cls.submit, name)))
+                for obj, attr in ((runtime, 'feed_lock'), (runtime, 'lock'),
+                                  (runtime.publisher, '_lock'), (runtime.integrations, 'lock')):
+                    stack.enter_context(patch.object(obj, attr, TimedLock(getattr(obj, attr))))
+            monitor = threading.Thread(target=cpu_monitor, daemon=True)
+            monitor.start()
+            began, cpu_began = time.perf_counter(), time.process_time()
+            runtime.run()
+            elapsed, cpu_seconds = time.perf_counter() - began, time.process_time() - cpu_began
+            cpu_stop.set(); monitor.join(2)
+        if runtime.error:
+            raise RuntimeError(runtime.error)
+        if args.condition == 'renderer' and runtime.integrations.renderer is None:
+            raise RuntimeError('Renderer did not start')
+        measured = [r for r in rows if args.start <= r['timestamp'] < args.end]
+        gameplay = [r for r in measured if r['state'] == 'song_playing']
+        def summary(samples):
+            if not samples: return None
+            values = np.array([r['active_ms'] for r in samples])
+            return dict(frames=len(samples), mean_ms=float(values.mean()),
+                p95_ms=float(np.percentile(values, 95)), p99_ms=float(np.percentile(values, 99)),
+                capacity_fps=float(1000 / values.mean()),
+                throughput_fps=(len(samples)-1)/(samples[-1]['completion']-samples[0]['completion']) if len(samples)>1 else 0,
+                mean_thread_ms=statistics.mean(r['thread_ms'] for r in samples),
+                names_ready_frames=sum(r['names_ready'] for r in samples),
+                stages_mean_ms={key:statistics.mean(r['stages'].get(key, 0) for r in samples)
+                                for key in sorted({k for r in samples for k in r['stages']})})
+        report = dict(condition=args.condition, interval=[args.start, args.end], profiled=args.profile_stages,
+            revision=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+            reference_revision=args.reference_revision,
+            engine_sha256=hashlib.sha256(engine_source).hexdigest(),
+            video=str(args.video.resolve()),
+            python=sys.version, opencv=cv2.__version__, opencv_threads=cv2.getNumThreads(),
+            score_mode=cfg['score_mode'], source_fps=runtime.fetcher.fps,
+            warmup=summary([r for r in rows if r['timestamp'] < args.start]),
+            measured=summary(measured), gameplay=summary(gameplay),
+            process_cpu_seconds=cpu_seconds, process_cpu_cores=cpu_seconds/elapsed,
+            process_tree_cpu=children_cpu, elapsed_seconds=elapsed,
+            results=runtime.results.status()['records'] if runtime.results else [])
+        write(out / 'report.json', report)
+        write(out / 'frames.json', rows)
+        write(out / 'trace.json', trace)
+        print(json.dumps({k:report[k] for k in ('condition','interval','profiled','gameplay')}, indent=2))
+    finally:
+        cpu_stop.set()
+        panel.close()
+        desk.close()
+        server.shutdown(); server.server_close()
+
+
+def gameplay_matrix(args, out):
+    out.mkdir(parents=True, exist_ok=True)
+    if args.config:
+        saved = read(args.config)
+        saved = saved.get('applied', saved)
+        selected = {key: saved[key] for key in ('debounce', 'score_filter', 'score_mode',
+                    'state', 'score_extractor', 'player_names', 'results') if key in saved}
+        selected.get('results', {})['webhook'] = None
+        write(out / 'input-config.json', selected)
+        args.config = out / 'input-config.json'
+    reports = []
+    for repeat in range(args.repeats):
+        for start, end in ((150, 170), (248, 265)):
+            for condition in ('recognition', 'panel', 'renderer'):
+                variants = ['reference', 'current'] if args.compare_revision else ['current']
+                if repeat % 2: variants.reverse()
+                traces = {}
+                for variant in variants:
+                    target = out / f'{repeat+1}-{start}-{condition}-{variant}'
+                    target.mkdir(parents=True, exist_ok=True)
+                    command = [sys.executable, '-B', str(Path(__file__).resolve()), '--probe-gameplay',
+                        '--video', str(args.video.resolve()), '--renderer-path', str(args.renderer_path.resolve()),
+                        '--out', str(target), '--start', str(start), '--end', str(end), '--condition', condition]
+                    if args.profile_stages: command.append('--profile-stages')
+                    if args.config: command.extend(('--config', str(args.config.resolve())))
+                    if variant == 'reference': command.extend(('--reference-revision', args.compare_revision))
+                    print(f'Running {target.name}', flush=True)
+                    with (target / 'probe.log').open('w') as log:
+                        subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=150)
+                    report = read(target / 'report.json')
+                    report.update(repeat=repeat+1, variant=variant)
+                    reports.append(report)
+                    write(out / 'report.json', reports)
+                    traces[variant] = read(target / 'trace.json')
+                    g = report['gameplay']
+                    print(f"  gameplay {g['mean_ms']:.2f} ms mean / {g['p95_ms']:.2f} ms p95", flush=True)
+                if len(traces) == 2 and traces['reference'] != traces['current']:
+                    raise AssertionError(f'Recognition trace changed: {repeat+1}-{start}-{condition}')
+
+
 if __name__ == '__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out',type=Path,default=ROOT/'.desktop-validation/windows')
@@ -262,8 +516,23 @@ if __name__ == '__main__':
     parser.add_argument('--window',action='store_true',help=argparse.SUPPRESS)
     parser.add_argument('--host',action='store_true',help=argparse.SUPPRESS)
     parser.add_argument('--cli',action='store_true',help=argparse.SUPPRESS)
+    parser.add_argument('--gameplay',action='store_true',help='Run the recorded gameplay performance matrix')
+    parser.add_argument('--probe-gameplay',action='store_true',help=argparse.SUPPRESS)
+    parser.add_argument('--video',type=Path)
+    parser.add_argument('--config',type=Path,help='Optional profile or desktop state; external integrations are isolated')
+    parser.add_argument('--renderer-path',type=Path,default=ROOT.parent/'ddr_score_render')
+    parser.add_argument('--repeats',type=int,default=3)
+    parser.add_argument('--profile-stages',action='store_true')
+    parser.add_argument('--compare-revision',help='Pair each run with the recognition engine from this Git revision')
+    parser.add_argument('--reference-revision',help=argparse.SUPPRESS)
+    parser.add_argument('--start',type=float,default=150)
+    parser.add_argument('--end',type=float,default=170)
+    parser.add_argument('--condition',choices=('recognition','panel','renderer'),default='recognition')
     args=parser.parse_args();out=args.out.resolve()
-    if args.window:probe_window(out)
+    if (args.gameplay or args.probe_gameplay) and args.video is None: parser.error('--video is required')
+    if args.gameplay:gameplay_matrix(args,out)
+    elif args.probe_gameplay:gameplay_trial(args,out)
+    elif args.window:probe_window(out)
     elif args.host:probe_host(out)
     elif args.cli:probe_cli(out)
     else:acceptance(out,args.seconds)

@@ -190,9 +190,11 @@ class WorkbenchTests(unittest.TestCase):
     def test_rgb_conversion_preserves_recognition_pixels(self):
         import numpy as np
         frame = np.random.default_rng(0).integers(0, 256, (720, 1280, 3), dtype=np.uint8)
+        original = frame.copy()
         self.wb.engine.process(frame, 0, diagnostics=True)
         passed_rgb = self.wb.engine.matcher.match.call_args.args[0]
         np.testing.assert_array_equal(passed_rgb, frame[..., ::-1])
+        np.testing.assert_array_equal(frame, original)
 
     def test_money_and_ex_modes_use_the_same_session(self):
         self.open()

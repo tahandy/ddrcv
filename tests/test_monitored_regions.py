@@ -12,6 +12,27 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(HAS_RUNTIME, 'Requires rehearsal dependencies')
 class RegionTests(unittest.TestCase):
+    def test_strided_rgb_preserves_real_state_and_glyph_matches(self):
+        import cv2
+        import numpy as np
+        from ddrcv.state.tbd5_states import StateRotation
+        from ddrcv.score.score_extractor import ScoreExtractor
+        reference_state, view_state = StateRotation(), StateRotation()
+        reference_scores, view_scores = ScoreExtractor(), ScoreExtractor()
+        for image in ('gameplay_1.png', 'gameplay_2.png', 'song_splash.png', 'results_1.png'):
+            frame = cv2.imread(str(ROOT / 'state_images/mar2025' / image))
+            self.assertIsNotNone(frame)
+            original = frame.copy()
+            contiguous, view = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), frame[..., ::-1]
+            np.testing.assert_array_equal(contiguous, view)
+            self.assertEqual(reference_state.match(contiguous), view_state.match(view))
+            for presence in ((True, True), (True, False), (False, True)):
+                reference_scores.set_presence(*presence)
+                view_scores.set_presence(*presence)
+                self.assertEqual(reference_scores.extract(contiguous, debug=True),
+                                 view_scores.extract(view, debug=True))
+            np.testing.assert_array_equal(frame, original)
+
     def marker(self, name, matched):
         import numpy as np
         from ddrcv.state.state_matcher import StateMatcher
