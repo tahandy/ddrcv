@@ -80,11 +80,23 @@ on at least five samples spanning one second. Low confidence, missing text,
 contradictions, capture gaps, or interrupted results recognition clear the
 relevant consecutive evidence. A paused frame never accumulates votes.
 
-The first fully confirmed result is finalized once. At ten seconds or departure,
-the latest assessed results frame is retained with its confirmed fields. No
-values are copied from another screenshot. If the screen leaves before OCR can
-settle, the retained screenshot is explicitly marked unconfirmed. Missing values
-stay null, not zero or -1. Zero is a valid score.
+As soon as scores for all present players confirm, the supporting frame and scores
+are saved and queued. Names never delay this first post. Missing names continue
+being read until they confirm, the screen ends, or the original ten-second deadline
+expires. Each later name must come from the same episode with score readings that
+match the saved scores. The local record is updated first, then the original Discord
+message is edited. Scores, outcome, screenshot, and filenames remain unchanged.
+
+Screenshot candidates are retained independently of OCR, at the existing sample
+rate. At the deadline or screen departure, an unconfirmed result prefers a settled
+frame with the lowest average score-crop motion across three consecutive samples
+(ties prefer newer frames), then the latest settled frame, then the latest recognized
+results frame. Recognition interruptions and capture gaps break motion comparisons.
+Visual stability is not score confirmation. Only confirmed fields belonging to the
+selected frame are included; missing values stay null. Up to two alternative frames
+are retained in the outbox for inspection. Live capture loss still expires the deadline;
+paused file playback does not advance it. Completely undetected results screens are
+not recoverable through this feature.
 
 Two confirmed EX scores permit a winner/margin or **TIE**, even if a missing name
 must be shown as P1/P2. Confirmed single-player results have no competitive
@@ -93,10 +105,12 @@ recording and two names, not arbitrary captures or layouts.
 
 Set `parse_names: false` to skip name OCR and name confirmation entirely. Present
 players then use P1/P2 labels, and confirmed scores are sufficient for a complete
-result. This setting defaults to true and is exposed as **Parse player names** in
-the desktop **Results** tab. The desktop's **Apply results settings** button changes
-it during capture without resetting gameplay. Pending result evidence is discarded
-and confirmed again under the new settings; existing saved results are unchanged.
+result. This setting defaults to true and appears as **Read names on results** in
+the desktop Results tab. It applies immediately without restarting capture or resetting
+scores. A names-only change clears name evidence, preserving score evidence,
+screenshot candidates, and the original deadline. Disabling it after the first post
+ends further name enrichment for that episode; it does not remove saved names.
+
 
 ## Concurrency, persistence, and delivery
 
@@ -121,8 +135,9 @@ Export names use the event creation time in UTC, optional confirmed player names
 Filename characters are sanitized for Windows. Disabled/unconfirmed names are
 omitted. The exported path is recorded as `screenshot_export_path`; the original
 `screenshot_path` remains in the durable outbox for Discord and recovery. Exports
-run on the persistence worker, and directory/write failures remain visible without
-claiming the event was saved or publishing it. Desktop folder changes affect new
+run on the persistence worker after internal persistence. Export-folder failures
+appear separately as `export_error` and do not prevent Discord delivery; failure to
+persist the internal screenshot/metadata still prevents sending. Desktop folder changes affect new
 results and do not move previous files or the outbox.
 
 Delivery states are `saved`, `queued`, `sending`, `retrying`, `sent`, and `failed`.
@@ -138,6 +153,22 @@ Connection/read timeouts are 3/10 seconds. Network errors, ambiguous timeouts,
 5xx responses, and 429 rate limits retry up to five attempts. Backoff is
 exponential; Discord's rate-limit delay takes precedence. Other 4xx responses
 fail for manual intervention. Pending deliveries recover on restart.
+
+Name edits use the same delivery worker and retry policy. Additive `revision`,
+`delivery.delivered_revision`, and `name_update` metadata preserve pending edits
+across restart and prevent old network responses from overwriting newer names.
+An edit failure leaves the initial delivery marked sent. A changed webhook or deleted
+message fails visibly; an edit never falls back to creating another post. Disabling
+publishing pauses both sends and edits. Legacy records load without migration.
+
+The desktop's collapsed **Recent results & recovery** section shows the newest 20
+events plus older failed deliveries/name edits. Its quiet attention count includes
+all such failures, separately from missing names. Expand it for saved/alternative
+screenshots, Send saved result, Retry delivery, Retry name update, and a Discord
+message link. Republish is secondary and asks before creating another post. Sending
+requires an active results service and enabled publishing; stopped services retain
+history in memory and persisted events recover on the next Start. Thumbnails are
+requested only while the recovery section is visible and expanded.
 
 Automatic retries intentionally favor delivery over exactly-once semantics: a
 lost acknowledgement can produce a duplicate Discord post. Retries retain the

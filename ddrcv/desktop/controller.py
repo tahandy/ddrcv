@@ -256,6 +256,67 @@ class Desk:
                 self._persist()
         return self.status()
 
+    def set_names(self, scope, enabled):
+        if scope not in ('player_names', 'results') or type(enabled) is not bool:
+            raise ValueError('Select a name switch and a boolean value')
+        key = 'enabled' if scope == 'player_names' else 'parse_names'
+        with self.operations:
+            if self.closed:
+                raise ValueError('Application is shutting down')
+            runtime = self.runtime
+            running = runtime and runtime.thread and not runtime.finished.is_set()
+            if running:
+                if scope == 'results':
+                    runtime.configure_results({key: enabled})
+                else:
+                    runtime.control('names', enabled)
+            elif runtime:
+                runtime.config[scope][key] = enabled
+            with self.lock:
+                self.applied[scope][key] = enabled
+                self.draft[scope][key] = enabled
+                self._persist()
+        return self.status()
+
+    def reset_score(self, player):
+        if type(player) is not int or player not in (1, 2):
+            raise ValueError('Select player 1 or 2')
+        if not self.runtime:
+            raise ValueError('Start capture before resetting a score')
+        self.runtime.control('reset_score', player - 1)
+        return self.status()
+
+    def results_history(self):
+        service = self.runtime.results if self.runtime else None
+        if service is None:
+            return dict(records=[], delivery_available=False, needs_attention=0)
+        return service.status()
+
+    def results_action(self, action, event_id, confirmed=False):
+        if action not in ('retry', 'republish', 'retry_names'):
+            raise ValueError('Unknown result action')
+        if action == 'republish' and confirmed is not True:
+            raise ValueError('Confirm creating another Discord post')
+        runtime = self.runtime
+        service = runtime.results if runtime else None
+        if service is None or service.closed or runtime.phase != 'Running':
+            raise ValueError('Start capture with results enabled before sending or retrying')
+        service.outbox.command(action, event_id)
+        return self.results_history()
+
+    def results_image(self, event_id, candidate):
+        service = self.runtime.results if self.runtime else None
+        if service is None:
+            raise ValueError('No results service')
+        with service.outbox.lock:
+            record = service.outbox.records.get(event_id)
+            if record is None:
+                raise ValueError('Unknown result event')
+            allowed = {'screenshot', *(item['id'] for item in record.get('alternatives', []))}
+            if candidate not in allowed or candidate not in ('screenshot', 'alternative-1', 'alternative-2'):
+                raise ValueError('Unknown screenshot candidate')
+            return service.outbox.directory / event_id / (candidate + '.png')
+
     def status(self):
         runtime = self.runtime
         status = runtime.status() if runtime else dict(phase='Stopped', published=dict(state='unknown', players=[True, True], score=None),

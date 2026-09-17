@@ -34,8 +34,8 @@ app and start capture, or pass the profile with the driver's `--config` option:
 
 For the workbench, put the same `player_names` section in its local
 `settings.json` (normally `.workbench/settings.json`) while it is stopped, then
-restart it. Preserve the other existing settings. Changes to this configuration
-take effect on the next runtime start. Recognition defaults to disabled and is
+restart it. Preserve the other existing settings. Workbench configuration changes take effect on the next runtime start. The desktop
+name switch applies immediately without restarting capture. Recognition defaults to disabled and is
 independent of the Results panel's **Parse player names** option.
 
 ## Monitoring
@@ -47,8 +47,8 @@ when playback is paused; an em dash means no confirmed name.
 
 The desktop **Status & configuration** tab shows each parsed name under its player
 label, alongside presence and accepted score. Its name-recognition status reports
-initialization and errors. Enable **Parse player names on login and song splash**
-in Configuration, then apply/start capture. This setting is separate from Results
+initialization and errors. Use **Read names on login/song splash**
+in Configuration; the switch applies immediately, including during capture. This setting is separate from Results
 name parsing. Both interfaces display the published names, including resets;
 neither starts inference from the status poll.
 
@@ -90,7 +90,8 @@ Runtime and workbench status include `player_name_status`: readiness/error,
 worker busy state, pending sample count, replaced-sample count, and the evidence
 screen (`login` or `song_splash`). Missing
 dependencies, model problems, and inference errors leave unconfirmed names null
-and do not stop scoring. Fix the error and restart capture to retry initialization.
+and do not stop scoring. In the desktop, switch names off and on to retry initialization without restarting
+capture. In the workbench, restart capture after fixing the error.
 
 ## Timing and lifetime
 

@@ -379,6 +379,7 @@ class Workbench:
         else:
             frame = self.source.get_frame()
             if frame is None:
+                self.results.tick(began)
                 self.deadline = began + .005
                 return
             height, width = frame.shape[:2]

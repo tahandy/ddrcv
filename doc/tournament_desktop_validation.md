@@ -139,3 +139,26 @@ and ONNX Runtime are not installed in this validation environment. Merged browse
 acceptance passed with the isolated backend; artifacts are in
 `.desktop-validation/merge-ui/` and `.desktop-validation/merge-*-tests.log`.
 Existing live hardware and native-window rehearsal limits still apply.
+
+## Tournament reliability follow-up
+
+The focused results, tournament, RapidOCR, player-name, desktop, workbench, and
+region suites passed 213 tests with the installed OCR model and local recording,
+including mocked Discord POST/PATCH failures, concurrent name enrichment,
+restart recovery, screenshot fallback, persistence failures, and live controls.
+Run `tools/run_results_tests.py --video apps/scripts/2025-03-27_15-52-48.mkv`
+with the project Python environment to repeat them.
+
+Extended headless Edge acceptance passed. The recovery section stays collapsed,
+loads images only when opened, offers the expected recovery actions, and requires
+confirmation for a second post. Live name toggles and existing layout checks also
+passed. Artifacts: `.desktop-validation/reliability-compact/report.json` and
+`results-recovery.png` in that directory.
+
+The recording contains a visible P2 perfect-full-combo rocket at 255 seconds.
+Replaying 248–278 seconds through CLI and workbench preserved gameplay scores
+1,615 / 1,632 and saved the matching results frame at 262 seconds, with names
+XETA / DANOOCT1 and P2 winning by 17. Seeking back retained one event through
+deduplication. Receipt: `.workbench/reliability-full-combo/summary.json`.
+This is a verified recording check; physical capture and live Discord remain
+unverified. All delivery tests used mocks and sent no external messages.

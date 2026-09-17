@@ -9,9 +9,10 @@ from pathlib import Path
 import threading
 import time
 from uuid import uuid4
+import numpy as np
 
 from .delivery import Outbox, redact_error
-from .recognition import Evidence, ResultsReader, outcome
+from .recognition import Evidence, ResultsReader, outcome, EX_BOXES, MONEY_BOXES
 
 LOG = logging.getLogger('ddrcv.results')
 DEFAULTS = dict(enabled=False, discord=False, webhook=None, parse_names=True, confidence=.8,
@@ -39,6 +40,17 @@ def load_config(path):
 
 
 @dataclass
+class Sample:
+    frame: object
+    timestamp: float
+    index: object
+    run: int
+    names_epoch: int
+    players: list
+    confirmed: bool = False
+
+
+@dataclass
 class Episode:
     generation: int
     source_id: str
@@ -58,8 +70,15 @@ class Episode:
     last_sample: float = -float('inf')
     evidence: object = field(default_factory=lambda: [[Evidence(), Evidence()], [Evidence(), Evidence()]])
     best: object = None
-    best_rank: int = -1
+    best_rank: float = float('inf')
     latest: object = None
+    settled: object = None
+    motion: object = None
+    previous_crop: object = None
+    previous_delta: object = None
+    names_epoch: int = 0
+    frozen_players: object = None
+    last_interval_write: float = -float('inf')
     saved: bool = False
 
 
@@ -82,6 +101,7 @@ class ResultsService:
         self.busy = False
         self.writes = deque()
         self.interval_writes = set()
+        self.name_writes = {}
         self.persisting = False
         self.closed = False
         self.replaced_frames = 0
@@ -123,15 +143,39 @@ class ResultsService:
             self._validate(config)
             if config == self.config:
                 return
-            # A settings change must not publish the same live results screen twice.
-            saved_episode = self.active if self.active and self.active.finalized else None
-            latched = self.latched and (self.active is None or saved_episode is not None)
-            self.config = config
-            self._reset_locked()
-            self.active = saved_episode
-            self.latched = latched
+            if all(config[k] == self.config.get(k) for k in config if k != 'parse_names'):
+                self.config = config
+                ep = self.active
+                if ep:
+                    ep.names_epoch += 1
+                    ep.config['parse_names'] = config['parse_names']
+                    for pair in ep.evidence:
+                        pair[0] = Evidence()
+                    if not ep.finalized:
+                        for sample in (ep.latest, ep.settled, ep.motion, ep.best):
+                            if sample:
+                                for player in sample.players:
+                                    player['name'] = None
+                    elif not config['parse_names']:
+                        ep.finish = True
+                        ep.pending = None
+            else:
+                self._configure_reset(config)
         self.outbox.configure(config['webhook'], config['discord'])
         self._announce()
+
+    def _configure_reset(self, config):
+        # A settings change must not publish the same live results screen twice.
+        saved_episode = self.active if self.active and self.active.finalized else None
+        if saved_episode:
+            saved_episode.finish = True
+            saved_episode.pending = None
+        latched = self.latched and (self.active is None or saved_episode is not None)
+        self.config = config
+        self._reset_locked()
+        self.active = saved_episode
+        self.latched = latched
+
 
     def reset(self, source_id='', recorded=False, mode='ex'):
         if mode not in ('ex', 'money'):
@@ -159,6 +203,9 @@ class ResultsService:
                           rehearsal=self.config['rehearsal'], webhook_configured=bool(self.config['webhook']))
         outbox = self.outbox.snapshot()
         status['records'] = outbox['records']
+        status['needs_attention'] = outbox['needs_attention']
+        status['last_sent_at'] = outbox['last_sent_at']
+        status['delivery_available'] = outbox['available'] and not self.closed
         status['error'] = status['error'] or outbox['error']
         return status
 
@@ -198,8 +245,8 @@ class ResultsService:
             if raw_state != 'song_result' or state != 'song_result':
                 if self.active:
                     self.active.run += 1
-                    if timestamp - self.active.start >= self.active.config['deadline_seconds']:
-                        self._finalize(self.active)
+                    self.active.previous_crop = self.active.previous_delta = None
+                    self.tick(timestamp)
                 return
             if not self.latched:
                 self.latched = True
@@ -222,23 +269,57 @@ class ResultsService:
             ep.end = timestamp
             if ep.finalized:
                 self.outbox.observe_interval(ep.event_id, ep.source_id, ep.mode, ep.start, ep.end)
-                if timestamp - ep.last_sample >= .5:
-                    ep.last_sample = timestamp
+                if timestamp - ep.last_interval_write >= .5:
+                    ep.last_interval_write = timestamp
                     self.interval_writes.add(ep.event_id)
                     self.changed.notify_all()
+            if ep.finish:
                 return
             if timestamp - ep.last_sample < 1 / ep.config['sample_hz'] - 1e-6:
                 return
+            gap = timestamp - ep.last_sample > ep.config['max_gap']
             ep.last_sample = timestamp
             if ep.pending is not None:
                 self.replaced_frames += 1
-            ep.pending = (frame.copy(), timestamp, frame_index, ep.run)
-            if ep.best is None:
-                ep.best = self._fallback(ep, ep.pending)
+            sample = Sample(frame.copy(), timestamp, frame_index, ep.run, ep.names_epoch,
+                            [dict(present=p, name=None, score=None) for p in ep.presence])
+            ep.pending = sample
+            if not ep.finalized:
+                self._retain(ep, sample, gap)
             if timestamp - ep.start >= ep.config['deadline_seconds']:
                 self._finalize(ep)
+                ep.finish = True
+                ep.pending = None
             else:
                 self._schedule(ep)
+
+    def _retain(self, ep, sample, gap):
+        """Bounded frame selection independent of OCR; only small crop math here."""
+        ep.latest = sample
+        if gap:
+            ep.previous_crop = ep.previous_delta = None
+        boxes = EX_BOXES if ep.mode == 'ex' else MONEY_BOXES
+        crops = [sample.frame[y:y+h, x:x+w].astype(np.int16).ravel()
+                 for present, (x, y, w, h) in zip(ep.presence, boxes) if present]
+        crop = np.concatenate(crops)
+        delta = None if ep.previous_crop is None else float(np.abs(crop - ep.previous_crop).mean())
+        if sample.timestamp - ep.start >= ep.config['settling_seconds']:
+            ep.settled = sample
+            if delta is not None and ep.previous_delta is not None:
+                rank = (delta + ep.previous_delta) / 2
+                if rank <= ep.best_rank:
+                    ep.motion, ep.best_rank = sample, rank
+        ep.previous_crop, ep.previous_delta = crop, delta
+        ep.best = ep.motion or ep.settled or ep.latest
+
+    def tick(self, timestamp):
+        """Live clock only when called without frames; file callers use source time."""
+        with self.lock:
+            ep = self.active
+            if ep and not self.closed and timestamp - ep.start >= ep.config['deadline_seconds']:
+                self._finalize(ep)
+                ep.finish = True
+                ep.pending = None
 
     def finish(self):
         """EOF/stop: finalize retained evidence without inventing additional observations."""
@@ -251,19 +332,13 @@ class ResultsService:
                 self.active = None
                 self.changed.notify_all()
 
-    @staticmethod
-    def _fallback(ep, sample):
-        frame, timestamp, index, _ = sample
-        players = [dict(present=p, name=None, score=None) for p in ep.presence]
-        return frame, timestamp, index, players, False
-
     def flush(self, timeout=5):
         """For replay tests/shutdown only. Never called by the frame loop."""
         deadline = time.monotonic() + timeout
         with self.changed:
-            while (self.jobs or self.busy or self.writes or self.interval_writes or self.persisting) and time.monotonic() < deadline:
+            while (self.jobs or self.busy or self.writes or self.interval_writes or self.name_writes or self.persisting) and time.monotonic() < deadline:
                 self.changed.wait(max(0, deadline - time.monotonic()))
-            return not (self.jobs or self.busy or self.writes or self.interval_writes or self.persisting)
+            return not (self.jobs or self.busy or self.writes or self.interval_writes or self.name_writes or self.persisting)
 
     def _run(self):
         while True:
@@ -276,7 +351,7 @@ class ResultsService:
                 sample, ep.pending = ep.pending, None
                 self.busy = True
             try:
-                if ep.generation != self.generation or ep.finalized or self.closed:
+                if ep.generation != self.generation or ep.finish or self.closed:
                     continue
                 if sample:
                     self._observe(ep, sample)
@@ -293,13 +368,11 @@ class ResultsService:
                     self.changed.notify_all()
 
     def _observe(self, ep, sample):
-        frame, timestamp, index, run = sample
+        frame, timestamp, run = sample.frame, sample.timestamp, sample.run
         with self.lock:
-            if self.closed or ep.finalized or ep.generation != self.generation:
+            if self.closed or ep.finish or ep.generation != self.generation:
                 return
-            ep.latest = self._fallback(ep, sample)
             if timestamp - ep.start < ep.config['settling_seconds']:
-                ep.best = ep.latest
                 return
         try:
             # Only the OCR worker changes reader options; an in-flight old read is
@@ -309,7 +382,7 @@ class ResultsService:
             readings = self.reader.read(frame, ep.presence, ep.mode)
         except Exception as exc:
             with self.lock:
-                if self.closed or ep.finalized or ep.generation != self.generation:
+                if self.closed or ep.finish or ep.generation != self.generation:
                     return
                 self.error = redact_error(exc, ep.config.get('webhook'))
                 self.phase = 'ocr_failed'
@@ -317,32 +390,47 @@ class ResultsService:
             return
         with self.lock:
             # EOF and shutdown can seal retained evidence while OCR is blocked.
-            if self.closed or ep.finalized or ep.generation != self.generation:
+            if self.closed or ep.finish or ep.generation != self.generation or run != ep.run:
                 return
             self.error = None
             if ep.evidence_run != run:
                 ep.evidence = [[Evidence(), Evidence()], [Evidence(), Evidence()]]
                 ep.evidence_run = run
+            if ep.finalized and any(readings[i]['score'] != p['score']
+                                    for i, p in enumerate(ep.frozen_players) if p['present']):
+                for pair in ep.evidence:
+                    pair[0] = Evidence()
+                return
             players = [dict(present=p, name=None, score=None) for p in ep.presence]
             for i, present in enumerate(ep.presence):
                 if not present:
                     continue
                 for j, field_name in enumerate(('name', 'score')):
-                    if field_name == 'name' and not ep.config['parse_names']:
+                    if field_name == 'name' and (not ep.config['parse_names'] or sample.names_epoch != ep.names_epoch):
                         continue
                     value = readings[i][field_name]
                     stable = ep.evidence[i][j].observe(value, timestamp, ep.config['min_frames'],
                         ep.config['confirmation_seconds'], ep.config['max_gap'])
                     if stable:
                         players[i][field_name] = value
-            complete = all(p['score'] is not None and (not ep.config['parse_names'] or p['name'] is not None)
-                           for p in players if p['present'])
-            ep.latest = (frame, timestamp, index, players, complete)
-            # Keep a frame and its own evidence together; contradictions invalidate fields.
-            ep.best = ep.latest
+            if ep.finalized:
+                changed = False
+                for frozen, player in zip(ep.frozen_players, players):
+                    if frozen['present'] and frozen['name'] is None and player['name'] is not None:
+                        frozen['name'] = player['name']
+                        changed = True
+                if changed:
+                    self.name_writes[ep.event_id] = [p['name'] for p in ep.frozen_players]
+                    self.changed.notify_all()
+                ep.finish = all(p['name'] is not None for p in ep.frozen_players if p['present'])
+                return
+            complete = all(p['score'] is not None for p in players if p['present'])
+            sample.players, sample.confirmed = players, complete
             self.phase = 'confirming'
             if complete:
+                ep.best = sample
                 self._finalize(ep)
+                ep.finish = not ep.config['parse_names'] or all(p['name'] is not None for p in players if p['present'])
 
     def _finalize(self, ep):
         with self.lock:
@@ -352,39 +440,60 @@ class ResultsService:
                 self.error = 'Results persistence queue saturated; result could not be accepted'
                 LOG.error(self.error)
                 return
-            frame, timestamp, index, players, stable = ep.best
+            sample = ep.best
+            frame, timestamp, index, players, stable = (sample.frame, sample.timestamp, sample.index,
+                                                       sample.players, sample.confirmed)
             record = dict(event_id=ep.event_id, source_id=ep.source_id, recorded=ep.recorded,
                 interval=[ep.start, ep.end], timestamp=timestamp, frame_index=index, score_mode=ep.mode,
                 players=deepcopy(players), parse_names=ep.config['parse_names'],
                 output_directory=ep.config['output_directory'], include_player_names=ep.config['include_player_names'],
-                partial=not stable, screenshot_confirmed=stable,
+                partial=not stable or (ep.config['parse_names'] and any(p['present'] and p['name'] is None for p in players)),
+                screenshot_confirmed=stable,
                 outcome=outcome(players, ep.mode), rehearsal=ep.config['rehearsal'],
                 auto_publish=ep.config['discord'], created_at=time.time())
             ep.finalized = True
+            ep.frozen_players = deepcopy(players)
             ep.pending = None
             self.phase = 'saving'
             # Reserve before disk I/O so an immediate loop/seek cannot create a duplicate.
             self.outbox.observe_interval(ep.event_id, ep.source_id, ep.mode, ep.start, ep.end)
-            self.writes.append((ep, record, frame))
+            alternatives = []
+            for candidate in (ep.motion, ep.latest):
+                if candidate is not None and candidate.timestamp != timestamp and all(c.timestamp != candidate.timestamp for c in alternatives):
+                    alternatives.append(candidate)
+            self.writes.append((ep, record, frame, alternatives))
             self.changed.notify_all()
 
     def _persist(self):
+        names_retry_at = 0
         try:
             while True:
                 with self.changed:
-                    self.changed.wait_for(lambda: self.writes or self.interval_writes or self.closed)
-                    if not self.writes and not self.interval_writes and self.closed:
+                    self.changed.wait_for(lambda: self.writes or self.interval_writes or self.closed or
+                                          (self.name_writes and time.monotonic() >= names_retry_at), timeout=.5)
+                    if not self.writes and not self.interval_writes and not self.name_writes and self.closed:
                         return
                     bundle = self.writes.popleft() if self.writes else None
-                    event_id = None if bundle else self.interval_writes.pop()
+                    names = self.name_writes.popitem() if not bundle and self.name_writes and (self.closed or time.monotonic() >= names_retry_at) else None
+                    event_id = self.interval_writes.pop() if not bundle and not names and self.interval_writes else None
+                    if not bundle and not names and not event_id:
+                        continue
                     self.persisting = True
                 try:
                     if bundle:
-                        ep, record, frame = bundle
+                        ep, record, frame, alternatives = bundle
                         self.outbox.save(record, frame)
+                        self.outbox.save_alternatives(record['event_id'], alternatives)
                         with self.lock:
                             ep.saved = True
                             self.phase = 'saved'
+                    elif names:
+                        self.outbox.enrich_names(*names)
+                        if names_retry_at:
+                            with self.lock:
+                                self.error = None
+                                self.phase = 'saved'
+                            names_retry_at = 0
                     else:
                         self.outbox.persist_interval(event_id)
                 except Exception as exc:
@@ -394,6 +503,11 @@ class ResultsService:
                         if bundle:
                             ep.finalized = False
                             self.outbox.forget_interval(ep.event_id)
+                        elif names and not self.closed:
+                            # Keep confirmed names through a transient disk error, allowing
+                            # newer coalesced names and screenshot writes to take priority.
+                            self.name_writes.setdefault(*names)
+                            names_retry_at = time.monotonic() + .5
                     LOG.error('Results persistence: %s', self.error)
                 finally:
                     with self.changed:

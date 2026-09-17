@@ -2,7 +2,7 @@
 import hmac
 import json
 
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
 
 
@@ -70,6 +70,12 @@ def create_app(desk, token, open_panel=None, shutdown=None):
             return jsonify(desk.apply())
         if name == 'apply_results':
             return jsonify(desk.apply_results())
+        if name == 'set_names':
+            return jsonify(desk.set_names(args['scope'], args['enabled']))
+        if name == 'reset_score':
+            return jsonify(desk.reset_score(args['player']))
+        if name == 'results_command':
+            return jsonify(desk.results_action(args['command'], args['event_id'], args.get('confirmed', False)))
         if name == 'open':
             if open_panel:
                 open_panel()
@@ -87,6 +93,14 @@ def create_app(desk, token, open_panel=None, shutdown=None):
         from cv2_enumerate_cameras import enumerate_cameras
         import cv2
         return jsonify([dict(index=c.index, name=c.name) for c in enumerate_cameras(cv2.CAP_DSHOW)])
+
+    @app.get('/api/results')
+    def results():
+        return jsonify(desk.results_history())
+
+    @app.get('/api/results/<event_id>/<candidate>')
+    def results_image(event_id, candidate):
+        return send_file(desk.results_image(event_id, candidate), mimetype='image/png')
 
     @app.post('/api/integration')
     def integration():

@@ -48,6 +48,10 @@ class FakeRuntime:
     def configure_results(self, settings):
         self.config['results'].update(settings)
 
+    def control(self, action, value):
+        if action == 'names':
+            self.config['player_names']['enabled'] = value
+
     def status(self):
         return dict(phase=self.phase, error=None, obs={}, renderer={})
 
@@ -71,6 +75,55 @@ class DeskTests(unittest.TestCase):
         self.assertIsNone(self.desk.runtime)
         self.assertEqual(self.desk.config()['draft']['publish']['websocket']['port'], 19005)
         self.assertTrue(self.desk.config()['pending'])
+
+    def test_live_name_switches_apply_only_their_setting(self):
+        self.desk.start()
+        runtime = self.desk.runtime
+        original_port = runtime.config['publish']['websocket']['port']
+        draft = self.desk.config()['draft']
+        draft['publish']['websocket']['port'] = original_port + 1
+        draft['results']['output_directory'] = 'pending folder'
+        self.desk.edit(draft)
+        self.desk.set_names('player_names', True)
+        self.desk.set_names('results', False)
+        self.assertEqual(runtime.stop_calls, 0)
+        self.assertTrue(runtime.config['player_names']['enabled'])
+        self.assertFalse(runtime.config['results']['parse_names'])
+        self.assertEqual(runtime.config['publish']['websocket']['port'], original_port)
+        self.assertNotEqual(runtime.config['results']['output_directory'], 'pending folder')
+        self.assertEqual(self.desk.config()['draft']['results']['output_directory'], 'pending folder')
+        self.assertEqual(self.desk.config()['draft']['publish']['websocket']['port'], original_port + 1)
+
+    def test_results_history_images_and_recovery_use_authenticated_api(self):
+        import numpy as np
+        from ddrcv.results.service import ResultsService
+        self.desk.start()
+        service = ResultsService(self.root / 'outbox', reader=Mock())
+        self.desk.runtime.results = service
+        client = create_app(self.desk, 'test-token').test_client()
+        headers = {'X-Desk-Token':'test-token'}
+        players = [dict(present=True, name=None, score=100), dict(present=True, name=None, score=200)]
+        record = dict(event_id='test-event', source_id='source', recorded=False, interval=[0,2],
+                      timestamp=2, players=players, partial=True, screenshot_confirmed=True,
+                      score_mode='ex', outcome=dict(kind='winner', winner=1, margin=100), auto_publish=False, created_at=1)
+        try:
+            service.outbox.save(record, np.zeros((20,20,3), np.uint8))
+            self.assertEqual(client.get('/api/results').status_code, 403)
+            self.assertEqual(len(client.get('/api/results', headers=headers).json['records']), 1)
+            image = client.get('/api/results/test-event/screenshot', headers=headers)
+            self.assertEqual(image.status_code, 200); image.close()
+            self.assertEqual(client.get('/api/results/unknown/screenshot', headers=headers).status_code, 400)
+            self.assertEqual(client.get('/api/results/test-event/result', headers=headers).status_code, 400)
+            args = dict(action='results_command', command='republish', event_id='test-event')
+            self.assertEqual(client.post('/api/action', json=args, headers=headers).status_code, 400)
+            with patch.object(service.outbox, 'command') as command:
+                args['command'] = 'retry'
+                self.assertEqual(client.post('/api/action', json=args, headers=headers).status_code, 200)
+                command.assert_called_once_with('retry', 'test-event')
+            service.close()
+            self.assertFalse(client.get('/api/results', headers=headers).json['delivery_available'])
+            self.assertEqual(client.post('/api/action', json=args, headers=headers).status_code, 400)
+        finally: service.close()
 
     def test_cli_roundtrip_preserves_unknown_fields_and_secrets(self):
         config = self.desk.config()['draft']
@@ -403,6 +456,52 @@ class RuntimeTests(unittest.TestCase):
                     runtime.stop()
             runtime.fetcher.stop.assert_called_once()
             runtime.publisher.stop.assert_called_once()
+
+    def test_live_name_control_and_individual_score_reset_preserve_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.make_runtime(tmp)
+            runtime.start()
+            try:
+                wait_for(lambda: runtime.sequence > 30)
+                # Hold capture so the immediate reset can be inspected before another read.
+                runtime.fetcher.get_frame.side_effect = lambda: None
+                time.sleep(.03)
+                generation = runtime.engine.session.song_generation
+                p2 = runtime.engine.session.trackers[1].value
+                runtime.control('reset_score', 0)
+                self.assertEqual(runtime.status()['published']['score']['p1_score'], -1)
+                self.assertIsNone(runtime.status()['score_age'][0])
+                self.assertEqual(runtime.engine.session.trackers[1].value, p2)
+                self.assertEqual(runtime.engine.session.song_generation, generation)
+                reader = Mock()
+                runtime.player_names.reader = reader
+                runtime.control('names', True)
+                runtime.control('names', False)
+                self.assertFalse(runtime.config['player_names']['enabled'])
+                self.assertEqual(runtime.engine.session.trackers[1].value, p2)
+                runtime.fetcher.start.assert_called_once()
+                runtime.fetcher.stop.assert_not_called()
+            finally: runtime.stop()
+
+    def test_results_deadline_runs_without_live_capture_frames(self):
+        from ddrcv.results.service import ResultsService
+        import numpy as np
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.make_runtime(tmp, config={'results': {'enabled':True}})
+            reader = Mock()
+            reader.read.side_effect = RuntimeError('no OCR')
+            runtime.results_factory = lambda directory, config, notify: ResultsService(directory, config, reader=reader, notify=notify)
+            runtime.start()
+            try:
+                wait_for(lambda: runtime.sequence > 3)
+                runtime.fetcher.get_frame.side_effect = lambda: None
+                time.sleep(.04)
+                timestamp = time.monotonic()
+                runtime.results.submit(np.zeros((720,1280,3), np.uint8), timestamp, 'song_result', 'song_result')
+                runtime.results.active.config['deadline_seconds'] = .03
+                wait_for(lambda: bool(runtime.results.status()['records']))
+                self.assertTrue(runtime.results.status()['records'][0]['partial'])
+            finally: runtime.stop()
 
     def test_capture_loss_marks_stale_without_resetting_scores(self):
         with tempfile.TemporaryDirectory() as tmp:

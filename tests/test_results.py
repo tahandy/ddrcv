@@ -13,7 +13,7 @@ import numpy as np
 
 from ddrcv.ocr import OCRResult
 from ddrcv.results.recognition import Evidence, ResultsReader, parse_number, outcome
-from ddrcv.results.delivery import Outbox, DeliveryError, format_payload, send_record, redact_error, message_receipt, screenshot_filename
+from ddrcv.results.delivery import Outbox, DeliveryError, format_payload, send_record, edit_record, webhook_identity, redact_error, message_receipt, screenshot_filename
 from ddrcv.results.service import ResultsService
 
 
@@ -182,13 +182,14 @@ class ServiceTests(unittest.TestCase):
         self.assertTrue(exported.is_file())
         self.assertIs(self.service.outbox, old_outbox)
 
-    def test_screenshot_output_failure_is_visible_not_falsely_saved(self):
+    def test_screenshot_export_failure_does_not_block_durable_result(self):
         blocked = Path(self.temp.name) / 'not-a-directory'
         blocked.write_text('existing file')
         self.service.configure(output_directory=str(blocked))
         self.settled()
-        self.assertEqual(self.service.status()['records'], [])
-        self.assertIsNotNone(self.service.status()['error'])
+        saved = self.service.status()['records'][0]
+        self.assertTrue(Path(saved['screenshot_path']).is_file())
+        self.assertTrue(saved['export_error'])
         self.assertEqual(blocked.read_text(), 'existing file')
 
     def test_toggle_names_invalidates_inflight_read_and_can_be_reenabled(self):
@@ -237,21 +238,22 @@ class ServiceTests(unittest.TestCase):
 
     def test_partial_read_publishes_only_confirmed_fields_without_false_winner(self):
         self.reader.read.return_value=[dict(name=None,score=0),dict(name='P2',score=None)]
-        for i in range(52):self.feed(i*.2)
+        for i in range(50):self.feed(i*.2)
+        self.service.finish(); self.service.flush()
         r=self.service.status()['records'][0]
         self.assertTrue(r['partial']);self.assertFalse(r['screenshot_confirmed'])
         self.assertEqual(r['players'][0]['score'],0)
         self.assertIsNone(r['players'][0]['name']);self.assertIsNone(r['players'][1]['score'])
         self.assertEqual(r['outcome']['kind'],'unavailable')
 
-    def test_contradiction_discards_previously_confirmed_field(self):
+    def test_scores_are_frozen_when_names_are_still_missing(self):
         self.reader.read.return_value=[dict(name=None,score=100),dict(name=None,score=200)]
         self.settled()
         self.reader.read.return_value=[dict(name=None,score=101),dict(name=None,score=200)]
         self.feed(3.6);self.service.finish();self.service.flush()
         r=self.service.status()['records'][0]
-        self.assertIsNone(r['players'][0]['score']);self.assertEqual(r['players'][1]['score'],200)
-        self.assertEqual(r['outcome']['kind'],'unavailable')
+        self.assertEqual(r['players'][0]['score'],100);self.assertEqual(r['players'][1]['score'],200)
+        self.assertEqual(r['outcome']['kind'],'winner')
 
     def test_single_player_and_money_never_get_ex_outcome(self):
         for i in range(18):self.feed(i*.2,presence=(False,True))
@@ -414,6 +416,153 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(self.service.status()['records'],[])
         self.assertEqual(self.reader.read.call_count,1)
 
+    def test_scores_post_first_then_names_enrich_independently(self):
+        self.reader.read.return_value = [dict(name=None, score=1615), dict(name=None, score=1632)]
+        self.settled()
+        first = self.service.status()['records'][0]
+        image = Path(first['screenshot_path']).read_bytes()
+        self.assertTrue(first['screenshot_confirmed'])
+        self.assertEqual(first['revision'], 1)
+        self.reader.read.return_value[0]['name'] = 'XETA'
+        for i in range(18, 25): self.feed(i*.2)
+        second = self.service.status()['records'][0]
+        self.assertEqual([p['name'] for p in second['players']], ['XETA', None])
+        self.reader.read.return_value[1]['name'] = 'DANOOCT1'
+        for i in range(25, 32): self.feed(i*.2)
+        final = self.service.status()['records'][0]
+        self.assertEqual(final['revision'], 3)
+        self.assertFalse(final['partial'])
+        self.assertEqual(final['timestamp'], first['timestamp'])
+        self.assertEqual(final['outcome'], first['outcome'])
+        self.assertEqual(Path(final['screenshot_path']).read_bytes(), image)
+
+    def test_name_enrichment_requires_matching_frozen_scores(self):
+        self.reader.read.return_value = [dict(name=None, score=100), dict(name=None, score=200)]
+        self.settled()
+        self.reader.read.return_value = [dict(name='WRONG', score=101), dict(name='WRONG', score=200)]
+        for i in range(18, 27): self.feed(i*.2)
+        self.assertEqual([p['name'] for p in self.service.status()['records'][0]['players']], [None, None])
+
+    def test_confirmed_names_survive_transient_local_write_failure(self):
+        self.reader.read.return_value = [dict(name=None, score=1615), dict(name=None, score=1632)]
+        self.settled()
+        original = self.service.outbox.enrich_names
+        calls = []
+        def failing_once(*args):
+            calls.append(args)
+            if len(calls) == 1:
+                raise OSError('temporary disk failure')
+            return original(*args)
+        with patch.object(self.service.outbox, 'enrich_names', side_effect=failing_once):
+            self.reader.read.return_value[0]['name'] = 'XETA'
+            for i in range(18, 25): self.feed(i*.2)
+        self.assertGreaterEqual(len(calls), 2)
+        result = self.service.status()['records'][0]
+        self.assertEqual(result['players'][0]['name'], 'XETA')
+        self.assertEqual(result['revision'], 2)
+        self.assertIsNone(self.service.error)
+
+    def test_settings_change_seals_saved_episode_enrichment(self):
+        self.reader.read.return_value = [dict(name=None, score=1615), dict(name=None, score=1632)]
+        self.settled()
+        count = self.reader.read.call_count
+        self.service.configure(include_player_names=False)
+        for i in range(18, 25): self.feed(i*.2)
+        self.assertEqual(self.reader.read.call_count, count)
+        self.assertEqual(len(self.service.status()['records']), 1)
+
+    def test_results_name_toggle_preserves_score_evidence_and_deadline(self):
+        self.feed(0)
+        for t in (2, 2.2, 2.4): self.feed(t)
+        episode = self.service.active
+        evidence = episode.evidence[0][1]
+        self.service.configure(parse_names=False)
+        self.assertIs(self.service.active, episode)
+        self.assertIs(episode.evidence[0][1], evidence)
+        self.assertEqual(episode.start, 0)
+        for t in (2.6, 2.8, 3): self.feed(t)
+        saved = self.service.status()['records'][0]
+        self.assertEqual(saved['timestamp'], 3)
+        self.assertEqual([p['name'] for p in saved['players']], [None, None])
+
+    def test_disabling_names_seals_posted_result_without_removing_names(self):
+        self.reader.read.return_value[1]['name'] = None
+        self.settled()
+        before = self.service.status()['records'][0]
+        self.service.configure(parse_names=False)
+        self.service.configure(parse_names=True)
+        self.reader.read.return_value[1]['name'] = 'LATE'
+        for i in range(18, 28): self.feed(i*.2)
+        after = self.service.status()['records'][0]
+        self.assertEqual(before['players'], after['players'])
+        self.assertEqual(after['revision'], 1)
+
+    def test_ocr_failure_selects_settled_low_motion_frame_and_keeps_alternative(self):
+        self.reader.read.side_effect = RuntimeError('offline model failure')
+        for t, value in ((0, 0), (2, 100), (2.2, 100), (2.4, 100), (2.6, 240)):
+            self.service.submit(np.full_like(self.frame, value), t, 'song_result', 'song_result')
+            self.service.flush()
+        self.service.finish(); self.service.flush()
+        saved = self.service.status()['records'][0]
+        self.assertEqual(saved['timestamp'], 2.4)
+        self.assertFalse(saved['screenshot_confirmed'])
+        self.assertEqual([p['score'] for p in saved['players']], [None, None])
+        self.assertEqual([p['timestamp'] for p in saved['alternatives']], [2.6])
+        self.assertTrue((cv2.imread(saved['screenshot_path']) == 100).all())
+
+    def test_live_deadline_saves_newer_frame_while_ocr_is_blocked(self):
+        entered, release = threading.Event(), threading.Event()
+        def blocked(*args):
+            entered.set(); release.wait(4)
+            return self.reader.read.return_value
+        self.reader.read.side_effect = blocked
+        self.service.reset('live', False, 'ex')
+        try:
+            self.feed(0); self.feed(2, flush=False)
+            self.assertTrue(entered.wait(1))
+            self.feed(3, flush=False)
+            self.service.tick(10)
+            wait_for(lambda: bool(self.service.status()['records']))
+            saved = self.service.status()['records'][0]
+            self.assertEqual(saved['timestamp'], 3)
+            self.assertTrue(saved['partial'])
+            self.assertEqual([p['score'] for p in saved['players']], [None, None])
+        finally:
+            release.set(); self.service.flush()
+        self.assertEqual(self.service.status()['records'][0]['revision'], 1)
+
+    def test_old_episode_cannot_enrich_next_song(self):
+        self.reader.read.return_value = [dict(name=None, score=1615), dict(name=None, score=1632)]
+        self.settled()
+        entered, release = threading.Event(), threading.Event()
+        def blocked(*args):
+            entered.set(); release.wait(4)
+            return [dict(name='OLD', score=1615), dict(name='OLD', score=1632)]
+        self.reader.read.side_effect = blocked
+        try:
+            self.feed(3.6, flush=False); self.assertTrue(entered.wait(1))
+            self.service.finish(); self.service.reset('new', False, 'ex')
+        finally:
+            release.set(); self.service.flush()
+        self.assertEqual(self.service.status()['records'][0]['revision'], 1)
+
+    def test_capture_gap_and_unknown_break_motion_comparisons(self):
+        self.feed(0); self.feed(.2); self.feed(2)
+        self.assertIsNone(self.service.active.motion)
+        self.feed(2.2); self.feed(2.4, raw='unknown'); self.feed(2.6)
+        self.assertIsNone(self.service.active.motion)
+
+    def test_export_failure_still_delivers(self):
+        sender = Mock(return_value=dict(message_id='123'))
+        self.service.outbox.sender = sender
+        blocked = Path(self.temp.name) / 'file'
+        blocked.touch()
+        self.service.configure(discord=True, webhook='mock', output_directory=str(blocked))
+        self.settled()
+        wait_for(lambda: self.service.status()['records'][0]['delivery']['state'] == 'sent')
+        self.assertTrue(self.service.status()['records'][0]['export_error'])
+        sender.assert_called_once()
+
 
 class DeliveryTests(unittest.TestCase):
     def setUp(self):
@@ -429,6 +578,145 @@ class DeliveryTests(unittest.TestCase):
         box=Outbox(self.temp.name,'https://discord.com/api/webhooks/1/secret',enabled,
                    sender=sender or Mock(return_value=dict(message_id='123',message_url='https://discord.com/channels/@me/1/123')))
         self.boxes.append(box);return box
+
+    def unnamed(self):
+        result = record()
+        for p in result['players']: p['name'] = None
+        result['partial'] = True
+        return result
+
+    def test_names_during_send_are_persisted_and_edit_same_message(self):
+        entered, release = threading.Event(), threading.Event()
+        sent = []
+        def sender(webhook, result, path):
+            sent.append(json.loads(json.dumps(result)))
+            entered.set(); release.wait(4)
+            return dict(message_id='123')
+        box = self.box(sender)
+        box.editor = Mock()
+        try:
+            box.save(self.unnamed(), self.frame)
+            self.assertTrue(entered.wait(1))
+            box.enrich_names('abc123', ['XETA', None])
+            box.enrich_names('abc123', ['XETA', 'DANOOCT1'])
+            release.set()
+            wait_for(lambda: box.snapshot()['records'][0]['delivery']['delivered_revision'] == 3)
+            saved = box.snapshot()['records'][0]
+            self.assertEqual(len(sent), 1)
+            self.assertIsNone(sent[0]['players'][0]['name'])
+            box.editor.assert_called_once()
+            self.assertEqual(saved['delivery']['message_id'], '123')
+            self.assertEqual(saved['players'][1]['name'], 'DANOOCT1')
+            persisted = json.loads((Path(self.temp.name)/'abc123/result.json').read_text())
+            self.assertEqual(persisted['revision'], 3)
+        finally: release.set()
+
+    def test_unsent_names_coalesce_into_initial_post(self):
+        box = self.box(enabled=False)
+        box.editor = Mock()
+        box.save(self.unnamed(), self.frame)
+        box.enrich_names('abc123', ['XETA', 'DANOOCT1'])
+        box.configure(box.webhook, True)
+        wait_for(lambda: box.snapshot()['records'][0]['delivery']['state'] == 'sent')
+        self.assertEqual(box.sender.call_args.args[1]['players'][0]['name'], 'XETA')
+        self.assertEqual(box.snapshot()['records'][0]['name_update']['state'], 'idle')
+        box.editor.assert_not_called()
+
+    def test_name_edit_failure_preserves_sent_result_and_manual_retry(self):
+        box = self.box()
+        box.editor = Mock(side_effect=DeliveryError('HTTP 404'))
+        box.save(self.unnamed(), self.frame)
+        wait_for(lambda: box.snapshot()['records'][0]['delivery']['state'] == 'sent')
+        box.enrich_names('abc123', ['XETA', None])
+        wait_for(lambda: box.snapshot()['needs_attention'] == 1)
+        self.assertEqual(box.snapshot()['records'][0]['delivery']['state'], 'sent')
+        box.editor.side_effect = None
+        box.command('retry_names', 'abc123')
+        wait_for(lambda: box.snapshot()['records'][0]['name_update']['state'] == 'idle')
+        box.sender.assert_called_once()
+
+    def test_edit_rate_limit_budget_and_changed_webhook(self):
+        box = self.box()
+        box.editor = Mock(side_effect=DeliveryError('rate limit', True, 0))
+        box.save(self.unnamed(), self.frame)
+        wait_for(lambda: box.snapshot()['records'][0]['delivery']['state'] == 'sent')
+        box.enrich_names('abc123', ['XETA', None])
+        wait_for(lambda: box.snapshot()['needs_attention'] == 1)
+        self.assertEqual(box.editor.call_count, 5)
+        box.configure('https://discord.com/api/webhooks/2/different', True)
+        box.command('retry_names', 'abc123')
+        wait_for(lambda: 'original' in (box.snapshot()['records'][0]['name_update']['error'] or ''))
+        self.assertEqual(box.editor.call_count, 5)
+        box.sender.assert_called_once()
+
+    def test_pending_edit_recovers_on_restart_without_another_post(self):
+        box = self.box()
+        box.save(self.unnamed(), self.frame)
+        wait_for(lambda: box.snapshot()['records'][0]['delivery']['state'] == 'sent')
+        box.configure(box.webhook, False)
+        box.enrich_names('abc123', ['XETA', None])
+        box.close()
+        editor = Mock()
+        reopened = Outbox(self.temp.name, box.webhook, True, sender=box.sender, editor=editor)
+        self.boxes.append(reopened)
+        wait_for(lambda: reopened.snapshot()['records'][0]['delivery']['delivered_revision'] == 2)
+        editor.assert_called_once(); box.sender.assert_called_once()
+
+    def test_new_name_during_edit_is_not_overwritten_by_old_acknowledgement(self):
+        box = self.box()
+        entered, release = threading.Event(), threading.Event()
+        def edit(*args): entered.set(); release.wait(4)
+        box.editor = Mock(side_effect=edit)
+        try:
+            box.save(self.unnamed(), self.frame)
+            wait_for(lambda: box.snapshot()['records'][0]['delivery']['state'] == 'sent')
+            box.enrich_names('abc123', ['XETA', None])
+            self.assertTrue(entered.wait(1))
+            box.enrich_names('abc123', ['XETA', 'DANOOCT1'])
+            release.set()
+            wait_for(lambda: box.snapshot()['records'][0]['delivery']['delivered_revision'] == 3)
+            self.assertEqual(box.editor.call_count, 2)
+            self.assertEqual(box.snapshot()['records'][0]['players'][1]['name'], 'DANOOCT1')
+            box.sender.assert_called_once()
+        finally: release.set()
+
+    def test_old_failures_remain_visible_beyond_recent_twenty(self):
+        box = self.box(enabled=False)
+        for i in range(23):
+            r = record(); r['event_id'] = f'event-{i}'; r['created_at'] = i
+            box.save(r, self.frame)
+        with box.lock: box.records['event-0']['delivery']['state'] = 'failed'
+        snapshot = box.snapshot()
+        self.assertEqual(snapshot['needs_attention'], 1)
+        self.assertEqual(len(snapshot['records']), 21)
+        self.assertEqual(snapshot['records'][0]['event_id'], 'event-0')
+
+    def test_edit_http_preserves_attachment_mentions_and_classifies_failures(self):
+        import requests
+        r = self.unnamed()
+        hook = 'https://discord.com/api/webhooks/1/secret'
+        r['delivery'] = dict(message_id='123', webhook_identity=webhook_identity(hook),
+                            image_url='https://cdn.discordapp.com/attachments/456/789/results.png?expired=signature')
+        response = Mock(status_code=200)
+        response.__enter__ = Mock(return_value=response); response.__exit__ = Mock(return_value=False)
+        response.json.return_value = dict(id='123', channel_id='456', embeds=[dict(image={
+            'url':'https://cdn.discordapp.com/attachments/456/789/results.png'})])
+        with patch('ddrcv.results.delivery.requests.patch', return_value=response) as edit, patch('ddrcv.results.delivery.requests.post') as post:
+            self.assertEqual(edit_record(hook, r)['message_id'], '123')
+            self.assertTrue(edit.call_args.args[0].endswith('/messages/123'))
+            body = edit.call_args.kwargs['json']
+            self.assertNotIn('attachments', body); self.assertNotIn('files', body)
+            self.assertEqual(body['allowed_mentions'], {'parse':[]})
+            self.assertEqual(body['embeds'][0]['image']['url'], 'https://cdn.discordapp.com/attachments/456/789/results.png')
+            post.assert_not_called()
+            for code, retryable in ((429, True), (503, True), (401, False), (404, False)):
+                response.status_code = code
+                response.json.return_value = {'retry_after':0}
+                with self.assertRaises(DeliveryError) as caught: edit_record(hook, r)
+                self.assertEqual(caught.exception.retryable, retryable)
+        with patch('ddrcv.results.delivery.requests.patch', side_effect=requests.Timeout()):
+            with self.assertRaises(DeliveryError) as caught: edit_record(hook, r)
+            self.assertTrue(caught.exception.retryable)
 
     def test_success_durable_and_not_sent_on_restart(self):
         sender=Mock(return_value=dict(message_id='123',message_url='https://discord.com/channels/@me/1/123'))

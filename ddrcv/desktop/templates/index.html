@@ -38,13 +38,13 @@
       </table>
       <div class="session-state"><span class="quiet">Confirmed state</span><strong id="state">Unknown</strong><span id="raw-state" class="quiet">Waiting for capture</span></div>
     </div>
-    <p id="name-status" class="quiet" role="status">Name recognition stopped</p>
+    <div class="status-notes"><p id="name-status" class="quiet" role="status">Name recognition stopped</p><p id="results-summary" class="quiet" role="status">Results: not started</p></div>
     <div class="session-bottom">
       <div class="health"><span id="capture">Capture stopped</span><span id="publisher">Publisher stopped</span><span id="throughput">0 frames processed</span></div>
       <div class="snapshot-bar"><button id="snapshot">View stream</button><span class="quiet">Snapshot on request</span><span id="snapshot-time"></span></div>
     </div>
     <figure id="preview" hidden><img id="frame" alt="Requested capture frame"><figcaption id="frame-caption"></figcaption><button id="hide-preview">Close snapshot</button></figure>
-    <details><summary>Read details &amp; recent errors</summary><pre id="read-details"></pre><pre id="logs" aria-label="Recent logs"></pre></details>
+    <details><summary>Read details &amp; recent errors</summary><pre id="read-details"></pre><pre id="logs" aria-label="Recent logs"></pre><div class="toolbar"><button id="reset-p1">Reset P1 tracking</button><button id="reset-p2">Reset P2 tracking</button></div><p class="quiet">Clears this player's live score until the next accepted read. Saved results are unchanged.</p></details>
   </section>
   <section aria-labelledby="config-heading">
     <div class="section-title"><h2 id="config-heading">Configuration</h2></div>
@@ -60,7 +60,7 @@
       </div>
       <label class="source-file wide">Local media<div class="inline"><input id="media-path" type="text"><button id="browse-media">Browse…</button></div></label>
       <label class="source-file check wide"><input id="resize" type="checkbox"> Resize full 16:9 file to 720p</label>
-      <label class="check wide"><input data-path="player_names.enabled" type="checkbox"> Parse player names on login and song splash</label>
+      <label class="check wide"><input data-path="player_names.enabled" type="checkbox"> Read names on login/song splash <span class="quiet">Applies immediately</span></label>
       <label>Publisher address<input data-path="publish.websocket.host" type="text"></label>
       <label>Publisher port<input data-path="publish.websocket.port" type="number" min="1" max="65535"></label>
     </div>
@@ -107,12 +107,14 @@
     <label class="check"><input data-path="results.enabled" type="checkbox"> Capture results</label>
     <label>Screenshot folder<div class="inline"><input data-path="results.output_directory" type="text"><button id="browse-results">Browse…</button></div></label>
     <label class="check"><input data-path="results.include_player_names" type="checkbox"> Include parsed player names in filenames</label>
-    <label class="check"><input data-path="results.parse_names" type="checkbox"> Parse player names</label>
+    <label class="check"><input data-path="results.parse_names" type="checkbox"> Read names on results</label>
+    <p class="quiet">Applies immediately. Scores post as soon as confirmed; names that confirm later update the same Discord message.</p>
     <p class="quiet">Screenshots use UTC timestamps and a unique suffix. Names are included only when successfully parsed.</p>
     <p class="quiet">Turn off name parsing if names are being read incorrectly. Results will use P1 and P2 labels and continue reading scores.</p>
     <div class="source-actions"><button id="apply-results" class="primary">Apply results settings</button><span id="results-feedback" role="status" class="quiet"></span></div>
     <p class="quiet">Applies these controls without restarting capture or resetting scores. A result still being read starts confirmation again; saved results stay unchanged.</p>
     <p id="results-detail" class="quiet">Start capture to process results.</p>
+    <details id="results-history"><summary>Recent results &amp; recovery</summary><p id="history-status" class="quiet"></p><div id="results-list"></div></details>
   </section>
 </div>
 </main>

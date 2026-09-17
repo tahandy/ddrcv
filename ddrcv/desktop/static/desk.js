@@ -14,6 +14,106 @@ let token = '',
   previewUrl = null,
   switchingSource = false,
   sourceRevision = null;
+let historyVersion = '', historyBusy = false, historyEpoch = 0, historyUrls = [];
+
+function clearHistory() {
+  historyEpoch++;
+  historyVersion = '';
+  historyUrls.forEach(url => URL.revokeObjectURL(url));
+  historyUrls = [];
+  $('results-list').replaceChildren();
+}
+function historyVisible() {
+  return nativeVisible && $('results-history').open && !$('panel-results').hidden;
+}
+async function historyImage(eventId, candidate, parent, epoch) {
+  const response = await fetch(`/api/results/${encodeURIComponent(eventId)}/${encodeURIComponent(candidate)}`, {
+    headers: {'X-Desk-Token': token}
+  });
+  if (!response.ok) throw Error('Saved screenshot could not be loaded');
+  const blob = await response.blob();
+  if (epoch !== historyEpoch || !historyVisible()) return;
+  const url = URL.createObjectURL(blob);
+  historyUrls.push(url);
+  const image = document.createElement('img');
+  image.src = url;
+  image.alt = candidate === 'screenshot' ? 'Saved results screenshot' : 'Alternative results screenshot';
+  parent.append(image);
+}
+async function refreshHistory() {
+  if (!historyVisible() || historyBusy) return;
+  historyBusy = true;
+  try {
+    const data = await api('results');
+    if (!historyVisible()) return;
+    const records = [...data.records].reverse();
+    const allowed = data.delivery_available && data.discord && data.webhook_configured;
+    const version = JSON.stringify([allowed, records.map(r => [r.event_id, r.revision, r.players, r.delivery,
+      r.name_update, r.alternatives, r.export_error])]);
+    $('history-status').textContent = !data.delivery_available ? 'Start capture with results enabled to send or retry.' :
+      !allowed ? 'Enable Discord publishing to send or retry saved results.' :
+      `${records.length} recent or unresolved result(s)`;
+    if (version === historyVersion) return;
+    clearHistory();
+    historyVersion = version;
+    const epoch = historyEpoch;
+    for (const r of records) {
+      const card = document.createElement('article'); card.className = 'result-card';
+      const heading = document.createElement('p');
+      heading.textContent = `${new Date(r.created_at * 1000).toLocaleString()} · ${r.score_mode.toUpperCase()} · ` +
+        r.players.map((p, i) => p.present ? `${p.name || 'P'+(i+1)}: ${p.score ?? 'unconfirmed'}` : `P${i+1}: absent`).join(' / ');
+      const detail = document.createElement('p'); detail.className = 'quiet';
+      const update = r.name_update || {};
+      detail.textContent = `Delivery: ${title(r.delivery.state)}${r.delivery.error ? ' · '+r.delivery.error : ''}` +
+        (update.state && update.state !== 'idle' ? ` · Name update: ${title(update.state)}${update.error ? ' · '+update.error : ''}` : '') +
+        (r.players.some(p => p.present && !p.name) && r.parse_names !== false ? ' · Names incomplete' : '') +
+        (!r.screenshot_confirmed ? ' · Scores/screenshot unconfirmed' : '') +
+        (r.export_error ? ' · Screenshot export warning: '+r.export_error : '');
+      card.append(heading, detail);
+      const picture = document.createElement('div'); card.append(picture);
+      historyImage(r.event_id, 'screenshot', picture, epoch).catch(e => { if (epoch === historyEpoch) detail.textContent += ' · '+e.message; });
+      const buttons = document.createElement('div'); buttons.className = 'toolbar wrap';
+      function command(label, action) {
+        const button = document.createElement('button'); button.textContent = label; button.disabled = !allowed;
+        button.onclick = async () => {
+          if (action === 'republish' && !confirm('Create another Discord post for this result?')) return;
+          button.disabled = true;
+          try {
+            await api('action', 'POST', {action:'results_command', command:action, event_id:r.event_id, confirmed:action === 'republish'});
+            historyVersion = ''; await refreshHistory();
+          } catch (e) { error(e.message); button.disabled = !allowed; }
+        };
+        buttons.append(button);
+      }
+      if (r.delivery.state === 'saved') command('Send saved result', 'retry');
+      if (r.delivery.state === 'failed') command('Retry delivery', 'retry');
+      if (update.state === 'failed' && r.delivery.state === 'sent') command('Retry name update', 'retry_names');
+      if (r.delivery.message_url) {
+        const link = document.createElement('a'); link.textContent = 'Open Discord message';
+        link.href = r.delivery.message_url; link.target = '_blank'; link.rel = 'noopener'; buttons.append(link);
+      }
+      card.append(buttons);
+      if (r.delivery.state === 'sent' || (r.alternatives || []).length) {
+        const more = document.createElement('details'), summary = document.createElement('summary');
+        summary.textContent = 'More recovery options'; more.append(summary);
+        if (r.delivery.state === 'sent') {
+          const group = document.createElement('div'); group.className = 'toolbar';
+          const before = buttons.childNodes.length; command('Republish', 'republish');
+          group.append(buttons.childNodes[before]); more.append(group);
+        }
+        let loaded = false;
+        more.ontoggle = () => {
+          if (!more.open || loaded || !historyVisible()) return;
+          loaded = true;
+          for (const alternative of r.alternatives || [])
+            historyImage(r.event_id, alternative.id, more, epoch).catch(e => error(e.message));
+        };
+        card.append(more);
+      }
+      $('results-list').append(card);
+    }
+  } finally { historyBusy = false; }
+}
 
 function error(message) {
   $('error').textContent = message || '';
@@ -114,6 +214,8 @@ function selectTab(tab) {
     item.tabIndex = selected ? 0 : -1;
     $(item.getAttribute('aria-controls')).hidden = !selected;
   }
+  if (!historyVisible()) clearHistory();
+  else refreshHistory().catch(e => error(e.message));
 }
 for (const tab of tabs) {
   tab.addEventListener('click', () => selectTab(tab));
@@ -236,6 +338,8 @@ async function pollOnce() {
   $('renderer-status').textContent = status.renderer.running ? 'Running' : 'Stopped';
   $('renderer-detail').textContent = status.renderer.error || 'Capture its window in OBS after checking the output.';
   const results = status.results;
+  $('results-summary').textContent = results ? `Results: ${results.last_sent_at ? 'last sent '+new Date(results.last_sent_at * 1000).toLocaleTimeString() : 'no delivery yet'} · ${results.needs_attention || 0} need attention` : 'Results: not started';
+  for (const id of ['reset-p1', 'reset-p2']) $(id).disabled = status.phase !== 'Running';
   $('discord-status').textContent = results?.discord ? 'Publishing enabled' : 'Disabled';
   $('results-detail').textContent = results?.error || (results ? `Results: ${title(results.phase)}${results.latest ? ' · Latest delivery: ' + title(results.latest.delivery?.state) : ''}` : 'Start capture with results enabled to process results.');
   $('apply-results').disabled = status.phase === 'Starting';
@@ -246,6 +350,7 @@ async function pollOnce() {
     player_name_status: status.player_name_status
   }, null, 2);
   if (status.error) error(status.error);
+  await refreshHistory();
 }
 async function poll() {
   clearTimeout(pollTimer);
@@ -292,7 +397,19 @@ function handle(id, fn) {
     }
   });
 }
-for (const el of document.querySelectorAll('[data-path]')) el.addEventListener('input', () => {
+for (const el of document.querySelectorAll('[data-path]')) el.addEventListener('input', async () => {
+  if (['player_names.enabled', 'results.parse_names'].includes(el.dataset.path)) {
+    const previous = get(el.dataset.path);
+    const enabled = el.checked;
+    el.disabled = true;
+    try {
+      await flush();
+      await api('action', 'POST', {action:'set_names', scope:el.dataset.path.split('.')[0], enabled});
+      set(el.dataset.path, enabled); updateAdvanced(); await pollOnce();
+    } catch (e) { el.checked = !!previous; error(e.message); }
+    finally { el.disabled = false; }
+    return;
+  }
   set(el.dataset.path, el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value);
   if (el.dataset.path === 'results.discord' && el.checked) {
     set('results.enabled', true);
@@ -361,6 +478,11 @@ handle('use-json', async () => {
   await loadConfig();
 });
 handle('start', () => act('start'));
+for (const player of [1, 2]) handle(`reset-p${player}`, () => api('action', 'POST', {action:'reset_score', player}));
+$('results-history').addEventListener('toggle', () => {
+  if (historyVisible()) refreshHistory().catch(e => error(e.message));
+  else clearHistory();
+});
 handle('stop', () => api('action', 'POST', {
   action: 'stop'
 }));

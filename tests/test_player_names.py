@@ -193,6 +193,43 @@ class NamesTests(unittest.TestCase):
         finally:
             service.close()
 
+    def test_live_toggle_reuses_worker_and_rejects_old_read(self):
+        self.read(0); self.read(.2)
+        worker = self.service.worker
+        entered, release = threading.Event(), threading.Event()
+        def blocked(crops):
+            entered.set(); release.wait(3)
+            return {0:'OLD', 1:'OLD'}
+        self.reader.read.side_effect = blocked
+        try:
+            self.submit(.4); self.assertTrue(entered.wait(1))
+            before = time.perf_counter()
+            self.service.configure_enabled(False)
+            self.service.configure_enabled(True)
+            self.assertLess(time.perf_counter() - before, .1)
+            self.assertIs(self.service.worker, worker)
+            release.set(); wait_for(lambda: not self.service.busy)
+            self.assertEqual(self.service.snapshot(), dict(p1=None, p2=None))
+            self.reader.read.side_effect = None
+            for t in (1, 1.2, 1.4): self.read(t)
+            self.assertEqual(self.service.snapshot()['p1'], 'ZERO.')
+            self.reader.warmup.assert_called_once()
+        finally: release.set()
+
+    def test_live_toggle_can_retry_failed_initialization(self):
+        reader = Mock(); reader.warmup.side_effect = RuntimeError('offline')
+        service = PlayerNameService(dict(enabled=True), reader=reader)
+        try:
+            wait_for(lambda: service.error is not None)
+            worker = service.worker
+            service.configure_enabled(False)
+            reader.warmup.side_effect = None
+            service.configure_enabled(True)
+            wait_for(lambda: service.ready)
+            self.assertIsNone(service.error)
+            self.assertIs(service.worker, worker)
+        finally: service.close()
+
     def login_read(self, t, **kwargs):
         before = self.reader.read_login.call_count
         self.submit(t, raw='login', state='login', **kwargs)

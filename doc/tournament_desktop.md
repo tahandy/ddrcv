@@ -126,11 +126,11 @@ Choose a **Screenshot folder** (or Browse) for readable PNG copies; the default 
 confirmed P1/P2 names, and a unique event suffix. **Include parsed player names in
 filenames** controls naming independently of name recognition. Unread or disabled
 names are omitted, and characters invalid in Windows filenames are sanitized.
-Turn off **Parse player names** if name recognition becomes unreliable; new results
+Turn off **Read names on results** if name recognition becomes unreliable; new results
 use P1/P2 labels while score confirmation and EX winner calculation continue.
-Name parsing defaults to enabled for existing profiles.
+This switch applies immediately. Name parsing defaults to enabled for existing profiles.
 
-Click **Apply results settings** to apply these controls during a run without
+Click **Apply results settings** to apply the other controls during a run without
 restarting capture, clearing gameplay scores, or reconnecting OBS/the renderer.
 Only the controls on the Results tab apply; other draft
 edits remain pending. A result still being read restarts confirmation, while saved
@@ -143,7 +143,8 @@ credentials.
 Changing the screenshot folder applies to newly captured results without moving
 earlier screenshots or interrupting pending Discord deliveries. Durable delivery
 records and their original screenshots remain in `results.outbox_directory`.
-An export failure is reported as a results error, not a successful save.
+An export failure appears as a separate warning. The internal screenshot remains
+saved and eligible for Discord delivery.
 
 To change cameras during a run, select the camera index (or an RTSP source) and
 click **Switch camera**. The app checks the new source for a valid 1280×720 frame
@@ -181,6 +182,30 @@ that remains blocked during cleanup prevents further handoffs until it exits.
   or scene automation.
 - Port conflicts identify the occupied publisher address. Choose another port or
   stop the other driver yourself. The app never takes over another process.
+
+## Quiet recovery controls
+
+The two name switches apply immediately: **Read names on login/song splash** and
+**Read names on results**. They preserve capture, score tracking, and unrelated
+configuration edits. Disabling login/splash names clears the live names; re-enabling
+starts fresh confirmation. Disabling results names stops further name enrichment
+for an already-posted episode without changing saved results.
+
+Results post when scores confirm. Later confirmed names update the same Discord
+message. A compact status line shows the last successful initial delivery and the
+number of unresolved delivery/name-edit failures. Expand **Recent results & recovery**
+in the Results tab to inspect screenshots and alternatives, send saved results, retry
+failed deliveries or name updates, and open the Discord message. **Republish** is a
+secondary action that confirms creating another post. No automatic popups are added.
+Start capture with results enabled and enable Discord publishing before sending or
+retrying. A screenshot-folder export warning does not block the internally saved
+screenshot from reaching Discord.
+
+**Reset P1 tracking** and **Reset P2 tracking** live inside **Read details & recent
+errors**. A reset clears only that player's live score until the next accepted read;
+it does not edit saved results or reset the other player. Gameplay recognition and
+full-combo handling otherwise remain unchanged.
+
 
 ## Validation
 

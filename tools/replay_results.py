@@ -76,6 +76,8 @@ def main():
     with patch.object(driver,'create_frame_fetcher',return_value=source),patch.object(driver,'create_publisher',return_value=publisher),patch.object(driver,'ResultsService',side_effect=make_service):
         driver.main(settings,logging.getLogger('replay-cli'))
     cli=assert_record(services[0].status()['records'])
+    gameplay_scores = [message['score'] for message in publisher.messages
+                       if message.get('state') == 'song_playing' and message.get('score')]
     cli_elapsed=time.perf_counter()-began
     assert len(publisher.messages)>=int((args.end-args.start)*source.fps)
     wb_dir=output/'workbench';wb_dir.mkdir(exist_ok=True)
@@ -114,7 +116,8 @@ def main():
     finally:wb.close()
     summary=dict(video=str(Path(args.video).resolve()),window=[args.start,args.end],
                  cli=dict(event_id=cli['event_id'],timestamp=cli['timestamp'],elapsed=cli_elapsed,
-                          messages=len(publisher.messages),screenshot=cli['screenshot_path']),
+                          messages=len(publisher.messages),screenshot=cli['screenshot_path'],
+                          last_gameplay_scores=gameplay_scores[-1] if gameplay_scores else None),
                  workbench=dict(event_id=workbench['event_id'],timestamp=workbench['timestamp'],
                      screenshot=workbench['screenshot_path'],deduplicated=status['results']['deduplicated']),
                  players=cli['players'],outcome=cli['outcome'])

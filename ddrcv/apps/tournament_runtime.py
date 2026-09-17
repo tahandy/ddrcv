@@ -40,6 +40,7 @@ class TournamentRuntime:
         self.results = None
         self.results_error = None
         self.results_update = None
+        self.control_update = None
         self.feed_lock = threading.RLock()
         self.feed_active = False
         self.feed_integrations = False
@@ -78,12 +79,15 @@ class TournamentRuntime:
                     self.player_names.changed.clear()
                     self._publish()
                 self._poll_results_update()
+                self._poll_control_update()
                 changed, frame = self._poll_source_switch()
                 if changed:
                     previous_state = 'unknown'
                 else:
                     frame = self.fetcher.get_frame()
                 if frame is None:
+                    if self.results is not None and not isinstance(self.fetcher, FileSource):
+                        self.results.tick(self.clock.monotonic())
                     if isinstance(self.fetcher, FileSource) and self.fetcher.ended:
                         self.phase = 'Ended'
                         break
@@ -137,6 +141,10 @@ class TournamentRuntime:
             request, self.results_update = self.results_update, None
         if request:
             request['future'].set_exception(RuntimeError('Driver stopped before results settings were applied'))
+        with self.lock:
+            control, self.control_update = self.control_update, None
+        if control:
+            control['future'].set_exception(RuntimeError('Driver stopped before control was applied'))
         self._finish_source_switch(RuntimeError('Driver stopped before the camera switch completed'))
         for fetcher, _ in self.retired_captures:
             try:
@@ -265,6 +273,49 @@ class TournamentRuntime:
             self._publish(info, integrations=True)
         self._finish_source_switch()
         return True, frame
+
+    def control(self, action, value):
+        if action not in ('names', 'reset_score'):
+            raise ValueError('Unknown runtime control')
+        if action == 'names' and type(value) is not bool:
+            raise ValueError('Name setting must be boolean')
+        if action == 'reset_score' and (type(value) is not int or value not in (0, 1)):
+            raise ValueError('Select player 1 or 2')
+        with self.lock:
+            if self.phase != 'Running' or self.stop_requested.is_set():
+                raise ValueError('Start capture before using this control')
+            if self.control_update:
+                raise ValueError('A runtime control is already pending')
+            future = Future()
+            self.control_update = dict(action=action, value=value, future=future)
+        future.result()
+
+    def _poll_control_update(self):
+        with self.lock:
+            request, self.control_update = self.control_update, None
+        if request is None:
+            return
+        try:
+            value = request['value']
+            if request['action'] == 'names':
+                self.player_names.configure_enabled(value)
+                self.config['player_names']['enabled'] = value
+            else:
+                session = self.engine.session
+                session.trackers[value].reset()
+                key = f'p{value+1}_score'
+                if session.info['score'] is not None:
+                    session.info['score'][key] = -1 if session.info['players'][value] else None
+                with self.lock:
+                    self.accepted_wall[value] = None
+                    if self.result:
+                        self.result['published'] = deepcopy(session.info)
+                        self.result['decisions'][key] = 'reset'
+            self._publish(self.engine.session.info)
+        except Exception as error:
+            request['future'].set_exception(error)
+        else:
+            request['future'].set_result(None)
 
     def configure_results(self, settings):
         """Apply operator controls on the recognition worker without resetting gameplay."""

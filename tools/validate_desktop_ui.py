@@ -99,6 +99,7 @@ def main(video, out):
             names = page.locator('[data-path="results.parse_names"]')
             expect(names).to_be_checked()
             names.uncheck()
+            expect(names).to_be_enabled()
             webhook = page.locator('[data-path="results.webhook"]')
             webhook.fill('https://discord.com/api/webhooks/1/desktop-ui-test')
             discord = page.locator('[data-path="results.discord"]')
@@ -112,6 +113,46 @@ def main(video, out):
             expect(page.locator('#phase')).to_have_text('Running')
             assert 'desktop-ui-test' not in page.locator('#config-json').input_value()
             page.screenshot(path=str(out / 'results.png'), full_page=True)
+            # Recovery remains hidden until requested. Use local fixtures; never send messages.
+            expect(page.locator('#results-history')).not_to_have_attribute('open', '')
+            assert not [r for r in requests if '/api/results/' in r]
+            recovery = dict(delivery_available=True, discord=True, webhook_configured=True,
+                records=[dict(event_id='recovery-test', revision=2, created_at=1, score_mode='ex',
+                    players=[dict(present=True,name='P1',score=100),dict(present=True,name=None,score=200)],
+                    parse_names=True, screenshot_confirmed=True, alternatives=[dict(id='alternative-1')],
+                    delivery=dict(state='sent',message_url='https://discord.com/channels/1/2/3'),
+                    name_update=dict(state='failed',error='Simulated update failure'))])
+            page.route('**/api/results', lambda route: route.fulfill(json=recovery))
+            page.route('**/api/results/recovery-test/*', lambda route: route.fulfill(
+                content_type='image/png', body=(ROOT/'state_images/results_updated.png').read_bytes()))
+            commands = []
+            def recovery_action(route):
+                args = route.request.post_data_json
+                if args.get('action') == 'results_command':
+                    commands.append(args)
+                    route.fulfill(json=recovery)
+                else: route.continue_()
+            page.route('**/api/action', recovery_action)
+            page.locator('#results-history > summary').click()
+            expect(page.locator('#results-list')).to_contain_text('Simulated update failure')
+            page.wait_for_function('document.querySelector("#results-list img")?.naturalWidth > 0')
+            assert not [r for r in requests if '/alternative-1' in r]
+            page.get_by_role('button', name='Retry name update', exact=True).click()
+            page.wait_for_timeout(300)
+            assert commands[-1]['command'] == 'retry_names'
+            page.locator('#results-list details > summary').click()
+            page.wait_for_function('document.querySelectorAll("#results-list img").length === 2')
+            page.once('dialog', lambda dialog: dialog.dismiss())
+            page.get_by_role('button', name='Republish', exact=True).click()
+            assert len(commands) == 1
+            page.screenshot(path=str(out/'results-recovery.png'), full_page=True)
+            page.locator('#results-history > summary').click()
+            before_images = len([r for r in requests if '/api/results/' in r])
+            page.wait_for_timeout(1100)
+            assert len([r for r in requests if '/api/results/' in r]) == before_images
+            page.unroute('**/api/results')
+            page.unroute('**/api/results/recovery-test/*')
+            page.unroute('**/api/action', recovery_action)
             page.reload()
             bridge()
             page.locator('#tab-results').click()
@@ -252,6 +293,8 @@ def main(video, out):
             write_json(out / 'report.json', dict(errors=errors, graphite_layout=True, minimum_width_no_overflow=True,
                         visual_status_fixtures=True, keyboard_focus_visible=True, integration_tabs=True, tab_keyboard_navigation=True,
                         tabs_preserved_draft=True, results_controls=True, results_apply_without_restart=True,
+                        collapsed_results_recovery=True, authenticated_thumbnails_on_demand=True,
+                        name_update_retry=True, republish_confirmation=True,
                         camera_action_failure_ui=True, snapshots_on_demand=True,
                         draft_survived_reopen=True, close_preserved_capture=True,
                         hidden_polling_stopped=True, secrets_masked=True, gui_save_cli_load=True, failed_save_close_recoverable=True))

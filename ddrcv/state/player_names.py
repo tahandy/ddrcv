@@ -98,6 +98,22 @@ class PlayerNameService:
             self.worker = threading.Thread(target=self._run, name='player-name-ocr', daemon=True)
             self.worker.start()
 
+    def configure_enabled(self, enabled):
+        if type(enabled) is not bool:
+            raise ValueError('player_names.enabled must be boolean')
+        with self.lock:
+            if self.closed:
+                raise ValueError('Name recognition is stopped')
+            if enabled == self.config['enabled']:
+                return
+            self.config['enabled'] = enabled
+            self.error = None
+            self.reset(self.generation)
+            if enabled and self.worker is None:
+                self.worker = threading.Thread(target=self._run, name='player-name-ocr', daemon=True)
+                self.worker.start()
+            self.lock.notify_all()
+
     def reset(self, generation=None):
         with self.lock:
             self.generation = generation
@@ -180,53 +196,49 @@ class PlayerNameService:
                         busy=self.busy, replaced_samples=self.replaced, screen=self.screen)
 
     def _run(self):
-        try:
-            self.reader.warmup()
+        while True:
             with self.lock:
+                self.lock.wait_for(lambda: self.closed or (self.config['enabled'] and not self.error
+                                   and (not self.ready or self.pending is not None)))
                 if self.closed:
                     return
-                self.ready = True
-                self.changed.set()
-            while True:
-                with self.lock:
-                    self.lock.wait_for(lambda: self.closed or self.pending is not None)
-                    if self.closed:
-                        return
+                warming = not self.ready
+                epoch = self.run
+                if not warming:
                     generation, run, timestamp, screen, crops = self.pending
                     self.pending = None
                     self.busy = True
-                try:
-                    readings = self.reader.read_login(crops) if screen == 'login' else self.reader.read(crops)
-                except Exception as error:
+            try:
+                if warming:
+                    self.reader.warmup()
                     with self.lock:
-                        self.busy = False
-                        if self.closed:
-                            return
-                        if generation != self.generation or run != self.run:
-                            continue
-                        self.error = str(error)
-                        self.pending = None
+                        self.ready = True
                         self.changed.set()
-                    return
+                    continue
+                readings = self.reader.read_login(crops) if screen == 'login' else self.reader.read(crops)
+            except Exception as error:
                 with self.lock:
                     self.busy = False
-                    if self.closed or generation != self.generation or run != self.run:
+                    if self.closed:
+                        return
+                    if epoch != self.run:
                         continue
-                    for i in crops:
-                        key = 'p' + str(i + 1)
-                        if self.names[key] is not None:
-                            continue
-                        if self.evidence[i].observe(readings.get(i), timestamp,
-                                self.config['min_frames'], self.config['confirmation_seconds'], self.config['max_gap']):
-                            self.names[key] = readings[i]
-                            self.changed.set()
-        except Exception as error:
-            with self.lock:
-                self.busy = False
-                if not self.closed:
                     self.error = str(error)
                     self.pending = None
                     self.changed.set()
+                continue
+            with self.lock:
+                self.busy = False
+                if self.closed or not self.config['enabled'] or generation != self.generation or run != self.run:
+                    continue
+                for i in crops:
+                    key = 'p' + str(i + 1)
+                    if self.names[key] is not None:
+                        continue
+                    if self.evidence[i].observe(readings.get(i), timestamp,
+                            self.config['min_frames'], self.config['confirmation_seconds'], self.config['max_gap']):
+                        self.names[key] = readings[i]
+                        self.changed.set()
 
     def close(self, timeout=1):
         with self.lock:
