@@ -68,6 +68,8 @@ def create_app(desk, token, open_panel=None, shutdown=None):
             return jsonify(desk.switch_source())
         if name == 'apply':
             return jsonify(desk.apply())
+        if name == 'apply_results':
+            return jsonify(desk.apply_results())
         if name == 'open':
             if open_panel:
                 open_panel()

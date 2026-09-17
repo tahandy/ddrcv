@@ -230,6 +230,10 @@ async function pollOnce() {
   }
   $('renderer-status').textContent = status.renderer.running ? 'Running' : 'Stopped';
   $('renderer-detail').textContent = status.renderer.error || 'Capture its window in OBS after checking the output.';
+  const results = status.results;
+  $('discord-status').textContent = results?.discord ? 'Publishing enabled' : 'Disabled';
+  $('results-detail').textContent = results?.error || (results ? `Results: ${title(results.phase)}${results.latest ? ' · Latest delivery: ' + title(results.latest.delivery?.state) : ''}` : 'Start capture with results enabled to process results.');
+  $('apply-results').disabled = status.phase === 'Starting';
   $('read-details').textContent = JSON.stringify({
     raw_scores: status.raw_scores,
     decisions: status.decisions
@@ -283,6 +287,14 @@ function handle(id, fn) {
 }
 for (const el of document.querySelectorAll('[data-path]')) el.addEventListener('input', () => {
   set(el.dataset.path, el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value);
+  if (el.dataset.path === 'results.discord' && el.checked) {
+    set('results.enabled', true);
+    document.querySelector('[data-path="results.enabled"]').checked = true;
+  } else if (el.dataset.path === 'results.enabled' && !el.checked) {
+    set('results.discord', false);
+    document.querySelector('[data-path="results.discord"]').checked = false;
+  }
+  if (el.dataset.path.startsWith('results.')) $('results-feedback').textContent = 'Results changes pending';
   scheduleSave();
 });
 $('source-kind').addEventListener('change', () => {
@@ -346,6 +358,12 @@ handle('stop', () => api('action', 'POST', {
   action: 'stop'
 }));
 handle('apply', () => act('apply'));
+handle('apply-results', async () => {
+  await flush();
+  await api('action', 'POST', {action: 'apply_results'});
+  await pollOnce();
+  $('results-feedback').textContent = 'Results settings applied';
+});
 handle('switch-source', async () => {
   if (switchingSource) return;
   switchingSource = true;
@@ -384,6 +402,15 @@ handle('browse-renderer', async () => {
   if (p) {
     set('renderer.path', p);
     document.querySelector('[data-path="renderer.path"]').value = p;
+    scheduleSave();
+  }
+});
+handle('browse-results', async () => {
+  const p = await window.pywebview.api.pick('directory');
+  if (p) {
+    set('results.output_directory', p);
+    document.querySelector('[data-path="results.output_directory"]').value = p;
+    $('results-feedback').textContent = 'Results changes pending';
     scheduleSave();
   }
 });

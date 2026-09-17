@@ -46,7 +46,10 @@ def default_config():
             "cache_dir": r'/home/tim/persistent/database/cache'
         },
         "results": {
-            "enabled": False,
+            "enabled": True,
+            "parse_names": True,
+            "output_directory": "screenshots",
+            "include_player_names": True,
             "outbox_directory": ".workbench/results",
             "settling_seconds": 2,
             "only_duo": False,
@@ -163,10 +166,12 @@ def validate_config(overrides):
     for key in ('confirm_seconds', 'unknown_seconds', 'max_frame_gap', 'min_fraction'):
         number(config['debounce'][key], 'debounce.' + key, 0)
     result = config['results']
-    for key in ('enabled', 'discord', 'only_duo'):
+    for key in ('enabled', 'discord', 'only_duo', 'parse_names', 'include_player_names'):
         boolean(result, key, False)
     if not isinstance(result.get('outbox_directory'), str) or not result['outbox_directory']:
         raise ValueError('Results require an outbox directory')
+    if not isinstance(result.get('output_directory'), str) or not result['output_directory'].strip():
+        raise ValueError('Results require a screenshot output directory')
     from ddrcv.results.service import ResultsService, DEFAULTS as RESULTS_DEFAULTS
     ResultsService._validate({**RESULTS_DEFAULTS, **result})
     boolean(config['driver_debug'], 'render_frame', False)

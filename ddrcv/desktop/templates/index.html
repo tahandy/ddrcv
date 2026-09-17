@@ -22,6 +22,7 @@
   <button id="tab-session" role="tab" aria-selected="true" aria-controls="panel-session">Status &amp; configuration</button>
   <button id="tab-obs" role="tab" aria-selected="false" aria-controls="panel-obs" tabindex="-1">OBS</button>
   <button id="tab-renderer" role="tab" aria-selected="false" aria-controls="panel-renderer" tabindex="-1">Renderer</button>
+  <button id="tab-results" role="tab" aria-selected="false" aria-controls="panel-results" tabindex="-1">Results</button>
 </nav>
 <main>
 <div id="panel-session" role="tabpanel" aria-labelledby="tab-session">
@@ -88,6 +89,28 @@
     <label>Renderer repository<div class="inline"><input data-path="renderer.path" type="text"><button id="browse-renderer">Browse…</button></div></label>
     <div class="toolbar"><button data-action="renderer_start">Launch renderer</button><button data-action="renderer_stop">Stop renderer</button></div>
     <p id="renderer-detail" class="quiet">Capture its window in OBS after checking the output.</p>
+  </section>
+</div>
+<div id="panel-results" role="tabpanel" aria-labelledby="tab-results" hidden>
+  <section class="integration-panel" aria-labelledby="discord-heading">
+    <div class="section-title"><h2 id="discord-heading">Discord <span id="discord-status" class="badge">Disabled</span></h2></div>
+    <div class="form-grid">
+      <label class="check wide"><input data-path="results.discord" type="checkbox"> Publish results to Discord</label>
+      <label class="wide">Webhook URL<input data-path="results.webhook" type="password" autocomplete="off" spellcheck="false" placeholder="https://discord.com/api/webhooks/…"></label>
+    </div>
+    <p class="quiet">Enabling publishing also enables results capture. Disabling publishing pauses queued deliveries; a post already being sent may finish.</p>
+  </section>
+  <section class="integration-panel" aria-labelledby="results-heading">
+    <div class="section-title"><h2 id="results-heading">Results capture</h2></div>
+    <label class="check"><input data-path="results.enabled" type="checkbox"> Capture results</label>
+    <label>Screenshot folder<div class="inline"><input data-path="results.output_directory" type="text"><button id="browse-results">Browse…</button></div></label>
+    <label class="check"><input data-path="results.include_player_names" type="checkbox"> Include parsed player names in filenames</label>
+    <label class="check"><input data-path="results.parse_names" type="checkbox"> Parse player names</label>
+    <p class="quiet">Screenshots use UTC timestamps and a unique suffix. Names are included only when successfully parsed.</p>
+    <p class="quiet">Turn off name parsing if names are being read incorrectly. Results will use P1 and P2 labels and continue reading scores.</p>
+    <div class="source-actions"><button id="apply-results" class="primary">Apply results settings</button><span id="results-feedback" role="status" class="quiet"></span></div>
+    <p class="quiet">Applies these controls without restarting capture or resetting scores. A result still being read starts confirmation again; saved results stay unchanged.</p>
+    <p id="results-detail" class="quiet">Start capture to process results.</p>
   </section>
 </div>
 </main>

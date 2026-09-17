@@ -22,6 +22,7 @@ class ResultsReader:
     def __init__(self, config=None, recognizer=None):
         config = config or {}
         self.confidence = float(config.get('confidence', .8))
+        self.parse_names = config.get('parse_names', True)
         self.ocr = recognizer or RapidOCRRecognizer(**config.get('ocr', {}))
 
     def warmup(self):
@@ -38,6 +39,8 @@ class ResultsReader:
                 continue
             boxes = (NAME_BOXES[i], (EX_BOXES if mode == 'ex' else MONEY_BOXES)[i])
             for field, (x, y, w, h) in zip(('name', 'score'), boxes):
+                if field == 'name' and not self.parse_names:
+                    continue
                 crops.append(prepare_ddr_crop(frame[y:y+h, x:x+w]))
                 keys.append((i, field))
         values = [dict(name=None, score=None), dict(name=None, score=None)]

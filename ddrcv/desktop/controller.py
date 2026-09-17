@@ -148,6 +148,7 @@ class Desk:
             for section, key in ((next(iter(config['ingest'].values())), 'path'),
                                  (config['state'], 'pkl_dir'), (config['score_extractor'], 'glyph_dir'),
                                  (config['results'], 'screenshot_directory'), (config['results'], 'outbox_directory'),
+                                 (config['results'], 'output_directory'),
                                  (config['renderer'], 'path')):
                 if section.get(key):
                     section[key] = str(Path(section[key]).expanduser().resolve())
@@ -233,6 +234,27 @@ class Desk:
         if runtime is None:
             raise ValueError('Start the driver before controlling integrations')
         return runtime.integrations.command(action, **args)
+
+    def apply_results(self):
+        """Apply only the Results tab controls, preserving unrelated draft edits."""
+        keys = ('enabled', 'discord', 'webhook', 'parse_names', 'output_directory', 'include_player_names')
+        with self.operations:
+            if self.closed:
+                raise ValueError('Application is shutting down')
+            with self.lock:
+                settings = {key: deepcopy(self.draft['results'][key]) for key in keys}
+                candidate = deepcopy(self.applied)
+                candidate['results'].update(settings)
+                validate_config(candidate)
+            runtime = self.runtime
+            if runtime and runtime.thread and not runtime.finished.is_set():
+                runtime.configure_results(settings)
+            elif runtime:
+                runtime.config['results'].update(settings)
+            with self.lock:
+                self.applied['results'].update(settings)
+                self._persist()
+        return self.status()
 
     def status(self):
         runtime = self.runtime

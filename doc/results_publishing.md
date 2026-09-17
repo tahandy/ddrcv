@@ -45,6 +45,9 @@ Example (without credentials):
 ```json
 {
   "enabled": true,
+  "parse_names": true,
+  "output_directory": "screenshots",
+  "include_player_names": true,
   "discord": false,
   "rehearsal": true,
   "webhook": null,
@@ -86,6 +89,13 @@ must be shown as P1/P2. Confirmed single-player results have no competitive
 outcome. Confidence is not proof of correctness; the MKV validation covers one
 recording and two names, not arbitrary captures or layouts.
 
+Set `parse_names: false` to skip name OCR and name confirmation entirely. Present
+players then use P1/P2 labels, and confirmed scores are sufficient for a complete
+result. This setting defaults to true and is exposed as **Parse player names** in
+the desktop **Results** tab. The desktop's **Apply results settings** button changes
+it during capture without resetting gameplay. Pending result evidence is discarded
+and confirmed again under the new settings; existing saved results are unchanged.
+
 ## Concurrency, persistence, and delivery
 
 Capture only submits sampled frame copies to a bounded latest-frame mailbox.
@@ -100,6 +110,18 @@ extend in memory as results frames arrive and persist independently of Discord
 requests. Sealed EOF bundles reserve their intervals before saving, so looping
 cannot duplicate a result while its screenshot is still being written. This does not infer unseen portions
 of a recording after an arbitrary seek.
+
+Desktop/CLI profiles default to capture enabled, with readable PNG copies in
+`results.output_directory` (default `screenshots`). Explicit `enabled: false`
+settings remain off. The workbench retains its separate opt-in capture setting.
+Export names use the event creation time in UTC, optional confirmed player names
+(`include_player_names`, default true), and the event ID to prevent collisions.
+Filename characters are sanitized for Windows. Disabled/unconfirmed names are
+omitted. The exported path is recorded as `screenshot_export_path`; the original
+`screenshot_path` remains in the durable outbox for Discord and recovery. Exports
+run on the persistence worker, and directory/write failures remain visible without
+claiming the event was saved or publishing it. Desktop folder changes affect new
+results and do not move previous files or the outbox.
 
 Delivery states are `saved`, `queued`, `sending`, `retrying`, `sent`, and `failed`.
 Status reaches the workbench and WebSocket feed even when playback is paused.

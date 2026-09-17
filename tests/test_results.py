@@ -13,7 +13,7 @@ import numpy as np
 
 from ddrcv.ocr import OCRResult
 from ddrcv.results.recognition import Evidence, ResultsReader, parse_number, outcome
-from ddrcv.results.delivery import Outbox, DeliveryError, format_payload, send_record, redact_error, message_receipt
+from ddrcv.results.delivery import Outbox, DeliveryError, format_payload, send_record, redact_error, message_receipt, screenshot_filename
 from ddrcv.results.service import ResultsService
 
 
@@ -38,6 +38,28 @@ def record(a=1615, b=1632):
 
 
 class ParseTests(unittest.TestCase):
+    def test_screenshot_filename_timestamp_safe_names_and_unique_event(self):
+        r = record()
+        r['created_at'] = 0
+        r['players'][0]['name'] = '../A:B*?'
+        r['players'][1]['name'] = 'CON / Player'
+        name = screenshot_filename(r)
+        self.assertTrue(name.startswith('1970-01-01_00-00-00_000000_UTC_'))
+        self.assertIn('P1-A_B', name)
+        self.assertIn('P2-CON___Player', name)
+        self.assertTrue(name.endswith('_abc123.png'))
+        self.assertNotRegex(name, r'[<>:"/\\|?*]')
+        r['event_id'] = 'abc124'
+        self.assertNotEqual(name, screenshot_filename(r))
+        for option in ('include_player_names', 'parse_names'):
+            r[option] = False
+            self.assertNotIn('_P1-', screenshot_filename(r))
+            self.assertNotIn('_P2-', screenshot_filename(r))
+            r[option] = True
+        r['players'][0]['name'] = None
+        self.assertNotIn('_P1-', screenshot_filename(r))
+        self.assertIn('_P2-', screenshot_filename(r))
+
     def test_strict_scores_zero_and_money_semantics(self):
         for text, expected in [('0',0), ('1,615',1615), ('00012',12), ('1632',1632)]:
             self.assertEqual(parse_number(text, 'ex'), expected)
@@ -77,6 +99,18 @@ class ParseTests(unittest.TestCase):
         self.assertIn('Winner unavailable',text);self.assertIn('unconfirmed',text)
         self.assertNotIn('**bad**',text);self.assertNotIn('**TIE**',text)
 
+    def test_names_disabled_omits_name_crops_for_both_score_modes(self):
+        for mode, presence, texts, expected in (
+                ('ex', (True, True), ('0', '1,632'), (0, 1632)),
+                ('money', (False, True), ('1,000,000',), (None, 1000000))):
+            backend = Mock()
+            backend.recognize_many.return_value = [OCRResult(text, .99) for text in texts]
+            reader = ResultsReader({'parse_names': False}, recognizer=backend)
+            values = reader.read(np.zeros((720, 1280, 3), np.uint8), presence, mode)
+            self.assertEqual([p['name'] for p in values], [None, None])
+            self.assertEqual(tuple(p['score'] for p in values), expected)
+            self.assertEqual(len(backend.recognize_many.call_args.args[0]), sum(presence))
+
 
 class ServiceTests(unittest.TestCase):
     def setUp(self):
@@ -108,6 +142,98 @@ class ServiceTests(unittest.TestCase):
         self.service.reset('video',True,'ex');self.settled(1)
         self.assertEqual(len(self.service.status()['records']),1)
         self.assertGreater(self.service.status()['deduplicated'],0)
+
+    def test_names_disabled_confirms_scores_and_formats_player_labels(self):
+        self.service.configure(parse_names=False)
+        self.settled()
+        r = self.service.status()['records'][0]
+        self.assertFalse(r['partial'])
+        self.assertTrue(r['screenshot_confirmed'])
+        self.assertFalse(r['parse_names'])
+        self.assertEqual([p['name'] for p in r['players']], [None, None])
+        self.assertEqual(r['outcome'], dict(kind='winner', winner=1, margin=17))
+        text = format_payload(r)['embeds'][0]['description']
+        self.assertIn('**P1**', text)
+        self.assertIn('Winner: P2 (+17 EX)', text)
+        self.assertNotIn('name unread', text)
+        self.assertNotIn('Partial result', text)
+
+    def test_screenshots_export_to_selected_folder_and_change_live(self):
+        output = Path(self.temp.name) / 'named screenshots'
+        self.service.configure(output_directory=str(output))
+        self.settled()
+        first = self.service.status()['records'][0]
+        exported = Path(first['screenshot_export_path'])
+        self.assertEqual(exported.parent, output.resolve())
+        self.assertIn('_P1-XETA_P2-DANOOCT1_', exported.name)
+        self.assertEqual(exported.read_bytes(), Path(first['screenshot_path']).read_bytes())
+        old_outbox = self.service.outbox
+        self.feed(4, raw='song_select', state='song_select')
+        next_output = Path(self.temp.name) / 'timestamps only'
+        self.service.configure(output_directory=str(next_output), include_player_names=False)
+        self.settled(5)
+        records = self.service.status()['records']
+        self.assertEqual(len(records), 2)
+        second = Path(records[1]['screenshot_export_path'])
+        self.assertEqual(second.parent, next_output.resolve())
+        self.assertNotIn('_P1-', second.name)
+        self.assertEqual(records[1]['players'][0]['name'], 'XETA')
+        self.assertTrue(second.is_file())
+        self.assertTrue(exported.is_file())
+        self.assertIs(self.service.outbox, old_outbox)
+
+    def test_screenshot_output_failure_is_visible_not_falsely_saved(self):
+        blocked = Path(self.temp.name) / 'not-a-directory'
+        blocked.write_text('existing file')
+        self.service.configure(output_directory=str(blocked))
+        self.settled()
+        self.assertEqual(self.service.status()['records'], [])
+        self.assertIsNotNone(self.service.status()['error'])
+        self.assertEqual(blocked.read_text(), 'existing file')
+
+    def test_toggle_names_invalidates_inflight_read_and_can_be_reenabled(self):
+        entered, release = threading.Event(), threading.Event()
+        original = self.reader.read.return_value
+        def blocked(*args):
+            entered.set()
+            release.wait(3)
+            return original
+        self.reader.read.side_effect = blocked
+        self.feed(0)
+        self.feed(2, flush=False)
+        self.assertTrue(entered.wait(2))
+        try:
+            self.service.configure(parse_names=False)
+            self.assertEqual(self.service.status()['records'], [])
+        finally:
+            release.set()
+        self.assertTrue(self.service.flush())
+        self.reader.read.side_effect = None
+        self.settled(3)
+        self.assertTrue(all(p['name'] is None for p in self.service.status()['records'][0]['players']))
+        self.feed(7, raw='song_select', state='song_select')
+        self.service.configure(parse_names=True)
+        self.settled(8)
+        records = self.service.status()['records']
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[1]['players'][0]['name'], 'XETA')
+
+    def test_settings_changes_do_not_duplicate_a_saved_live_screen(self):
+        self.service.reset('live', False, 'ex')
+        self.settled()
+        self.service.configure(parse_names=False)
+        self.settled(4)
+        self.assertEqual(len(self.service.status()['records']), 1)
+        self.service.configure(enabled=False)
+        self.feed(8, raw='song_select', state='song_select')
+        self.service.configure(enabled=True)
+        self.settled(9)
+        self.assertEqual(len(self.service.status()['records']), 2)
+
+    def test_invalid_name_toggle_is_rejected_without_changing_settings(self):
+        with self.assertRaisesRegex(ValueError, 'parse_names'):
+            self.service.configure(parse_names='false')
+        self.assertTrue(self.service.config['parse_names'])
 
     def test_partial_read_publishes_only_confirmed_fields_without_false_winner(self):
         self.reader.read.return_value=[dict(name=None,score=0),dict(name='P2',score=None)]

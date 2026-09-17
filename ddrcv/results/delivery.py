@@ -1,11 +1,13 @@
 """Durable outbox. Only this worker makes network requests; no capture locks."""
 from copy import deepcopy
+from datetime import datetime, timezone
 import json
 import logging
 import math
 from pathlib import Path
 from queue import Queue, Empty, Full
 import re
+import shutil
 import threading
 import time
 from uuid import uuid4
@@ -31,6 +33,23 @@ def escaped(text):
     return re.sub(r'([\\`*_~|<>@])', r'\\\1', str(text))
 
 
+def screenshot_filename(record):
+    """Readable UTC timestamp, optional confirmed names, and stable collision-free ID."""
+    stamp = datetime.fromtimestamp(record['created_at'], timezone.utc).strftime('%Y-%m-%d_%H-%M-%S_%f_UTC')
+    parts = [stamp]
+    if record.get('include_player_names', True) and record.get('parse_names', True):
+        for index, player in enumerate(record['players'], 1):
+            if not player['present'] or not player['name']:
+                continue
+            name = re.sub(r'[<>:"/\\|?*\x00-\x1f\x7f]', '_', player['name'])
+            name = ''.join(c for c in name if c.isprintable())
+            name = re.sub(r'\s+', '_', name).strip(' ._')[:32].rstrip(' ._')
+            if name:
+                parts.append(f'P{index}-{name}')
+    parts.append(record['event_id'])
+    return '_'.join(parts) + '.png'
+
+
 def format_payload(record):
     label = 'EX' if record['score_mode'] == 'ex' else 'Money'
     lines = []
@@ -38,7 +57,8 @@ def format_payload(record):
         if not p['present']:
             lines.append(f'P{i+1}: absent')
             continue
-        name = escaped(p['name']) if p['name'] else f'P{i+1} (name unread)'
+        name = escaped(p['name']) if p['name'] else (f'P{i+1}' if not record.get('parse_names', True)
+                                                    else f'P{i+1} (name unread)')
         score = f"{p['score']:,}" if p['score'] is not None else 'unconfirmed'
         lines.append(f'**{name}** — {label}: **{score}**')
     result = record['outcome']
@@ -234,6 +254,17 @@ class Outbox:
                 raise OSError('Could not encode results screenshot')
             temporary.replace(folder / 'screenshot.png')
             record['screenshot_path'] = str(folder / 'screenshot.png')
+            if record.get('output_directory'):
+                output = Path(record['output_directory']).expanduser().resolve()
+                output.mkdir(parents=True, exist_ok=True)
+                target = output / screenshot_filename(record)
+                temporary_export = output / f'.{uuid4().hex}.tmp'
+                try:
+                    shutil.copyfile(record['screenshot_path'], temporary_export)
+                    temporary_export.replace(target)
+                finally:
+                    temporary_export.unlink(missing_ok=True)
+                record['screenshot_export_path'] = str(target)
             record['delivery'] = dict(state='queued' if record.pop('auto_publish') else 'saved', attempts=0,
                                       error=None, next_attempt=0, message_id=None, message_url=None)
             self._merge_interval(record)

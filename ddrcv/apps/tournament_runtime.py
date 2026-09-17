@@ -38,6 +38,7 @@ class TournamentRuntime:
         self.results_factory = results_factory
         self.results = None
         self.results_error = None
+        self.results_update = None
         self.feed_lock = threading.RLock()
         self.feed_active = False
         self.latest_info = deepcopy(engine.session.info)
@@ -68,6 +69,7 @@ class TournamentRuntime:
             self.integrations.start()
             self.phase = 'Running'
             while not self.stop_requested.is_set():
+                self._poll_results_update()
                 changed, frame = self._poll_source_switch()
                 if changed:
                     previous_state = 'unknown'
@@ -122,6 +124,10 @@ class TournamentRuntime:
 
     def _cleanup(self):
         self.stop_requested.set()
+        with self.lock:
+            request, self.results_update = self.results_update, None
+        if request:
+            request['future'].set_exception(RuntimeError('Driver stopped before results settings were applied'))
         self._finish_source_switch(RuntimeError('Driver stopped before the camera switch completed'))
         for fetcher, _ in self.retired_captures:
             try:
@@ -249,11 +255,59 @@ class TournamentRuntime:
         self._finish_source_switch()
         return True, frame
 
-    def _reset_results_source(self):
+    def configure_results(self, settings):
+        """Apply operator controls on the recognition worker without resetting gameplay."""
+        from ddrcv.apps.driver_config import validate_config
+        allowed = {'enabled', 'discord', 'webhook', 'parse_names', 'output_directory', 'include_player_names'}
+        if set(settings) - allowed:
+            raise ValueError('Only Results tab settings can change during capture')
+        with self.lock:
+            if self.phase != 'Running' or self.stop_requested.is_set():
+                raise ValueError('Wait for the driver to be running before applying results settings')
+            if self.results_update:
+                raise ValueError('Results settings are already being applied')
+            candidate = deepcopy(self.config)
+            candidate['results'].update(settings)
+            validated = validate_config(candidate)['results']
+            future = Future()
+            self.results_update = dict(config=validated, future=future)
+        future.result()
+
+    def _poll_results_update(self):
+        with self.lock:
+            request, self.results_update = self.results_update, None
+        if request is None:
+            return
+        previous = self.config['results']
+        try:
+            config = request['config']
+            if self.results is not None:
+                self.results.configure(**config)
+            elif config['enabled']:
+                from ddrcv.results.service import ResultsService
+                factory = self.results_factory or ResultsService
+                service = factory(config['outbox_directory'], config, notify=self._publish_results_status)
+                try:
+                    self._reset_results_source(service)
+                except Exception:
+                    service.close()
+                    raise
+                self.results = service
+            self.config['results'] = deepcopy(config)
+            self.results_error = None
+            self._publish_results_status()
+        except Exception as error:
+            self.config['results'] = previous
+            request['future'].set_exception(error)
+        else:
+            request['future'].set_result(None)
+
+    def _reset_results_source(self, service=None):
         from ddrcv.results.service import source_identity
         kind, source = next(iter(self.config['ingest'].items()))
         identity, recorded = source_identity(dict(kind=kind, path=source.get('path', '')))
-        self.results.reset(identity, recorded, self.config.get('score_mode',
+        service = self.results if service is None else service
+        service.reset(identity, recorded, self.config.get('score_mode',
                            'money' if self.config.get('score_filter', {}).get('max_per_frame', 12) is None else 'ex'))
 
     def _start_results(self):
@@ -272,6 +326,7 @@ class TournamentRuntime:
             self.log.exception('Results service could not start')
             if self.results is not None:
                 self.results.close()
+                self.results = None
 
     def _publish(self, info=None):
         with self.feed_lock:

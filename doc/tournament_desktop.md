@@ -113,9 +113,37 @@ blue focus/selection accents, and a player table with explicit presence and read
 age. Status remains readable through text as well as color. Profile Open/Save
 actions and runtime controls are available on every tab.
 
-Status and configuration share the first tab. **OBS** and **Renderer** have their
+Status and configuration share the first tab. **OBS**, **Renderer**, and **Results** have their
 own tabs; switching tabs keeps the draft and active session intact. The Start,
 Stop, and Apply controls remain available above every tab.
+
+The first section in **Results** is **Discord**: enter a webhook URL and toggle
+**Publish results to Discord**. Enabling publishing also checks **Capture results**.
+Capture defaults to on for new desktop/CLI profiles; an explicit saved off setting
+is preserved. Discord publishing still defaults to off.
+Choose a **Screenshot folder** (or Browse) for readable PNG copies; the default is
+`screenshots` under the checkout. Filenames contain a UTC date/time, optional
+confirmed P1/P2 names, and a unique event suffix. **Include parsed player names in
+filenames** controls naming independently of name recognition. Unread or disabled
+names are omitted, and characters invalid in Windows filenames are sanitized.
+Turn off **Parse player names** if name recognition becomes unreliable; new results
+use P1/P2 labels while score confirmation and EX winner calculation continue.
+Name parsing defaults to enabled for existing profiles.
+
+Click **Apply results settings** to apply these controls during a run without
+restarting capture, clearing gameplay scores, or reconnecting OBS/the renderer.
+Only the controls on the Results tab apply; other draft
+edits remain pending. A result still being read restarts confirmation, while saved
+results remain unchanged. Disabling publishing pauses queued deliveries; a request
+already in flight may finish. Re-enabling publishing resumes queued deliveries.
+Changes also persist in the local draft and shared profiles. Webhooks are masked
+in the panel and advanced JSON, with the same secret-preservation behavior as OBS
+credentials.
+
+Changing the screenshot folder applies to newly captured results without moving
+earlier screenshots or interrupting pending Discord deliveries. Durable delivery
+records and their original screenshots remain in `results.outbox_directory`.
+An export failure is reported as a results error, not a successful save.
 
 To change cameras during a run, select the camera index (or an RTSP source) and
 click **Switch camera**. The app checks the new source for a valid 1280×720 frame

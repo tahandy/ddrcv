@@ -45,6 +45,9 @@ class FakeRuntime:
     def switch_source(self, ingest):
         self.config['ingest'] = deepcopy(ingest)
 
+    def configure_results(self, settings):
+        self.config['results'].update(settings)
+
     def status(self):
         return dict(phase=self.phase, error=None, obs={}, renderer={})
 
@@ -95,6 +98,9 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(self.desk.draft['score_filter']['max_per_frame'], 12)
         self.assertFalse(self.desk.draft['obs']['enabled'])
         self.assertFalse(self.desk.draft['renderer']['enabled'])
+        self.assertTrue(self.desk.draft['results']['enabled'])
+        self.assertFalse(load_config(path)['results']['discord'])
+        self.assertFalse(validate_config({'results': {'enabled': False}})['results']['enabled'])
 
     def test_edits_and_loads_leave_active_runtime_untouched(self):
         self.desk.start()
@@ -118,6 +124,62 @@ class DeskTests(unittest.TestCase):
         self.desk.apply()
         self.assertEqual(self.desk.runtime.phase, 'Ready')
         self.assertIsNone(self.desk.runtime.thread)
+
+    def test_results_controls_apply_live_preserve_other_edits_and_mask_webhook(self):
+        self.desk.start()
+        runtime = self.desk.runtime
+        config = self.desk.config()['draft']
+        config['results'].update(enabled=True, discord=True, parse_names=False,
+                                 webhook='https://discord.com/api/webhooks/1/desktop-test',
+                                 output_directory=str(self.root / 'exports'), include_player_names=False)
+        config['obs']['port'] = ''  # Unfinished unrelated edits must not block results controls.
+        config['results']['outbox_directory'] = 'pending-outbox'
+        self.desk.edit(config)
+        client = create_app(self.desk, 'test').test_client()
+        self.assertEqual(client.post('/api/action', json={'action': 'apply_results'}).status_code, 403)
+        response = client.post('/api/action', json={'action': 'apply_results'}, headers={'X-Desk-Token': 'test'})
+        self.assertEqual(response.status_code, 200, response.json)
+        self.assertIs(self.desk.runtime, runtime)
+        self.assertEqual(runtime.stop_calls, 0)
+        self.assertFalse(runtime.config['results']['parse_names'])
+        self.assertTrue(runtime.config['results']['discord'])
+        self.assertEqual(runtime.config['results']['output_directory'], str(self.root / 'exports'))
+        self.assertFalse(runtime.config['results']['include_player_names'])
+        self.assertNotEqual(runtime.config['results']['outbox_directory'], 'pending-outbox')
+        self.assertTrue(self.desk.status()['pending'])
+        masked = self.desk.config()['draft']
+        self.assertEqual(masked['results']['webhook'], MASK)
+        masked['obs']['port'] = 4455
+        self.desk.edit(masked)
+        path = self.root / 'results-profile.json'
+        self.desk.save(path)
+        saved = load_config(path)['results']
+        self.assertFalse(saved['parse_names'])
+        self.assertEqual(saved['webhook'], runtime.config['results']['webhook'])
+        self.assertEqual(saved['output_directory'], str(self.root / 'exports'))
+        self.assertFalse(saved['include_player_names'])
+
+    def test_invalid_results_controls_preserve_running_config(self):
+        self.desk.start()
+        previous = deepcopy(self.desk.applied)
+        config = self.desk.config()['draft']
+        config['results']['discord'] = True
+        self.desk.edit(config)
+        with self.assertRaisesRegex(ValueError, 'webhook'):
+            self.desk.apply_results()
+        self.assertEqual(self.desk.applied, previous)
+        self.assertEqual(self.desk.runtime.stop_calls, 0)
+
+    def test_results_controls_while_stopped_persist_without_capture(self):
+        config = self.desk.config()['draft']
+        config['results']['parse_names'] = False
+        self.desk.edit(config)
+        self.desk.apply_results()
+        self.assertIsNone(self.desk.runtime)
+        self.desk.close()
+        self.desk = Desk(self.root, FakeRuntime)
+        self.assertFalse(self.desk.applied['results']['parse_names'])
+        self.assertFalse(self.desk.draft['results']['parse_names'])
 
     def test_invalid_config_or_failed_preflight_preserves_active_run(self):
         self.desk.start()
@@ -297,7 +359,12 @@ class RuntimeTests(unittest.TestCase):
         import numpy as np
         from ddrcv.apps.recognition_engine import RecognitionEngine
         from ddrcv.apps.tournament_runtime import TournamentRuntime
-        cfg = validate_config(config or {})
+        overrides = deepcopy(config or {})
+        results = overrides.setdefault('results', {})
+        results.setdefault('enabled', False)
+        results.setdefault('outbox_directory', str(Path(tmp) / 'outbox'))
+        results.setdefault('output_directory', str(Path(tmp) / 'screenshots'))
+        cfg = validate_config(overrides)
         matcher = Mock()
         matcher.match.return_value = ('song_playing', None)
         extractor = Mock()
@@ -662,6 +729,57 @@ class RecoveryTests(unittest.TestCase):
             finally:
                 runtime.stop()
             service.close.assert_called_once()
+
+    def test_results_controls_start_lazily_and_reconfigure_without_gameplay_reset(self):
+        from ddrcv.results.service import ResultsService
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = RuntimeTests().make_runtime(tmp, config={'results': {'outbox_directory': str(Path(tmp) / 'outbox')}})
+            reader = Mock()
+            reader.read.return_value = [dict(name='P1', score=120), dict(name='P2', score=150)]
+            factory = Mock(side_effect=lambda directory, config, notify: ResultsService(
+                directory, config, reader=reader, sender=Mock(), notify=notify))
+            runtime.results_factory = factory
+            runtime.start()
+            try:
+                wait_for(lambda: runtime.sequence > 30)
+                before = runtime.sequence
+                scores = deepcopy(runtime.engine.session.info['score'])
+                with patch.object(runtime.engine, 'reset', wraps=runtime.engine.reset) as reset:
+                    runtime.configure_results(dict(enabled=True, parse_names=False))
+                    service = runtime.results
+                    self.assertIsNotNone(service)
+                    runtime.configure_results(dict(discord=True, webhook='https://discord.com/api/webhooks/1/test'))
+                    self.assertTrue(service.outbox.enabled)
+                    runtime.configure_results(dict(discord=False, parse_names=True))
+                    self.assertIs(runtime.results, service)
+                    self.assertFalse(service.outbox.enabled)
+                    self.assertTrue(service.config['parse_names'])
+                    reset.assert_not_called()
+                wait_for(lambda: runtime.sequence > before + 4)
+                self.assertEqual(runtime.engine.session.info['score'], scores)
+                factory.assert_called_once()
+                runtime.publisher.start.assert_called_once()
+                runtime.fetcher.start.assert_called_once()
+                runtime.fetcher.stop.assert_not_called()
+            finally:
+                runtime.stop()
+
+    def test_failed_live_results_start_keeps_capture_and_settings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = RuntimeTests().make_runtime(tmp)
+            runtime.results_factory = Mock(side_effect=OSError('Outbox unavailable'))
+            runtime.start()
+            try:
+                wait_for(lambda: runtime.sequence > 3)
+                with self.assertRaisesRegex(OSError, 'Outbox unavailable'):
+                    runtime.configure_results(dict(enabled=True))
+                self.assertFalse(runtime.config['results']['enabled'])
+                self.assertIsNone(runtime.results)
+                before = runtime.sequence
+                wait_for(lambda: runtime.sequence > before + 3)
+                self.assertEqual(runtime.phase, 'Running')
+            finally:
+                runtime.stop()
 
     def test_renderer_service_controls_only_its_owned_process(self):
         from ddrcv.apps.tournament_integrations import Integrations

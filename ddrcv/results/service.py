@@ -14,7 +14,8 @@ from .delivery import Outbox, redact_error
 from .recognition import Evidence, ResultsReader, outcome
 
 LOG = logging.getLogger('ddrcv.results')
-DEFAULTS = dict(enabled=False, discord=False, webhook=None, confidence=.8,
+DEFAULTS = dict(enabled=False, discord=False, webhook=None, parse_names=True, confidence=.8,
+                output_directory=None, include_player_names=True,
                 sample_hz=5, settling_seconds=2., min_frames=5, confirmation_seconds=1.,
                 max_gap=.75, deadline_seconds=10., only_duo=False, rehearsal=False)
 
@@ -96,6 +97,13 @@ class ResultsService:
     @staticmethod
     def _validate(config):
         import math
+        if type(config['parse_names']) is not bool:
+            raise ValueError('results.parse_names must be a boolean')
+        if type(config['include_player_names']) is not bool:
+            raise ValueError('results.include_player_names must be a boolean')
+        directory = config['output_directory']
+        if directory is not None and (not isinstance(directory, str) or not directory.strip() or '\x00' in directory):
+            raise ValueError('Results require a valid screenshot output directory')
         for key in ('sample_hz', 'settling_seconds', 'min_frames', 'confirmation_seconds', 'max_gap', 'deadline_seconds'):
             value = config[key]
             if not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
@@ -113,8 +121,15 @@ class ResultsService:
         with self.lock:
             config = {**self.config, **settings}
             self._validate(config)
+            if config == self.config:
+                return
+            # A settings change must not publish the same live results screen twice.
+            saved_episode = self.active if self.active and self.active.finalized else None
+            latched = self.latched and (self.active is None or saved_episode is not None)
             self.config = config
             self._reset_locked()
+            self.active = saved_episode
+            self.latched = latched
         self.outbox.configure(config['webhook'], config['discord'])
         self._announce()
 
@@ -140,7 +155,8 @@ class ResultsService:
         with self.lock:
             status = dict(phase=self.phase, error=self.error, replaced_frames=self.replaced_frames,
                           deduplicated=self.deduplicated, pending=len(self.jobs), enabled=self.config['enabled'],
-                          discord=self.config['discord'], rehearsal=self.config['rehearsal'], webhook_configured=bool(self.config['webhook']))
+                          discord=self.config['discord'], parse_names=self.config['parse_names'],
+                          rehearsal=self.config['rehearsal'], webhook_configured=bool(self.config['webhook']))
         outbox = self.outbox.snapshot()
         status['records'] = outbox['records']
         status['error'] = status['error'] or outbox['error']
@@ -166,7 +182,7 @@ class ResultsService:
     def submit(self, frame, timestamp, raw_state, state, presence=(True, True), frame_index=None):
         """Only copies sampled pixels and updates small in-memory state; never waits on OCR/I/O."""
         with self.lock:
-            if self.closed or not self.config['enabled']:
+            if self.closed:
                 return
             if self.last_timestamp is not None and timestamp <= self.last_timestamp:
                 return
@@ -176,6 +192,8 @@ class ResultsService:
                 if self.active:
                     self.finish()
                 self.latched = False
+                return
+            if not self.config['enabled']:
                 return
             if raw_state != 'song_result' or state != 'song_result':
                 if self.active:
@@ -284,6 +302,10 @@ class ResultsService:
                 ep.best = ep.latest
                 return
         try:
+            # Only the OCR worker changes reader options; an in-flight old read is
+            # rejected below by its episode generation after configuration changes.
+            if isinstance(self.reader, ResultsReader):
+                self.reader.parse_names = ep.config['parse_names']
             readings = self.reader.read(frame, ep.presence, ep.mode)
         except Exception as exc:
             with self.lock:
@@ -306,12 +328,15 @@ class ResultsService:
                 if not present:
                     continue
                 for j, field_name in enumerate(('name', 'score')):
+                    if field_name == 'name' and not ep.config['parse_names']:
+                        continue
                     value = readings[i][field_name]
                     stable = ep.evidence[i][j].observe(value, timestamp, ep.config['min_frames'],
                         ep.config['confirmation_seconds'], ep.config['max_gap'])
                     if stable:
                         players[i][field_name] = value
-            complete = all(p['name'] is not None and p['score'] is not None for p in players if p['present'])
+            complete = all(p['score'] is not None and (not ep.config['parse_names'] or p['name'] is not None)
+                           for p in players if p['present'])
             ep.latest = (frame, timestamp, index, players, complete)
             # Keep a frame and its own evidence together; contradictions invalidate fields.
             ep.best = ep.latest
@@ -330,7 +355,9 @@ class ResultsService:
             frame, timestamp, index, players, stable = ep.best
             record = dict(event_id=ep.event_id, source_id=ep.source_id, recorded=ep.recorded,
                 interval=[ep.start, ep.end], timestamp=timestamp, frame_index=index, score_mode=ep.mode,
-                players=deepcopy(players), partial=not stable, screenshot_confirmed=stable,
+                players=deepcopy(players), parse_names=ep.config['parse_names'],
+                output_directory=ep.config['output_directory'], include_player_names=ep.config['include_player_names'],
+                partial=not stable, screenshot_confirmed=stable,
                 outcome=outcome(players, ep.mode), rehearsal=ep.config['rehearsal'],
                 auto_publish=ep.config['discord'], created_at=time.time())
             ep.finalized = True

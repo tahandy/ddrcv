@@ -26,6 +26,7 @@ def main(video, out):
         port = sock.getsockname()[1]
     write_json(profile, {'ingest': {'video': {'path': str(video.resolve())}},
                         'publish': {'websocket': {'port': port}},
+                        'results': {'outbox_directory': str(out / 'outbox'), 'output_directory': str(out / 'screenshots')},
                         'score_filter': {'max_per_frame': None}})
     with (out / 'launcher.log').open('w') as log:
         backend = subprocess.Popen([sys.executable, '-B', '-m', 'ddrcv.desktop', '--no-panel',
@@ -83,6 +84,43 @@ def main(video, out):
             expect(page.locator('#panel-obs')).not_to_be_visible()
             expect(page.locator('#panel-renderer')).to_be_visible()
             page.screenshot(path=str(out / 'renderer.png'), full_page=True)
+            page.locator('#tab-results').click()
+            expect(page.locator('#panel-results')).to_be_visible()
+            expect(page.locator('#panel-renderer')).not_to_be_visible()
+            expect(page.locator('#panel-results h2').first).to_contain_text('Discord')
+            expect(page.locator('[data-path="results.enabled"]')).to_be_checked()
+            filename_names = page.locator('[data-path="results.include_player_names"]')
+            expect(filename_names).to_be_checked()
+            filename_names.uncheck()
+            export_folder = str(out / 'selected screenshots')
+            page.evaluate('path => window.pywebview.api.pick = async () => path', export_folder)
+            page.locator('#browse-results').click()
+            expect(page.locator('[data-path="results.output_directory"]')).to_have_value(export_folder)
+            names = page.locator('[data-path="results.parse_names"]')
+            expect(names).to_be_checked()
+            names.uncheck()
+            webhook = page.locator('[data-path="results.webhook"]')
+            webhook.fill('https://discord.com/api/webhooks/1/desktop-ui-test')
+            discord = page.locator('[data-path="results.discord"]')
+            discord.check()
+            expect(page.locator('[data-path="results.enabled"]')).to_be_checked()
+            # Exercise publishing controls without sending any external messages.
+            discord.uncheck()
+            page.locator('[data-path="results.enabled"]').uncheck()
+            page.locator('#apply-results').click()
+            expect(page.locator('#results-feedback')).to_have_text('Results settings applied')
+            expect(page.locator('#phase')).to_have_text('Running')
+            assert 'desktop-ui-test' not in page.locator('#config-json').input_value()
+            page.screenshot(path=str(out / 'results.png'), full_page=True)
+            page.reload()
+            bridge()
+            page.locator('#tab-results').click()
+            expect(names).not_to_be_checked()
+            expect(webhook).to_have_value('[unchanged secret]')
+            expect(filename_names).not_to_be_checked()
+            expect(page.locator('[data-path="results.output_directory"]')).to_have_value(export_folder)
+            page.locator('#tab-results').press('ArrowLeft')
+            expect(page.locator('#tab-renderer')).to_be_focused()
             page.locator('#tab-renderer').press('Home')
             expect(page.locator('#panel-session')).to_be_visible()
             expect(page.locator('#tab-session')).to_be_focused()
@@ -96,6 +134,10 @@ def main(video, out):
             page.locator('#save-as').click()
             expect(page.locator('#profile')).to_have_text(str(saved))
             assert load_config(saved)['obs']['password'] == 'desktop-ui-test-secret'
+            assert load_config(saved)['results']['parse_names'] is False
+            assert load_config(saved)['results']['webhook'].endswith('/desktop-ui-test')
+            assert load_config(saved)['results']['output_directory'] == export_folder
+            assert load_config(saved)['results']['include_player_names'] is False
             page.locator('[data-path="publish.websocket.port"]').fill(str(port + 1 if port < 65535 else port - 1))
             page.wait_for_timeout(600)
             expect(page.locator('#pending')).to_have_text('Draft changes · not applied')
@@ -161,7 +203,7 @@ def main(video, out):
             expect(page.locator('#p2-presence')).to_have_text('Yes')
             for width, height, suffix in ((1120, 800, 'default'), (760, 560, 'minimum')):
                 page.set_viewport_size({'width': width, 'height': height})
-                for tab in ('session', 'obs', 'renderer'):
+                for tab in ('session', 'obs', 'renderer', 'results'):
                     page.locator('#tab-'+tab).click()
                     expect(page.locator('#save-as')).to_be_visible()
                     expect(page.locator('#start')).to_be_disabled()
@@ -209,7 +251,8 @@ def main(video, out):
             assert not errors, errors
             write_json(out / 'report.json', dict(errors=errors, graphite_layout=True, minimum_width_no_overflow=True,
                         visual_status_fixtures=True, keyboard_focus_visible=True, integration_tabs=True, tab_keyboard_navigation=True,
-                        tabs_preserved_draft=True, camera_action_failure_ui=True, snapshots_on_demand=True,
+                        tabs_preserved_draft=True, results_controls=True, results_apply_without_restart=True,
+                        camera_action_failure_ui=True, snapshots_on_demand=True,
                         draft_survived_reopen=True, close_preserved_capture=True,
                         hidden_polling_stopped=True, secrets_masked=True, gui_save_cli_load=True, failed_save_close_recoverable=True))
             browser.close()

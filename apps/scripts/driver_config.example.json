@@ -11,7 +11,10 @@
         "max_per_frame": 12
     },
     "results": {
-        "enabled": false,
+        "enabled": true,
+        "parse_names": true,
+        "output_directory": "screenshots",
+        "include_player_names": true,
         "only_duo": false,
         "discord": false,
         "webhook": null,
