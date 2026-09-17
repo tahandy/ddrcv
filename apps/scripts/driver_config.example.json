@@ -19,5 +19,17 @@
         "settling_seconds": 2,
         "rehearsal": false
     },
+    "obs": {
+        "enabled": false,
+        "automation": false,
+        "host": "localhost",
+        "port": 4455,
+        "password": "",
+        "scene_map": null
+    },
+    "renderer": {
+        "enabled": false,
+        "path": "../ddr_score_render"
+    },
     "score_mode": "ex"
 }

@@ -1,6 +1,6 @@
 # Results capture and Discord delivery
 
-The tournament CLI and workbench use the same background results service. It reads
+The tournament CLI, desktop app, and workbench use the same background results service. It reads
 player names and the **large score**, captures the supporting clean frame, and
 publishes a compact Discord embed. Lower-panel tabs, judgments, difficulty, stage,
 and song lookup are not prerequisites.
@@ -33,7 +33,7 @@ The CLI loads the same local results config, then applies explicit JSON override
 ```
 
 Run from this checkout's root. The default outbox is `.workbench/results`;
-`results.outbox_directory` overrides it for the CLI. Do not run two instances
+`results.outbox_directory` overrides it for the CLI and desktop app. Do not run two instances
 against the same outbox at once: the second reports that it is already in use.
 Independent rehearsal runs should use a separate workbench `--data-dir` or CLI
 outbox. An OS lock releases automatically when its owner exits or crashes.
