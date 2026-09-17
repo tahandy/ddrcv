@@ -28,6 +28,7 @@ class TournamentRuntime:
         self.accepted_wall = [None, None]
         self.sequence = 0
         self.frame_times = deque(maxlen=120)
+        self.processing_times = deque(maxlen=120)
         self.processing_ms = 0
         self.thread = None
         self.capture_thread = None
@@ -118,6 +119,7 @@ class TournamentRuntime:
                     self.frame_wall, self.frame_utc = wall, time.time()
                     self.frame_times.append(wall)
                     self.processing_ms = (wall - began) * 1000
+                    self.processing_times.append((wall, wall - began))
                     for index, key in enumerate(('p1_score', 'p2_score')):
                         if result['decisions'].get(key) == 'accepted':
                             self.accepted_wall[index] = wall
@@ -259,6 +261,8 @@ class TournamentRuntime:
             self.frame_wall = self.frame_utc = None
             self.accepted_wall = [None, None]
             self.frame_times.clear()
+            self.processing_times.clear()
+            self.processing_ms = 0
             self.source_revision += 1
         try:
             self._release_capture(old)
@@ -453,8 +457,14 @@ class TournamentRuntime:
         wall = time.perf_counter()
         with self.lock:
             frame_age = None if self.frame_wall is None else wall - self.frame_wall
-            times = list(self.frame_times)
-            fps = (len(times) - 1) / (times[-1] - times[0]) if len(times) > 1 and times[-1] > times[0] else 0
+            # Recent completed frames: playback/capture waits affect throughput,
+            # but only active frame work contributes to processing capacity.
+            times = [t for t in self.frame_times if wall - t <= 2]
+            fps = (len(times) - 1) / (wall - times[0]) if len(times) > 1 and wall > times[0] else 0
+            durations = [duration for t, duration in self.processing_times if wall - t <= 2]
+            mean_seconds = sum(durations) / len(durations) if durations else 0
+            active = self.phase == 'Running' and frame_age is not None and frame_age <= 1
+            source_fps = self.fetcher.fps if isinstance(self.fetcher, FileSource) and self.fetcher.kind == 'video' else None
             snapshot = dict(phase=self.phase, error=self.error, sequence=self.sequence,
                             source=deepcopy(self.config['ingest']), source_revision=self.source_revision,
                             source_switching=self.source_switch is not None, source_error=self.source_error,
@@ -464,7 +474,10 @@ class TournamentRuntime:
                             decisions=deepcopy(self.result['decisions']) if self.result else {},
                             frame_age=frame_age, capture_stale=frame_age is None or frame_age > 1,
                             score_age=[None if t is None else wall - t for t in self.accepted_wall],
-                            fps=round(fps, 1), processing_ms=round(self.processing_ms, 2),
+                            fps=round(fps, 1) if active else 0, processing_ms=round(self.processing_ms, 2),
+                            processing_avg_ms=round(mean_seconds * 1000, 2) if active and mean_seconds > 0 else None,
+                            processing_fps=round(1 / mean_seconds, 1) if active and mean_seconds > 0 else None,
+                            source_fps=round(source_fps, 2) if source_fps else None,
                             publisher=self.publisher.status)
         if self.results is not None:
             snapshot['results'] = self.results.feed_status()

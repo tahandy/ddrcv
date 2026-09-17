@@ -318,7 +318,22 @@ async function pollOnce() {
   $('capture').textContent = status.frame_age == null ? 'Waiting for capture' : `${status.capture_stale?'Stale capture':'Capture healthy'} · ${status.frame_age.toFixed(1)} s old`;
   $('capture').className = status.capture_stale ? 'stale' : '';
   $('publisher').textContent = status.publisher.running ? `Publishing · ${status.publisher.clients} client(s)` : 'Publisher stopped';
-  $('throughput').textContent = `${status.fps} fps · ${status.processing_ms} ms recognition · ${status.sequence} frames`;
+  let capacity;
+  const timingActive = status.phase === 'Running' && status.frame_age != null && status.frame_age <= 1;
+  if (!timingActive) {
+    capacity = status.phase === 'Running' ? (status.frame_age == null ? 'waiting for frames' : 'no recent frames') :
+      status.phase === 'Ended' ? 'playback ended' : status.phase === 'Starting' ? 'starting capture' : 'capture stopped';
+  } else if (Number.isFinite(status.processing_fps) && status.processing_fps > 0) {
+    capacity = `${status.processing_fps.toFixed(1)} fps (${status.processing_avg_ms.toFixed(1)} ms/frame)`;
+  } else if (!('processing_fps' in status) && Number.isFinite(status.processing_ms) && status.processing_ms > 0) {
+    // A reopened panel can connect to a backend started before this UI update.
+    // Its timing is the latest frame, so do not label it as the new rolling average.
+    capacity = `${(1000 / status.processing_ms).toFixed(1)} fps (${status.processing_ms.toFixed(1)} ms, last frame)`;
+  } else {
+    capacity = 'waiting for timing sample';
+  }
+  const sourceRate = status.source_fps == null ? '' : ` · File: ${status.source_fps.toFixed(1)} fps`;
+  $('throughput').textContent = `Processing capacity: ${capacity} · Throughput: ${(timingActive ? status.fps : 0).toFixed(1)} fps${sourceRate} · ${status.sequence} frames`;
   $('pending').textContent = status.pending ? 'Draft changes · not applied' : 'Configuration applied';
   $('apply').textContent = ['Running', 'Starting'].includes(status.phase) ? 'Apply and Restart' : 'Apply configuration';
   $('start').disabled = ['Running', 'Starting'].includes(status.phase);

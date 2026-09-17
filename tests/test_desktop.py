@@ -457,6 +457,43 @@ class RuntimeTests(unittest.TestCase):
             runtime.fetcher.stop.assert_called_once()
             runtime.publisher.stop.assert_called_once()
 
+    def test_processing_capacity_excludes_source_waits_and_expires(self):
+        from ddrcv.ingest.file_source import FileSource
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Mock(spec=FileSource)
+            source.kind, source.fps = 'video', 30
+            runtime = self.make_runtime(tmp, fetcher=source)
+            runtime.phase = 'Running'
+            runtime.frame_wall = 10
+            runtime.frame_times.extend((9.9, 9.95, 10))
+            runtime.processing_times.extend(((7, 1), (9.9, .01), (9.95, .03), (10, .02)))
+            with patch('ddrcv.apps.tournament_runtime.time.perf_counter', return_value=10):
+                status = runtime.status()
+            self.assertEqual(status['fps'], 20)
+            self.assertEqual(status['processing_fps'], 50)
+            self.assertEqual(status['processing_avg_ms'], 20)
+            self.assertEqual(status['source_fps'], 30)
+            with patch('ddrcv.apps.tournament_runtime.time.perf_counter', return_value=12.1):
+                status = runtime.status()
+            self.assertEqual(status['fps'], 0)
+            self.assertIsNone(status['processing_fps'])
+            self.assertIsNone(status['processing_avg_ms'])
+
+    def test_processing_measurement_ignores_capture_wait_in_running_loop(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.make_runtime(tmp)
+            runtime.start()
+            try:
+                wait_for(lambda: runtime.sequence >= 35)
+                status = runtime.status()
+                self.assertGreater(status['processing_fps'], status['fps'])
+                self.assertGreater(status['processing_avg_ms'], 0)
+                self.assertIsNone(status['source_fps'])
+            finally:
+                runtime.stop()
+            self.assertEqual(runtime.status()['fps'], 0)
+            self.assertIsNone(runtime.status()['processing_fps'])
+
     def test_live_name_control_and_individual_score_reset_preserve_session(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self.make_runtime(tmp)

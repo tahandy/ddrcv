@@ -40,7 +40,7 @@
     </div>
     <div class="status-notes"><p id="name-status" class="quiet" role="status">Name recognition stopped</p><p id="results-summary" class="quiet" role="status">Results: not started</p></div>
     <div class="session-bottom">
-      <div class="health"><span id="capture">Capture stopped</span><span id="publisher">Publisher stopped</span><span id="throughput">0 frames processed</span></div>
+      <div class="health"><span id="capture">Capture stopped</span><span id="publisher">Publisher stopped</span><span id="throughput" title="Processing capacity = 1 / average active frame time over the last 2 seconds (up to 120 frames). An older running backend uses its latest frame timing, labeled last frame; fully exit and relaunch the app to enable averaging. Includes recognition, worker submissions and publishing; excludes capture, video decoding/playback waits and background OCR/delivery. Throughput is completed frames per wall-clock second. File FPS is the recording's nominal rate. Capacity below File FPS indicates processing cannot keep up; higher capacity alone does not prove the whole pipeline is keeping up.">0 frames processed</span></div>
       <div class="snapshot-bar"><button id="snapshot">View stream</button><span class="quiet">Snapshot on request</span><span id="snapshot-time"></span></div>
     </div>
     <figure id="preview" hidden><img id="frame" alt="Requested capture frame"><figcaption id="frame-caption"></figcaption><button id="hide-preview">Close snapshot</button></figure>

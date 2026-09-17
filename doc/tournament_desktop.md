@@ -117,6 +117,25 @@ Status and configuration share the first tab. **OBS**, **Renderer**, and **Resul
 own tabs; switching tabs keeps the draft and active session intact. The Start,
 Stop, and Apply controls remain available above every tab.
 
+The status line separates **Processing capacity**, **Throughput**, and **File** FPS.
+Processing capacity is the reciprocal of average active frame-processing time
+over the last two seconds (up to 120 frames), with average milliseconds per frame
+alongside it. It includes recognition, worker submissions and publishing, but
+excludes capture, recording decode/playback waits, and background OCR/delivery.
+Throughput counts completed frames per wall-clock second and includes those waits;
+File FPS is the recording's nominal rate, shown only for video files.
+For example, 100 fps capacity with 26 fps throughput on a 30 fps file means active
+frame processing takes about 10 ms: that processing time alone does not explain
+the lower throughput. Capacity below the file rate indicates insufficient
+processing speed. These are recent measurements, not a guarantee of capture
+latency or background-worker health. Stopped or stale capture shows no current
+capacity and zero throughput.
+If the backend was already running when the panel was updated, the readout uses
+its existing per-frame timing and labels it **last frame**. Fully exit the app
+(not just the panel) and relaunch to enable the rolling average. Missing timing
+shows a reason such as **waiting for frames**, **no recent frames**, or
+**playback ended**, rather than a dash.
+
 The first section in **Results** is **Discord**: enter a webhook URL and toggle
 **Publish results to Discord**. Enabling publishing also checks **Capture results**.
 Capture defaults to on for new desktop/CLI profiles; an explicit saved off setting

@@ -220,6 +220,7 @@ def main(video, out):
             assert cfg['draft']['ingest']['simple']['uri'] == 2
             status = page.request.get(meta['url']+'/api/status', headers={'X-Desk-Token':meta['token']}).json()
             assert 'video' in status['source'] and status['publisher']['port'] == port
+            measured_rates = {key: status[key] for key in ('fps', 'processing_fps', 'processing_avg_ms', 'source_fps')}
             page.unroute('**/api/action', camera_action)
             # Presentation fixtures use the real page/JS, with status responses
             # replaced only for reproducible visual states. No capture is changed.
@@ -230,7 +231,8 @@ def main(video, out):
                            published={'state': 'song_playing', 'players': [True, True],
                                       'score': {'p1_score': 198430, 'p2_score': 186250}},
                            raw_state='song_playing', frame_age=.1, capture_stale=False,
-                           score_age=[.2, .3], fps=29.9, processing_ms=1.2, sequence=1000)
+                           score_age=[.2, .3], fps=26, processing_ms=1.2, sequence=1000,
+                           processing_fps=100, processing_avg_ms=10, source_fps=30)
             healthy['publisher'].update(running=True, clients=2)
             visual = deepcopy(healthy)
             def status_fixture(route):
@@ -242,6 +244,24 @@ def main(video, out):
             page.evaluate("document.getElementById('profile').textContent='tournament.json'; document.getElementById('error').hidden=true")
             expect(page.locator('#p1')).to_have_text('198,430')
             expect(page.locator('#p2-presence')).to_have_text('Yes')
+            expect(page.locator('#throughput')).to_contain_text('Processing capacity: 100.0 fps (10.0 ms/frame)')
+            expect(page.locator('#throughput')).to_contain_text('Throughput: 26.0 fps · File: 30.0 fps')
+            # New panel / pre-update persistent backend: the old timing field
+            # remains useful and must not be mistaken for the rolling average.
+            del visual['processing_fps']
+            del visual['processing_avg_ms']
+            visual['processing_ms'] = 10
+            expect(page.locator('#throughput')).to_contain_text('Processing capacity: 100.0 fps (10.0 ms, last frame)')
+            visual['processing_ms'] = 0
+            expect(page.locator('#throughput')).to_contain_text('waiting for timing sample')
+            visual['processing_ms'] = 10
+            visual.update(frame_age=3, capture_stale=True)
+            expect(page.locator('#throughput')).to_contain_text('no recent frames · Throughput: 0.0 fps')
+            visual.update(phase='Ended')
+            expect(page.locator('#throughput')).to_contain_text('playback ended')
+            visual.clear()
+            visual.update(deepcopy(healthy))
+            expect(page.locator('#throughput')).to_contain_text('Processing capacity: 100.0 fps (10.0 ms/frame)')
             for width, height, suffix in ((1120, 800, 'default'), (760, 560, 'minimum')):
                 page.set_viewport_size({'width': width, 'height': height})
                 for tab in ('session', 'obs', 'renderer', 'results'):
@@ -291,6 +311,8 @@ def main(video, out):
             assert page.evaluate('window.probeClosed') is True
             assert not errors, errors
             write_json(out / 'report.json', dict(errors=errors, graphite_layout=True, minimum_width_no_overflow=True,
+                        distinct_processing_and_source_rates=True, legacy_timing_and_unavailable_states=True,
+                        measured_rates=measured_rates,
                         visual_status_fixtures=True, keyboard_focus_visible=True, integration_tabs=True, tab_keyboard_navigation=True,
                         tabs_preserved_draft=True, results_controls=True, results_apply_without_restart=True,
                         collapsed_results_recovery=True, authenticated_thumbnails_on_demand=True,

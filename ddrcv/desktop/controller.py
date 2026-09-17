@@ -322,6 +322,7 @@ class Desk:
         status = runtime.status() if runtime else dict(phase='Stopped', published=dict(state='unknown', players=[True, True], score=None),
                     raw_state='unknown', raw_scores=None, decisions={}, frame_age=None,
                     capture_stale=True, score_age=[None, None], sequence=0, fps=0, processing_ms=0,
+                    processing_fps=None, processing_avg_ms=None, source_fps=None,
                     publisher=dict(running=False, clients=0), obs=dict(connected=False, automation=False),
                     renderer=dict(running=False))
         with self.lock:
