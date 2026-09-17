@@ -48,6 +48,7 @@ def default_config():
         "results": {
             "enabled": True,
             "parse_names": True,
+            "screenshots_only": False,
             "output_directory": "screenshots",
             "include_player_names": True,
             "outbox_directory": ".workbench/results",
@@ -169,7 +170,7 @@ def validate_config(overrides):
     result = config['results']
     from ddrcv.state.player_names import validate_config as validate_names
     config['player_names'] = validate_names(config['player_names'])
-    for key in ('enabled', 'discord', 'only_duo', 'parse_names', 'include_player_names'):
+    for key in ('enabled', 'discord', 'only_duo', 'parse_names', 'screenshots_only', 'include_player_names'):
         boolean(result, key, False)
     if not isinstance(result.get('outbox_directory'), str) or not result['outbox_directory']:
         raise ValueError('Results require an outbox directory')

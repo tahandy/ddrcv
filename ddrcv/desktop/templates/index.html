@@ -107,8 +107,10 @@
     <label class="check"><input data-path="results.enabled" type="checkbox"> Capture results</label>
     <label>Screenshot folder<div class="inline"><input data-path="results.output_directory" type="text"><button id="browse-results">Browse…</button></div></label>
     <label class="check"><input data-path="results.include_player_names" type="checkbox"> Include parsed player names in filenames</label>
+    <label class="check"><input data-path="results.screenshots_only" type="checkbox"> Screenshots only <span class="quiet">Applies immediately</span></label>
+    <p class="quiet">Skip results score and name parsing. Automatically save and post a screenshot when the results screen ends or after ten seconds. Gameplay scores continue. Capture results and Discord publishing must be enabled for automatic posts.</p>
     <label class="check"><input data-path="results.parse_names" type="checkbox"> Read names on results</label>
-    <p class="quiet">Applies immediately. Scores post as soon as confirmed; names that confirm later update the same Discord message.</p>
+    <p class="quiet">Applies immediately. When Screenshots only is off, scores post as soon as confirmed; names that confirm later update the same Discord message.</p>
     <p class="quiet">Screenshots use UTC timestamps and a unique suffix. Names are included only when successfully parsed.</p>
     <p class="quiet">Turn off name parsing if names are being read incorrectly. Results will use P1 and P2 labels and continue reading scores.</p>
     <div class="source-actions"><button id="apply-results" class="primary">Apply results settings</button><span id="results-feedback" role="status" class="quiet"></span></div>

@@ -61,13 +61,13 @@ async function refreshHistory() {
       const card = document.createElement('article'); card.className = 'result-card';
       const heading = document.createElement('p');
       heading.textContent = `${new Date(r.created_at * 1000).toLocaleString()} · ${r.score_mode.toUpperCase()} · ` +
-        r.players.map((p, i) => p.present ? `${p.name || 'P'+(i+1)}: ${p.score ?? 'unconfirmed'}` : `P${i+1}: absent`).join(' / ');
+        (r.screenshots_only ? 'Screenshots only' : r.players.map((p, i) => p.present ? `${p.name || 'P'+(i+1)}: ${p.score ?? 'unconfirmed'}` : `P${i+1}: absent`).join(' / '));
       const detail = document.createElement('p'); detail.className = 'quiet';
       const update = r.name_update || {};
       detail.textContent = `Delivery: ${title(r.delivery.state)}${r.delivery.error ? ' · '+r.delivery.error : ''}` +
         (update.state && update.state !== 'idle' ? ` · Name update: ${title(update.state)}${update.error ? ' · '+update.error : ''}` : '') +
         (r.players.some(p => p.present && !p.name) && r.parse_names !== false ? ' · Names incomplete' : '') +
-        (!r.screenshot_confirmed ? ' · Scores/screenshot unconfirmed' : '') +
+        (!r.screenshots_only && !r.screenshot_confirmed ? ' · Scores/screenshot unconfirmed' : '') +
         (r.export_error ? ' · Screenshot export warning: '+r.export_error : '');
       card.append(heading, detail);
       const picture = document.createElement('div'); card.append(picture);
@@ -356,7 +356,7 @@ async function pollOnce() {
   $('results-summary').textContent = results ? `Results: ${results.last_sent_at ? 'last sent '+new Date(results.last_sent_at * 1000).toLocaleTimeString() : 'no delivery yet'} · ${results.needs_attention || 0} need attention` : 'Results: not started';
   for (const id of ['reset-p1', 'reset-p2']) $(id).disabled = status.phase !== 'Running';
   $('discord-status').textContent = results?.discord ? 'Publishing enabled' : 'Disabled';
-  $('results-detail').textContent = results?.error || (results ? `Results: ${title(results.phase)}${results.latest ? ' · Latest delivery: ' + title(results.latest.delivery?.state) : ''}` : 'Start capture with results enabled to process results.');
+  $('results-detail').textContent = results?.error || (results ? `Results: ${title(results.phase)}${results.screenshots_only ? ' · Screenshots only' : ''}${results.latest ? ' · Latest delivery: ' + title(results.latest.delivery?.state) : ''}` : 'Start capture with results enabled to process results.');
   $('apply-results').disabled = status.phase === 'Starting';
   $('read-details').textContent = JSON.stringify({
     raw_scores: status.raw_scores,
@@ -413,13 +413,14 @@ function handle(id, fn) {
   });
 }
 for (const el of document.querySelectorAll('[data-path]')) el.addEventListener('input', async () => {
-  if (['player_names.enabled', 'results.parse_names'].includes(el.dataset.path)) {
+  if (['player_names.enabled', 'results.parse_names', 'results.screenshots_only'].includes(el.dataset.path)) {
     const previous = get(el.dataset.path);
     const enabled = el.checked;
     el.disabled = true;
     try {
       await flush();
-      await api('action', 'POST', {action:'set_names', scope:el.dataset.path.split('.')[0], enabled});
+      await api('action', 'POST', el.dataset.path === 'results.screenshots_only' ?
+        {action:'set_screenshots_only', enabled} : {action:'set_names', scope:el.dataset.path.split('.')[0], enabled});
       set(el.dataset.path, enabled); updateAdvanced(); await pollOnce();
     } catch (e) { el.checked = !!previous; error(e.message); }
     finally { el.disabled = false; }

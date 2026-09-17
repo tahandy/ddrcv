@@ -324,7 +324,7 @@ class TournamentRuntime:
     def configure_results(self, settings):
         """Apply operator controls on the recognition worker without resetting gameplay."""
         from ddrcv.apps.driver_config import validate_config
-        allowed = {'enabled', 'discord', 'webhook', 'parse_names', 'output_directory', 'include_player_names'}
+        allowed = {'enabled', 'discord', 'webhook', 'parse_names', 'screenshots_only', 'output_directory', 'include_player_names'}
         if set(settings) - allowed:
             raise ValueError('Only Results tab settings can change during capture')
         with self.lock:

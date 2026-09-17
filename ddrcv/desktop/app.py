@@ -70,6 +70,8 @@ def create_app(desk, token, open_panel=None, shutdown=None):
             return jsonify(desk.apply())
         if name == 'apply_results':
             return jsonify(desk.apply_results())
+        if name == 'set_screenshots_only':
+            return jsonify(desk.set_screenshots_only(args['enabled']))
         if name == 'set_names':
             return jsonify(desk.set_names(args['scope'], args['enabled']))
         if name == 'reset_score':

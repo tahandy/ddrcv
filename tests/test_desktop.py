@@ -94,6 +94,32 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(self.desk.config()['draft']['results']['output_directory'], 'pending folder')
         self.assertEqual(self.desk.config()['draft']['publish']['websocket']['port'], original_port + 1)
 
+    def test_screenshots_only_live_action_is_scoped_authenticated_and_persisted(self):
+        self.assertFalse(self.desk.config()['draft']['results']['screenshots_only'])
+        self.desk.start()
+        runtime = self.desk.runtime
+        draft = self.desk.config()['draft']
+        draft['results']['output_directory'] = 'unapplied folder'
+        draft['publish']['websocket']['port'] += 1
+        self.desk.edit(draft)
+        client = create_app(self.desk, 'test').test_client()
+        args = dict(action='set_screenshots_only', enabled=True)
+        self.assertEqual(client.post('/api/action', json=args).status_code, 403)
+        self.assertEqual(client.post('/api/action', json=args, headers={'X-Desk-Token': 'test'}).status_code, 200)
+        self.assertTrue(runtime.config['results']['screenshots_only'])
+        self.assertTrue(runtime.config['results']['parse_names'])
+        self.assertNotEqual(runtime.config['results']['output_directory'], 'unapplied folder')
+        self.assertNotEqual(runtime.config['publish']['websocket']['port'], draft['publish']['websocket']['port'])
+        self.assertEqual(runtime.stop_calls, 0)
+        self.assertEqual(self.desk.config()['draft']['results']['output_directory'], 'unapplied folder')
+        self.desk.close()
+        self.desk = Desk(self.root, FakeRuntime)
+        self.assertTrue(self.desk.config()['draft']['results']['screenshots_only'])
+        self.desk.set_screenshots_only(False)
+        self.assertFalse(self.desk.config()['draft']['results']['screenshots_only'])
+        with self.assertRaises(ValueError):
+            self.desk.set_screenshots_only('false')
+
     def test_results_history_images_and_recovery_use_authenticated_api(self):
         import numpy as np
         from ddrcv.results.service import ResultsService
@@ -890,6 +916,11 @@ class RecoveryTests(unittest.TestCase):
                     self.assertIs(runtime.results, service)
                     self.assertFalse(service.outbox.enabled)
                     self.assertTrue(service.config['parse_names'])
+                    runtime.configure_results(dict(screenshots_only=True))
+                    self.assertTrue(service.config['screenshots_only'])
+                    self.assertTrue(service.config['parse_names'])
+                    runtime.configure_results(dict(screenshots_only=False))
+                    self.assertFalse(service.config['screenshots_only'])
                     reset.assert_not_called()
                 wait_for(lambda: runtime.sequence > before + 4)
                 self.assertEqual(runtime.engine.session.info['score'], scores)

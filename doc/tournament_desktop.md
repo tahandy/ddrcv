@@ -149,6 +149,22 @@ Turn off **Read names on results** if name recognition becomes unreliable; new r
 use P1/P2 labels while score confirmation and EX winner calculation continue.
 This switch applies immediately. Name parsing defaults to enabled for existing profiles.
 
+Enable **Screenshots only** in Results to bypass both results score and name OCR.
+It applies immediately without restarting capture or clearing gameplay scores.
+Capture results still needs to be enabled; Discord publishing must also be enabled
+for automatic posts. The existing screenshot selection saves a detected results
+screen on departure or at its original ten-second deadline, with alternatives and
+normal delivery/retry support. Discord and recovery label it **Screenshots only**,
+without extracted scores, names, or a winner. This mode does not load the results
+OCR model. Login/song-splash names retain their separate switch.
+
+Switching modes preserves retained screenshots and the current deadline, clears
+unfinished results parsing evidence, and rejects recognition already in flight.
+Saved results and posts stay unchanged. Turning it off resumes results parsing
+with the existing name preference; an already-saved episode is never posted again.
+The setting is saved as `results.screenshots_only` and defaults to false for older
+profiles. Completely missed results screens remain outside automatic recovery.
+
 Click **Apply results settings** to apply the other controls during a run without
 restarting capture, clearing gameplay scores, or reconnecting OBS/the renderer.
 Only the controls on the Results tab apply; other draft

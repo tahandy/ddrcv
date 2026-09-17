@@ -77,6 +77,8 @@ def format_payload(record):
         lines.append('Partial result: missing fields are unconfirmed.')
     if not record['screenshot_confirmed']:
         lines.append('Screenshot stability unconfirmed.')
+    if record.get('screenshots_only', False):
+        lines = ['Screenshots only — score and name parsing disabled.']
     title = 'Rehearsal — DDR results' if record.get('rehearsal') else 'DDR results'
     return dict(allowed_mentions={'parse': []}, embeds=[dict(title=title, description='\n'.join(lines),
         image={'url': 'attachment://results.png'}, footer={'text': f"Event {record['event_id']}"})])

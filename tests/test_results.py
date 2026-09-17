@@ -158,6 +158,123 @@ class ServiceTests(unittest.TestCase):
         self.assertNotIn('name unread', text)
         self.assertNotIn('Partial result', text)
 
+    def test_screenshots_only_skips_ocr_and_delivers_at_departure(self):
+        sender = Mock(return_value=dict(message_id='123', message_url=None))
+        self.service.outbox.sender = sender
+        self.service.configure(screenshots_only=True, discord=True,
+                               webhook='https://discord.com/api/webhooks/1/test')
+        self.settled()
+        self.assertEqual(self.service.status()['records'], [])
+        self.reader.read.assert_not_called()
+        self.feed(4, raw='song_select', state='song_select')
+        wait_for(lambda: self.service.status()['records'][0]['delivery']['state'] == 'sent')
+        saved = self.service.status()['records'][0]
+        self.assertTrue(saved['screenshots_only'])
+        self.assertFalse(saved['partial'])
+        self.assertFalse(saved['screenshot_confirmed'])
+        self.assertFalse(saved['parse_names'])
+        self.assertTrue(all(p['name'] is None and p['score'] is None for p in saved['players']))
+        self.assertEqual(saved['outcome']['kind'], 'unavailable')
+        self.assertTrue((cv2.imread(saved['screenshot_path']) == int(saved['timestamp'] * 10)).all())
+        payload = format_payload(saved)
+        self.assertEqual(payload['allowed_mentions'], {'parse': []})
+        self.assertEqual(payload['embeds'][0]['description'],
+                         'Screenshots only — score and name parsing disabled.')
+        self.assertEqual(payload['embeds'][0]['image']['url'], 'attachment://results.png')
+        sender.assert_called_once()
+
+    def test_screenshots_only_live_deadline_keeps_short_screen_and_reloads(self):
+        self.service.configure(screenshots_only=True)
+        self.service.reset('live', False, 'money')
+        self.feed(0, presence=(False, True))
+        self.service.tick(10)
+        self.assertTrue(self.service.flush())
+        saved = self.service.status()['records'][0]
+        self.assertEqual(saved['timestamp'], 0)
+        self.assertEqual([p['present'] for p in saved['players']], [False, True])
+        self.reader.read.assert_not_called()
+        self.service.close()
+        self.service = ResultsService(self.temp.name, dict(enabled=True), reader=self.reader)
+        reloaded = self.service.status()['records'][0]
+        self.assertTrue(reloaded['screenshots_only'])
+        self.assertEqual(reloaded['delivery']['state'], 'saved')
+
+    def test_live_screenshots_only_preserves_candidates_deadline_and_rejects_blocked_ocr(self):
+        entered, release = threading.Event(), threading.Event()
+        def blocked(*args):
+            entered.set()
+            release.wait(3)
+            return [dict(name='WRONG', score=999), dict(name='WRONG', score=999)]
+        self.reader.read.side_effect = blocked
+        self.feed(0)
+        self.feed(2, flush=False)
+        self.assertTrue(entered.wait(2))
+        try:
+            episode = self.service.active
+            selected = episode.best
+            self.service.configure(screenshots_only=True)
+            self.assertIs(self.service.active, episode)
+            self.assertIs(episode.best, selected)
+            self.assertEqual(episode.start, 0)
+            self.feed(3, flush=False)
+            self.service.tick(10)
+            wait_for(lambda: len(self.service.status()['records']) == 1)
+            self.assertTrue(self.service.busy)  # Screenshot saved while OCR is still blocked.
+        finally:
+            release.set()
+        self.assertTrue(self.service.flush())
+        saved = self.service.status()['records'][0]
+        self.assertTrue(saved['screenshots_only'])
+        self.assertEqual(saved['timestamp'], 3)
+        self.assertTrue(all(p['name'] is None and p['score'] is None for p in saved['players']))
+        self.assertIsNone(self.service.status()['error'])
+
+    def test_screenshots_only_roundtrip_rejects_old_ocr_success_and_error(self):
+        for fails in (False, True):
+            with self.subTest(fails=fails):
+                self.service.reset('video', True, 'ex')
+                entered, release = threading.Event(), threading.Event()
+                def blocked(*args):
+                    entered.set()
+                    release.wait(3)
+                    if fails:
+                        raise RuntimeError('stale OCR failure')
+                    return [dict(name='OLD', score=999), dict(name='OLD', score=999)]
+                self.reader.read.side_effect = blocked
+                self.feed(0)
+                self.feed(2, flush=False)
+                self.assertTrue(entered.wait(2))
+                try:
+                    self.service.configure(screenshots_only=True)
+                    self.service.configure(screenshots_only=False)
+                finally:
+                    release.set()
+                self.assertTrue(self.service.flush())
+                self.assertIsNone(self.service.status()['error'])
+                self.assertEqual(self.service.status()['records'], [])
+                for pair in self.service.active.evidence:
+                    self.assertTrue(all(e.value is None for e in pair))
+                self.assertTrue(all(p['score'] is None for p in self.service.active.best.players))
+
+    def test_screenshots_only_can_resume_parsing_without_duplicate_saved_result(self):
+        self.service.configure(screenshots_only=True)
+        self.feed(0); self.feed(2)
+        episode = self.service.active
+        self.service.configure(screenshots_only=False)
+        self.assertIs(self.service.active, episode)
+        for i in range(8):
+            self.feed(2.2 + i * .2)
+        saved = self.service.status()['records'][0]
+        self.assertFalse(saved['screenshots_only'])
+        self.assertEqual(saved['players'][0]['score'], 1615)
+        self.service.configure(screenshots_only=True)
+        self.service.configure(screenshots_only=False)
+        self.settled(4)
+        self.assertEqual(len(self.service.status()['records']), 1)
+        self.assertEqual(self.service.status()['records'][0]['players'], saved['players'])
+        with self.assertRaisesRegex(ValueError, 'screenshots_only'):
+            self.service.configure(screenshots_only='true')
+
     def test_screenshots_export_to_selected_folder_and_change_live(self):
         output = Path(self.temp.name) / 'named screenshots'
         self.service.configure(output_directory=str(output))

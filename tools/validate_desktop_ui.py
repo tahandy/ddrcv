@@ -100,6 +100,17 @@ def main(video, out):
             expect(names).to_be_checked()
             names.uncheck()
             expect(names).to_be_enabled()
+            screenshots_only = page.locator('[data-path="results.screenshots_only"]')
+            expect(screenshots_only).not_to_be_checked()
+            screenshots_only.check()
+            expect(screenshots_only).to_be_enabled()
+            expect(page.locator('#results-detail')).to_contain_text('Screenshots only')
+            expect(page.locator('#phase')).to_have_text('Running')
+            expect(page.locator('[data-path="results.output_directory"]')).to_have_value(export_folder)
+            expect(names).not_to_be_checked()
+            screenshots_only.uncheck()
+            expect(screenshots_only).to_be_enabled()
+            expect(page.locator('#results-detail')).not_to_contain_text('Screenshots only')
             webhook = page.locator('[data-path="results.webhook"]')
             webhook.fill('https://discord.com/api/webhooks/1/desktop-ui-test')
             discord = page.locator('[data-path="results.discord"]')
@@ -146,6 +157,13 @@ def main(video, out):
             page.get_by_role('button', name='Republish', exact=True).click()
             assert len(commands) == 1
             page.screenshot(path=str(out/'results-recovery.png'), full_page=True)
+            recovery['records'][0].update(screenshots_only=True, parse_names=False,
+                screenshot_confirmed=False, revision=3,
+                players=[dict(present=True, name=None, score=None)] * 2,
+                name_update=dict(state='idle'))
+            expect(page.locator('#results-list')).to_contain_text('Screenshots only')
+            expect(page.locator('#results-list')).not_to_contain_text('unconfirmed')
+            expect(page.locator('#results-list')).not_to_contain_text('Names incomplete')
             page.locator('#results-history > summary').click()
             before_images = len([r for r in requests if '/api/results/' in r])
             page.wait_for_timeout(1100)

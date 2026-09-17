@@ -237,7 +237,7 @@ class Desk:
 
     def apply_results(self):
         """Apply only the Results tab controls, preserving unrelated draft edits."""
-        keys = ('enabled', 'discord', 'webhook', 'parse_names', 'output_directory', 'include_player_names')
+        keys = ('enabled', 'discord', 'webhook', 'parse_names', 'screenshots_only', 'output_directory', 'include_player_names')
         with self.operations:
             if self.closed:
                 raise ValueError('Application is shutting down')
@@ -275,6 +275,23 @@ class Desk:
             with self.lock:
                 self.applied[scope][key] = enabled
                 self.draft[scope][key] = enabled
+                self._persist()
+        return self.status()
+
+    def set_screenshots_only(self, enabled):
+        if type(enabled) is not bool:
+            raise ValueError('Screenshots only must be a boolean')
+        with self.operations:
+            if self.closed:
+                raise ValueError('Application is shutting down')
+            runtime = self.runtime
+            if runtime and runtime.thread and not runtime.finished.is_set():
+                runtime.configure_results({'screenshots_only': enabled})
+            elif runtime:
+                runtime.config['results']['screenshots_only'] = enabled
+            with self.lock:
+                self.applied['results']['screenshots_only'] = enabled
+                self.draft['results']['screenshots_only'] = enabled
                 self._persist()
         return self.status()
 

@@ -15,7 +15,7 @@ from .delivery import Outbox, redact_error
 from .recognition import Evidence, ResultsReader, outcome, EX_BOXES, MONEY_BOXES
 
 LOG = logging.getLogger('ddrcv.results')
-DEFAULTS = dict(enabled=False, discord=False, webhook=None, parse_names=True, confidence=.8,
+DEFAULTS = dict(enabled=False, discord=False, webhook=None, parse_names=True, screenshots_only=False, confidence=.8,
                 output_directory=None, include_player_names=True,
                 sample_hz=5, settling_seconds=2., min_frames=5, confirmation_seconds=1.,
                 max_gap=.75, deadline_seconds=10., only_duo=False, rehearsal=False)
@@ -117,6 +117,8 @@ class ResultsService:
     @staticmethod
     def _validate(config):
         import math
+        if type(config['screenshots_only']) is not bool:
+            raise ValueError('results.screenshots_only must be a boolean')
         if type(config['parse_names']) is not bool:
             raise ValueError('results.parse_names must be a boolean')
         if type(config['include_player_names']) is not bool:
@@ -143,11 +145,20 @@ class ResultsService:
             self._validate(config)
             if config == self.config:
                 return
-            if all(config[k] == self.config.get(k) for k in config if k != 'parse_names'):
+            if all(config[k] == self.config.get(k) for k in config if k not in ('parse_names', 'screenshots_only')):
+                mode_changed = config['screenshots_only'] != self.config['screenshots_only']
                 self.config = config
                 ep = self.active
                 if ep:
                     ep.names_epoch += 1
+                    ep.config['screenshots_only'] = config['screenshots_only']
+                    if mode_changed:
+                        # Reject in-flight OCR even if the operator toggles back before it returns.
+                        ep.run += 1
+                        ep.pending = None
+                        ep.evidence = [[Evidence(), Evidence()], [Evidence(), Evidence()]]
+                        if self.phase == 'ocr_failed':
+                            self.error = None
                     ep.config['parse_names'] = config['parse_names']
                     for pair in ep.evidence:
                         pair[0] = Evidence()
@@ -156,7 +167,13 @@ class ResultsService:
                             if sample:
                                 for player in sample.players:
                                     player['name'] = None
-                    elif not config['parse_names']:
+                                    if mode_changed:
+                                        player['score'] = None
+                                if mode_changed:
+                                    sample.confirmed = False
+                        if mode_changed:
+                            self.phase = 'capturing' if config['screenshots_only'] else 'confirming'
+                    elif not config['parse_names'] or config['screenshots_only']:
                         ep.finish = True
                         ep.pending = None
             else:
@@ -200,6 +217,7 @@ class ResultsService:
             status = dict(phase=self.phase, error=self.error, replaced_frames=self.replaced_frames,
                           deduplicated=self.deduplicated, pending=len(self.jobs), enabled=self.config['enabled'],
                           discord=self.config['discord'], parse_names=self.config['parse_names'],
+                          screenshots_only=self.config['screenshots_only'],
                           rehearsal=self.config['rehearsal'], webhook_configured=bool(self.config['webhook']))
         outbox = self.outbox.snapshot()
         status['records'] = outbox['records']
@@ -290,8 +308,11 @@ class ResultsService:
                 self._finalize(ep)
                 ep.finish = True
                 ep.pending = None
-            else:
+            elif not ep.config['screenshots_only']:
                 self._schedule(ep)
+            else:
+                ep.pending = None
+                self.phase = 'capturing'
 
     def _retain(self, ep, sample, gap):
         """Bounded frame selection independent of OCR; only small crop math here."""
@@ -370,7 +391,7 @@ class ResultsService:
     def _observe(self, ep, sample):
         frame, timestamp, run = sample.frame, sample.timestamp, sample.run
         with self.lock:
-            if self.closed or ep.finish or ep.generation != self.generation:
+            if self.closed or ep.finish or ep.generation != self.generation or ep.config['screenshots_only'] or run != ep.run:
                 return
             if timestamp - ep.start < ep.config['settling_seconds']:
                 return
@@ -382,7 +403,7 @@ class ResultsService:
             readings = self.reader.read(frame, ep.presence, ep.mode)
         except Exception as exc:
             with self.lock:
-                if self.closed or ep.finish or ep.generation != self.generation:
+                if self.closed or ep.finish or ep.generation != self.generation or run != ep.run:
                     return
                 self.error = redact_error(exc, ep.config.get('webhook'))
                 self.phase = 'ocr_failed'
@@ -445,9 +466,10 @@ class ResultsService:
                                                        sample.players, sample.confirmed)
             record = dict(event_id=ep.event_id, source_id=ep.source_id, recorded=ep.recorded,
                 interval=[ep.start, ep.end], timestamp=timestamp, frame_index=index, score_mode=ep.mode,
-                players=deepcopy(players), parse_names=ep.config['parse_names'],
+                players=deepcopy(players), parse_names=ep.config['parse_names'] and not ep.config['screenshots_only'],
+                screenshots_only=ep.config['screenshots_only'],
                 output_directory=ep.config['output_directory'], include_player_names=ep.config['include_player_names'],
-                partial=not stable or (ep.config['parse_names'] and any(p['present'] and p['name'] is None for p in players)),
+                partial=not ep.config['screenshots_only'] and (not stable or (ep.config['parse_names'] and any(p['present'] and p['name'] is None for p in players))),
                 screenshot_confirmed=stable,
                 outcome=outcome(players, ep.mode), rehearsal=ep.config['rehearsal'],
                 auto_publish=ep.config['discord'], created_at=time.time())

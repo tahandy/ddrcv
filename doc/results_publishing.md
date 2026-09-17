@@ -112,6 +112,26 @@ screenshot candidates, and the original deadline. Disabling it after the first p
 ends further name enrichment for that episode; it does not remove saved names.
 
 
+## Screenshots-only operation
+
+Set `results.screenshots_only: true`, or use the live **Screenshots only** desktop
+switch, to bypass all results score/name OCR. Capture and Discord publishing remain
+separate settings. The service still detects results episodes, retains sampled
+frames, and saves the existing motion-ranked fallback on departure or at the
+original deadline (ten seconds by default). OCR models are lazy and are not loaded
+for this path. Gameplay tracking and login/splash names are unchanged.
+
+Saved records carry `screenshots_only: true`, null names/scores, and no winner.
+Discord shows the screenshot with an explicit parsing-disabled label; intentional
+missing fields are not described as a partial recognition failure. The same outbox,
+retry, alternatives, exports, and recovery controls apply. Older records/profiles
+without the flag keep their existing behavior.
+
+The live switch retains screenshot candidates and the episode deadline, clears
+unfinished parsing evidence, and invalidates in-flight OCR. Already-saved content
+is preserved; mode changes never duplicate its post. Turning parsing back on uses
+fresh evidence and the saved name-reading preference.
+
 ## Concurrency, persistence, and delivery
 
 Capture only submits sampled frame copies to a bounded latest-frame mailbox.
