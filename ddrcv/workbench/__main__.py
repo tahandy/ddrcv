@@ -25,8 +25,10 @@ def main():
     try:
         if args.check:
             import json
-            print(json.dumps(wb.checks(), indent=2))
-            return
+            checks = wb.checks()
+            print(json.dumps(checks, indent=2))
+            return 1 if any(item['name'] == 'RapidOCR model and inference' and not item['ok']
+                            for item in checks) else 0
         app = create_app(wb)
         try:
             server = make_server('127.0.0.1', args.port, app, threaded=True)
@@ -47,4 +49,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

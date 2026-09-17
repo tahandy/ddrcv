@@ -86,6 +86,10 @@ until enough subsequent frames have been observed. This also means seeking
 straight into gameplay can temporarily lack player-presence evidence normally
 obtained on the song splash.
 
+Optional [login and splash player-name publication](player_names.md) uses background OCR
+independently of results capture. Login names remain through selection; the splash
+confirms names afresh for the song.
+
 **Image** input runs stateless recognition diagnostics. It never creates fake
 confirmation votes or accepted scores and does not automatically select an OBS
 scene. Use video playback or **Simulate output without footage** to test the

@@ -2,10 +2,12 @@
 
 from ddrcv.score.temporal import ScoreTracker
 from ddrcv.state.temporal import StateDebouncer
+from uuid import uuid4
 
 
 class TournamentSession:
     def __init__(self, debounce=None, score_filter=None):
+        self.song_generation = uuid4().hex
         self.debouncer = StateDebouncer(**(debounce or {}))
         self.trackers = [ScoreTracker(**(score_filter or {})) for _ in range(2)]
         self.info = {'state': 'unknown', 'players': (True, True), 'song': None, 'score': None}
@@ -23,6 +25,10 @@ class TournamentSession:
             self.last_known_state = state
             if state in ('song_select', 'song_splash', 'login', 'total_result') or (
                     state == 'song_playing' and previous not in ('song_select', 'song_splash')):
+                # Names read at login are useful while choosing the first song.
+                # Score reset behavior stays the same; splash starts fresh names.
+                if not (state == 'song_select' and previous == 'login'):
+                    self.song_generation = uuid4().hex
                 for tracker in self.trackers:
                     tracker.reset()
                 self.info.update(players=(True, True), song=None, score=None)

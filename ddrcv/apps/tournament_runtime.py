@@ -10,6 +10,7 @@ import cv2
 
 from ddrcv.ingest.file_source import FileSource, normalize_frame
 from ddrcv.apps.tournament_integrations import Integrations
+from ddrcv.state.player_names import PlayerNameService
 
 
 class TournamentRuntime:
@@ -41,7 +42,10 @@ class TournamentRuntime:
         self.results_update = None
         self.feed_lock = threading.RLock()
         self.feed_active = False
+        self.feed_integrations = False
         self.latest_info = deepcopy(engine.session.info)
+        self.latest_message = {**deepcopy(self.latest_info), 'player_names': dict(p1=None, p2=None)}
+        self.player_names = None
 
     def start(self):
         if self.thread:
@@ -62,6 +66,7 @@ class TournamentRuntime:
             # Claim the publisher before opening hardware; conflicts never touch another driver.
             self.publisher.start()
             self.feed_active = True
+            self.player_names = PlayerNameService(self.config.get('player_names'))
             self._start_results()
             self.fetcher.start()
             candidate_thread = getattr(self.fetcher, 'thread', None)
@@ -69,6 +74,9 @@ class TournamentRuntime:
             self.integrations.start()
             self.phase = 'Running'
             while not self.stop_requested.is_set():
+                if self.player_names.changed.is_set():
+                    self.player_names.changed.clear()
+                    self._publish()
                 self._poll_results_update()
                 changed, frame = self._poll_source_switch()
                 if changed:
@@ -94,10 +102,11 @@ class TournamentRuntime:
                 if self.results is not None and not still:
                     self.results.submit(frame, now, result['raw_state'], info['state'], info['players'],
                                         self.fetcher.index - 1 if isinstance(self.fetcher, FileSource) else None)
-                self._publish(info)
-                # Still images cannot drive OBS automation.
-                if not still:
-                    self.integrations.update(info)
+                with self.feed_lock:
+                    if not still:
+                        self.player_names.submit(frame, now, result['raw_state'], info['state'],
+                                                 info['players'], self.engine.session.song_generation)
+                    self._publish(info, integrations=not still)
                 wall = time.perf_counter()
                 with self.lock:
                     self.sequence += 1
@@ -134,7 +143,7 @@ class TournamentRuntime:
                 fetcher.stop()
             except Exception:
                 self.log.exception('Capture cleanup error')
-        for stop in (self.fetcher.stop, self._stop_results, self.publisher.stop, self.integrations.stop):
+        for stop in (self.fetcher.stop, self._stop_names, self._stop_results, self.publisher.stop, self.integrations.stop):
             try:
                 stop()
             except Exception as error:
@@ -250,8 +259,10 @@ class TournamentRuntime:
         if self.results is not None:
             self.results.finish()
             self._reset_results_source()
-        self._publish(info)
-        self.integrations.update(info)
+        with self.feed_lock:
+            if self.player_names is not None:
+                self.player_names.reset(self.engine.session.song_generation)
+            self._publish(info, integrations=True)
         self._finish_source_switch()
         return True, frame
 
@@ -328,18 +339,29 @@ class TournamentRuntime:
                 self.results.close()
                 self.results = None
 
-    def _publish(self, info=None):
+    def _publish(self, info=None, integrations=None):
         with self.feed_lock:
             if not self.feed_active:
                 return
             if info is not None:
                 self.latest_info = deepcopy(info)
+            if integrations is not None:
+                self.feed_integrations = integrations
             message = deepcopy(self.latest_info)
+            message['player_names'] = (self.player_names.snapshot() if self.player_names is not None
+                                       else dict(p1=None, p2=None))
             if self.results is not None:
                 message['results'] = self.results.feed_status()
             elif self.results_error:
                 message['results'] = dict(phase='failed', error=self.results_error)
+            self.latest_message = deepcopy(message)
             self.publisher.send_message(message)
+            if self.feed_integrations:
+                self.integrations.update(message)
+
+    def _stop_names(self):
+        if self.player_names is not None:
+            self.player_names.close()
 
     def _publish_results_status(self):
         # Delivery can complete during capture loss; publish the latest confirmed
@@ -367,6 +389,7 @@ class TournamentRuntime:
             if self.thread.is_alive():
                 raise RuntimeError('Driver shutdown is still pending; wait before restarting')
             for worker in (self.capture_thread, self.integrations.thread, *self._results_workers(),
+                           self.player_names.worker if self.player_names is not None else None,
                            *(worker for _, worker in self.retired_captures)):
                 if worker and worker.is_alive():
                     raise RuntimeError('Background cleanup is still pending; wait before restarting')
@@ -398,6 +421,10 @@ class TournamentRuntime:
         elif self.results_error:
             snapshot['results'] = dict(phase='failed', error=self.results_error)
         snapshot.update(self.integrations.status())
+        with self.feed_lock:
+            snapshot['published'] = deepcopy(self.latest_message)
+            if self.player_names is not None:
+                snapshot['player_name_status'] = self.player_names.status()
         return snapshot
 
     def snapshot(self):

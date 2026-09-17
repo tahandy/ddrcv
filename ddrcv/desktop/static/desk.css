@@ -38,6 +38,8 @@ section { border: 1px solid var(--border); border-radius: 3px; background: var(-
 section:last-child { margin-bottom: 0; }
 .section-title { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .session-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(150px, 1fr); gap: 20px; }
+.player-name { display: block; color: var(--accent); font-weight: 600; }
+#name-status { margin-top: 8px; overflow-wrap: anywhere; }
 .scores { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .scores th, .scores td { padding: 7px 10px; text-align: left; font-weight: 400; overflow-wrap: anywhere; }
 .scores th:first-child, .scores td:first-child { padding-left: 0; }

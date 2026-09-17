@@ -1,5 +1,7 @@
 # Direct dependency versions exercised with Windows Python 3.12.6.
-# Full OCR/jacket-database research dependencies remain in requirements.txt.
+# CPU OCR is required by default results processing. Legacy research dependencies
+# (EasyOCR, Torch, jacket lookup) remain in requirements.txt.
+-r requirements-ocr.txt
 numpy==2.2.0
 opencv-python==4.10.0.84
 Pillow==11.0.0

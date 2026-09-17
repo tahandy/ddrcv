@@ -56,13 +56,19 @@
     </div>
   </section>
   <aside aria-label="Recognition and connections">
-    <h2>Recognition</h2>
+    <h2>Status</h2>
     <dl><dt>Detected screen</dt><dd id="raw-state">—</dd><dt>Confirmed screen</dt><dd id="confirmed-state">Unknown</dd><dt>Frame</dt><dd id="frame-index">—</dd></dl>
     <p id="confirmation" class="muted" hidden></p>
-    <table class="scores"><caption class="sr-only">Player presence, read scores, published scores, and filter decisions</caption><thead><tr><th scope="col"></th><th scope="col">P1 <span id="p1-presence" class="presence">—</span></th><th scope="col">P2 <span id="p2-presence" class="presence">—</span></th></tr></thead>
-      <tbody><tr><th scope="row">Read score</th><td id="p1-raw">—</td><td id="p2-raw">—</td></tr><tr class="published"><th scope="row">Published score</th><td id="p1-published">—</td><td id="p2-published">—</td></tr><tr class="decisions"><th scope="row">Filter</th><td id="p1-decision">—</td><td id="p2-decision">—</td></tr></tbody>
+    <table class="scores"><caption class="sr-only">Player names, presence, read scores, published scores, and filter decisions</caption><thead><tr><th scope="col"></th><th scope="col">P1 <span id="p1-presence" class="presence">—</span></th><th scope="col">P2 <span id="p2-presence" class="presence">—</span></th></tr></thead>
+      <tbody><tr class="player-names"><th scope="row">Parsed name</th><td id="p1-name">—</td><td id="p2-name">—</td></tr><tr><th scope="row">Read score</th><td id="p1-raw">—</td><td id="p2-raw">—</td></tr><tr class="published"><th scope="row">Published score</th><td id="p1-published">—</td><td id="p2-published">—</td></tr><tr class="decisions"><th scope="row">Filter</th><td id="p1-decision">—</td><td id="p2-decision">—</td></tr></tbody>
     </table>
-    <details class="read-help"><summary>About these readings</summary><p class="muted">Read scores are diagnostic. Only confirmed gameplay readings that pass the filter are published.</p></details>
+    <section class="name-monitor" aria-label="Player name recognition">
+      <h2>Player name recognition</h2>
+      <p id="name-status" role="status">Waiting for status</p>
+      <p id="name-error" class="warning" hidden></p>
+      <dl><dt>Evidence screen</dt><dd id="name-screen">—</dd><dt>Worker</dt><dd id="name-worker">—</dd><dt>Pending samples</dt><dd id="name-pending">—</dd><dt>Replaced samples</dt><dd id="name-replaced">—</dd></dl>
+    </section>
+    <details class="read-help"><summary>About these readings</summary><p class="muted">Names appear after repeated matching reads on login or song splash. An em dash means no confirmed name. Read scores are diagnostic. Only confirmed gameplay readings that pass the filter are published.</p><p class="muted">Enable login/splash names with player_names.enabled in the workbench settings.json, then restart the workbench. Results name parsing is separate.</p></details>
     <section class="connections"><h2>Connections</h2><p id="feed-status">Score feed: checking…</p><p id="renderer-status">Renderer: stopped</p><p id="obs-status">OBS: not connected</p><p id="capture-age" class="muted"></p><a href="/video" target="_blank" rel="noopener">Open clean video view</a></section>
     <details class="message"><summary>Published message</summary><pre id="message"></pre></details>
   </aside>

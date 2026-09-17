@@ -207,7 +207,12 @@ async function pollOnce() {
     $(`p${i+1}-presence`).textContent = status.published.players[i] ? 'Yes' : 'No';
     $(`p${i+1}`).textContent = !status.published.players[i] || value == null || value < 0 ? '—' : value.toLocaleString();
     $(`p${i+1}-age`).textContent = age(status.score_age[i]);
+    $(`p${i+1}-name`).textContent = status.published.player_names?.[`p${i+1}`] ?? '—';
   }
+  const names = status.player_name_status || {};
+  const namePhases = {disabled: 'Disabled', initializing: 'Loading OCR model', ready: names.busy ? 'Reading names' : 'Ready', failed: 'OCR failed', closed: 'Stopped'};
+  $('name-status').textContent = 'Name recognition: ' + (namePhases[names.phase] || 'Stopped') + (names.error ? ' · ' + names.error : '');
+  $('name-status').className = names.error ? 'failed' : 'quiet';
   $('capture').textContent = status.frame_age == null ? 'Waiting for capture' : `${status.capture_stale?'Stale capture':'Capture healthy'} · ${status.frame_age.toFixed(1)} s old`;
   $('capture').className = status.capture_stale ? 'stale' : '';
   $('publisher').textContent = status.publisher.running ? `Publishing · ${status.publisher.clients} client(s)` : 'Publisher stopped';
@@ -236,7 +241,9 @@ async function pollOnce() {
   $('apply-results').disabled = status.phase === 'Starting';
   $('read-details').textContent = JSON.stringify({
     raw_scores: status.raw_scores,
-    decisions: status.decisions
+    decisions: status.decisions,
+    player_names: status.published.player_names,
+    player_name_status: status.player_name_status
   }, null, 2);
   if (status.error) error(status.error);
 }

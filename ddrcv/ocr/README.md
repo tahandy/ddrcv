@@ -18,8 +18,11 @@ python -m pip install -e .
 Use Python **3.11 or newer** (the pinned ONNX Runtime requirement). Tested on
 Windows x64 with Python 3.12.6. Direct requirements: `rapidocr==3.9.2`,
 `onnxruntime==1.30.0`, `numpy==2.2.0`, `opencv-python==4.10.0.84`. Pip installs
-transitive dependencies. These optional dependencies are separate from the
-workbench/tournament requirements. The legacy `get_best_match_from_results`
+transitive dependencies. Tournament, desktop, and workbench requirements include
+these dependencies. Both application setup scripts provision the cached model
+and require a successful real-model splash smoke test. Run
+`python -B -m ddrcv.ocr.check` for an offline readiness check, or add `--provision`
+to permit the initial model download. The legacy `get_best_match_from_results`
 helper remains for the older parsers and sandbox scripts. The obsolete
 `get_ocr_singleton` EasyOCR factory has been removed; use `get_rapidocr()` for
 new crop recognition. Legacy EasyOCR demos construct their own reader and

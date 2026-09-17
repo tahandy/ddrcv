@@ -7,9 +7,11 @@ and song lookup are not prerequisites.
 
 ## Run this worktree
 
-Use the Python environment inside this checkout. Optional OCR dependencies are
-installed with `python -m pip install -r requirements-ocr.txt` in addition to the
-workbench dependencies. No changes to another checkout's environment are needed.
+Use the Python environment inside this checkout. OCR dependencies are
+included in the tournament/workbench/desktop requirements. Both setup scripts
+provision the model and run real inference. Existing environments can install
+`requirements-ocr.txt` and run `python -B -m ddrcv.ocr.check --provision`.
+No changes to another checkout's environment are needed.
 
 ```bat
 .venv\Scripts\python.exe -B -m ddrcv.workbench --port 5004

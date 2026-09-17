@@ -281,6 +281,7 @@ async function poll() {
       text(player + '-presence', !s.source.kind ? '—' : s.published.players?.[i] ? 'Present' : 'Absent');
       text(player + '-raw', scoreText(d.raw_scores?.[player + '_score']));
       text(player + '-published', scoreText(s.published.score?.[player + '_score']));
+      text(player + '-name', s.published.player_names?.[player]);
       const reason = d.decisions?.[player + '_score'];
       text(player + '-decision', simulated ? 'Simulated' : reasons[reason] || reason);
       $(player + '-decision').className = ['jump_limit', 'decrease', 'no_digits'].includes(reason) ? 'warning' : '';
@@ -291,6 +292,15 @@ async function poll() {
     text('performance', s.diagnostics ? `${s.processing_ms.toFixed(1)} ms/frame · ${s.actual_fps} frames/s${s.lagging ? ' · Below requested speed; every frame is kept.' : ''}` : simulated ? 'Simulation is active. Open a source to return to recognition.' : 'Playback is silent. Every recorded frame is processed.');
     $('performance').title = `Video decode: ${s.decode_ms ?? 0} ms; recognition and publication: ${s.recognition_ms ?? 0} ms. Preview delivery runs separately, up to 30 fps.`;
     $('performance').className = s.lagging ? 'warning' : 'muted';
+    // Poll name updates even while the frame sequence is held or capture is lost.
+    const names = s.player_name_status || {};
+    const namePhases = {disabled: 'Disabled', initializing: 'Loading OCR model', ready: 'Ready', failed: 'OCR failed', closed: 'Stopped'};
+    text('name-status', namePhases[names.phase] || 'Unavailable');
+    text('name-error', names.error); $('name-error').hidden = !names.error;
+    text('name-screen', names.screen ? screenName(names.screen) : null);
+    text('name-worker', names.busy ? 'Reading names' : names.phase === 'ready' ? 'Idle' : null);
+    text('name-pending', names.pending);
+    text('name-replaced', names.replaced_samples);
     text('message', JSON.stringify(s.published, null, 2));
     text('feed-status', s.publisher.running ? `Score feed :${s.publisher.port} · ${s.publisher.clients} subscriber${s.publisher.clients === 1 ? '' : 's'}` : 'Score feed stopped: ' + (s.publisher.error || 'not started'));
     text('renderer-status', s.renderer.running ? 'Renderer process: running' : `Renderer process: stopped${s.renderer.exit_code !== null ? ' (exit ' + s.renderer.exit_code + ')' : ''}`);

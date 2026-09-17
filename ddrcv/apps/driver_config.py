@@ -56,6 +56,7 @@ def default_config():
             "discord": False,
             'webhook': None
         },
+        "player_names": {"enabled": False},
         "driver_debug": {
             "render_frame": False
         }
@@ -122,7 +123,7 @@ def validate_config(overrides):
     """Validate without opening capture or connecting integrations."""
     config = normalize_config(overrides)
     for section in ('ingest', 'publish', 'debounce', 'score_filter', 'score_extractor',
-                    'state', 'results', 'driver_debug', 'obs', 'renderer'):
+                    'state', 'results', 'player_names', 'driver_debug', 'obs', 'renderer'):
         if not isinstance(config[section], dict):
             raise ValueError(f'{section} must be an object')
     ingest = config['ingest']
@@ -166,6 +167,8 @@ def validate_config(overrides):
     for key in ('confirm_seconds', 'unknown_seconds', 'max_frame_gap', 'min_fraction'):
         number(config['debounce'][key], 'debounce.' + key, 0)
     result = config['results']
+    from ddrcv.state.player_names import validate_config as validate_names
+    config['player_names'] = validate_names(config['player_names'])
     for key in ('enabled', 'discord', 'only_duo', 'parse_names', 'include_player_names'):
         boolean(result, key, False)
     if not isinstance(result.get('outbox_directory'), str) or not result['outbox_directory']:

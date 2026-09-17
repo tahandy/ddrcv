@@ -17,6 +17,8 @@ if errorlevel 1 goto failed
 if errorlevel 1 goto failed
 .venv\Scripts\python.exe -m pip install --no-deps -e .
 if errorlevel 1 goto failed
+.venv\Scripts\python.exe -B -m ddrcv.ocr.check --provision
+if errorlevel 1 goto failed
 if exist "..\ddr_score_render\setup.py" (
   .venv\Scripts\python.exe -m pip install --no-deps -e "..\ddr_score_render"
   if errorlevel 1 goto failed

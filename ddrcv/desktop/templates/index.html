@@ -27,17 +27,18 @@
 <main>
 <div id="panel-session" role="tabpanel" aria-labelledby="tab-session">
   <section aria-labelledby="status-heading">
-    <div class="section-title"><h2 id="status-heading">Session</h2><span class="quiet">Score mode: <span id="mode">EX</span></span></div>
+    <div class="section-title"><h2 id="status-heading">Status</h2><span class="quiet">Score mode: <span id="mode">EX</span></span></div>
     <div class="session-grid">
-      <table class="scores" aria-label="Accepted player scores">
+      <table class="scores" aria-label="Parsed player names and accepted scores">
         <thead><tr><th scope="col">Player</th><th scope="col">Present</th><th scope="col" class="number">Accepted score</th><th scope="col">Last accepted read</th></tr></thead>
         <tbody>
-          <tr><th scope="row">Player 1</th><td id="p1-presence">Unknown</td><td id="p1" class="number">—</td><td id="p1-age">No accepted read</td></tr>
-          <tr><th scope="row">Player 2</th><td id="p2-presence">Unknown</td><td id="p2" class="number">—</td><td id="p2-age">No accepted read</td></tr>
+          <tr><th scope="row"><span class="quiet">Player 1</span><span id="p1-name" class="player-name" aria-label="Player 1 parsed name">—</span></th><td id="p1-presence">Unknown</td><td id="p1" class="number">—</td><td id="p1-age">No accepted read</td></tr>
+          <tr><th scope="row"><span class="quiet">Player 2</span><span id="p2-name" class="player-name" aria-label="Player 2 parsed name">—</span></th><td id="p2-presence">Unknown</td><td id="p2" class="number">—</td><td id="p2-age">No accepted read</td></tr>
         </tbody>
       </table>
       <div class="session-state"><span class="quiet">Confirmed state</span><strong id="state">Unknown</strong><span id="raw-state" class="quiet">Waiting for capture</span></div>
     </div>
+    <p id="name-status" class="quiet" role="status">Name recognition stopped</p>
     <div class="session-bottom">
       <div class="health"><span id="capture">Capture stopped</span><span id="publisher">Publisher stopped</span><span id="throughput">0 frames processed</span></div>
       <div class="snapshot-bar"><button id="snapshot">View stream</button><span class="quiet">Snapshot on request</span><span id="snapshot-time"></span></div>
@@ -59,6 +60,7 @@
       </div>
       <label class="source-file wide">Local media<div class="inline"><input id="media-path" type="text"><button id="browse-media">Browse…</button></div></label>
       <label class="source-file check wide"><input id="resize" type="checkbox"> Resize full 16:9 file to 720p</label>
+      <label class="check wide"><input data-path="player_names.enabled" type="checkbox"> Parse player names on login and song splash</label>
       <label>Publisher address<input data-path="publish.websocket.host" type="text"></label>
       <label>Publisher port<input data-path="publish.websocket.port" type="number" min="1" max="65535"></label>
     </div>

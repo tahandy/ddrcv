@@ -8,6 +8,8 @@ import sys
 def checks():
     import importlib.util
     result = []
+    from ddrcv.ocr.check import check_ocr
+    result.append(check_ocr())
     for module in ('webview', 'pystray', 'cv2', 'numpy', 'flask', 'websockets', 'obsws_python', 'pygame'):
         result.append(dict(name=module, ok=importlib.util.find_spec(module) is not None))
     edge = False

@@ -30,10 +30,12 @@ from ddrcv.publish.obs_service import OBSService
 from ddrcv.score.score_extractor import ScoreExtractor
 from ddrcv.publish.obs_policy import DEFAULT_SCENE_MAP
 from ddrcv.workbench.regions import draw_monitored_regions
+from ddrcv.state.player_names import PlayerNameService
 
 ROOT = Path(__file__).resolve().parents[2]
 STATES = ['unknown', 'login', 'song_select', 'song_splash', 'song_playing', 'song_result', 'total_result']
 DEFAULTS = dict(source=dict(kind='video', path='', resize_to_720p=False), score_mode='money',
+                player_names=dict(enabled=False),
                 port=9000, renderer_path=str(ROOT.parent / 'ddr_score_render'),
                 obs=dict(host='localhost', port=4455, password='', scene_map=DEFAULT_SCENE_MAP))
 
@@ -129,6 +131,8 @@ class Workbench:
         self.results.notify = self._results_changed
         self.results_source_id = ''
         self.results_recorded = False
+        self.player_names = PlayerNameService(self.settings['player_names'])
+        self.message['player_names'] = self.player_names.snapshot()
         self.publisher.send_message(self.message)
         if start_publisher:
             try:
@@ -175,6 +179,14 @@ class Workbench:
 
     def _run(self):
         while not self.closed.is_set():
+            if self.player_names.changed.is_set():
+                self.player_names.changed.clear()
+                with self.lock:
+                    self.message['player_names'] = self.player_names.snapshot()
+                    if self.result is not None:
+                        self.result['published']['player_names'] = dict(self.message['player_names'])
+                    if self.kind != 'image':
+                        self.publisher.send_message(self.message)
             try:
                 # Timed queue waits use coarse Windows synchronization timers.
                 # Python 3.12 sleep uses a high-resolution waitable timer. Short
@@ -208,6 +220,8 @@ class Workbench:
         self.results.reset(self.results_source_id, self.results_recorded, self.settings['score_mode'])
         with self.lock:
             self.epoch += 1
+            self.player_names.reset(self.engine.session.song_generation)
+            message['player_names'] = self.player_names.snapshot()
             self.result = None
             self.message = message
             self.frame_times.clear()
@@ -316,6 +330,7 @@ class Workbench:
             self._reset()
             self.kind, self.phase, self.meta = 'simulation', 'Simulation', {'kind': 'simulation'}
             message = dict(state=state, players=players, song=None,
+                           player_names=dict(p1=None, p2=None),
                            score={key: score if present else None for key, score, present in
                                   zip(('p1_score', 'p2_score'), scores, players)})
             with self.lock:
@@ -395,8 +410,14 @@ class Workbench:
                                 result['published']['state'], result['published']['players'], packet.index)
         with self.lock:
             previous_state = self.message['state']
+            if self.kind != 'image':
+                self.player_names.submit(packet.image, packet.timestamp, result['raw_state'],
+                                         result['published']['state'], result['published']['players'],
+                                         self.engine.session.song_generation)
             self.result = plain(result)
             self.message = deepcopy(result['published'])
+            self.message['player_names'] = self.player_names.snapshot()
+            self.result['published']['player_names'] = dict(self.message['player_names'])
             if self.results.config['enabled']:
                 self.message['results'] = self.results.feed_status()
             self.image_cache.clear()
@@ -434,6 +455,7 @@ class Workbench:
                                            or (self.playing and len(times) >= 8 and actual_fps < desired_fps * .9))),
                               frame_age=None if self.last_frame_wall is None else time.perf_counter() - self.last_frame_wall,
                               results=self.results.status(),
+                              player_name_status=self.player_names.status(),
                               publisher=self.publisher.status,
                               renderer=dict(running=self.renderer is not None and self.renderer.poll() is None,
                                             exit_code=self.renderer.poll() if self.renderer else None)))
@@ -564,6 +586,8 @@ class Workbench:
 
     def checks(self):
         checks = []
+        from ddrcv.ocr.check import check_ocr
+        checks.append(check_ocr())
         for module in ('cv2', 'numpy', 'PIL', 'imagehash', 'skimage', 'flask', 'websockets', 'obsws_python', 'pygame', 'tkinter'):
             checks.append(dict(name=module, ok=importlib.util.find_spec(module) is not None, detail='Python dependency'))
         glyphs = ROOT / 'ddrcv' / 'score' / 'fonts' / 'World2'
@@ -618,6 +642,7 @@ class Workbench:
             self.obs_worker.join(timeout=3)
             self.obs.disconnect()
             self.stop_renderer()
+            self.player_names.close()
             self.results.close()
             self.publisher.stop()
             logging.getLogger().removeHandler(self.logs)

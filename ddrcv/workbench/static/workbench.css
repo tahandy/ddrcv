@@ -60,6 +60,9 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 24px; al
 .region-active { color: #73befa; }
 .region-missed { color: #b9b9b9; }
 .region-diagnostic { color: #f5c36e; }
+.name-monitor { margin-top: 16px; }
+.name-monitor p { margin-top: 6px; overflow-wrap: anywhere; }
+.player-names td { color: var(--accent); font-weight: 600; }
 aside { border-left: 1px solid var(--line); padding-left: 20px; }
 dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 12px 0; }
 dt { color: var(--muted); }
