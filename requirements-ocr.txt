@@ -1,0 +1,6 @@
+# Optional crop OCR component. Tested on Windows x64, Python 3.12.6.
+# ONNX Runtime 1.30 requires Python >=3.11. No Torch/Paddle/EasyOCR required.
+numpy==2.2.0
+opencv-python==4.10.0.84
+rapidocr==3.9.2
+onnxruntime==1.30.0

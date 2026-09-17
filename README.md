@@ -13,3 +13,6 @@ On Windows with Python 3.12:
 The [rehearsal and tournament handoff guide](doc/tournament_handoff.md) covers
 recorded footage, diagnostics, the sibling `ddr_score_render` checkout, optional
 OBS integration, live capture, and the maintained TBD5 CLI.
+
+Optional persistent, thread-safe crop OCR is documented in
+[ddrcv/ocr/README.md](ddrcv/ocr/README.md), including installation and offline use.
