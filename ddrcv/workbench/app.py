@@ -67,16 +67,32 @@ def create_app(workbench=None):
 
     @app.get('/stream.mjpg')
     def stream():
+        view = request.args.get('view', 'clean')
+        if view not in ('clean', 'monitored'):
+            raise ValueError('Stream view must be clean or monitored')
         def generate():
             import cv2
             import numpy as np
             blank = cv2.imencode('.jpg', np.zeros((720, 1280, 3), dtype=np.uint8))[1].tobytes()
+            sequence, deadline, last_sent = -1, 0, 0
             while not wb.closed.is_set():
-                image, sequence = wb.image('clean')
+                changed = wb.wait_for_frame(sequence, timeout=.5)
+                if wb.closed.is_set():
+                    break
+                if not changed and time.perf_counter() - last_sent < 2:
+                    continue
+                delay = deadline - time.perf_counter()
+                if delay > 0:
+                    time.sleep(delay)
+                began = time.perf_counter()
+                image, sequence = wb.image(view)
                 image = image if image is not None else blank
                 yield (b'--frame\r\nContent-Type: image/jpeg\r\nX-Frame-Sequence: ' + str(sequence).encode()
                        + b'\r\nContent-Length: ' + str(len(image)).encode() + b'\r\n\r\n' + image + b'\r\n')
-                time.sleep(1 / 30)
+                # New frames wake viewers immediately. A small paused heartbeat
+                # detects disconnected browser tabs without re-sending at 30 Hz.
+                deadline = began + 1 / 30
+                last_sent = time.perf_counter()
         return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame', headers={'Cache-Control': 'no-store'})
 
     @app.get('/video')

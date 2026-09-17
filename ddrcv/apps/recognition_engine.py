@@ -1,6 +1,7 @@
 """The same per-frame recognizer for live operation and local rehearsal."""
 from copy import deepcopy
 from contextlib import nullcontext
+import cv2
 
 from ddrcv.apps.tournament_session import TournamentSession
 from ddrcv.score.score_extractor import ScoreExtractor
@@ -11,6 +12,10 @@ from ddrcv.state.region_monitor import collect_regions
 
 class RecognitionEngine:
     def __init__(self, config=None, matcher=None, extractor=None):
+        # Small, fixed 720p/ROI operations don't benefit from a machine-wide
+        # OpenCV pool. In particular, parallel color conversion burns CPU
+        # without improving frame latency on the rehearsal workload.
+        cv2.setNumThreads(1)
         self.config = deepcopy(config or {})
         self.config['debounce'] = {**dict(confirm_seconds=.2, min_frames=3, unknown_seconds=1.0, max_frame_gap=.5, min_fraction=.75), **self.config.get('debounce', {})}
         self.config['score_filter'] = {**dict(game_fps=60, max_per_frame=12), **self.config.get('score_filter', {})}
@@ -28,7 +33,7 @@ class RecognitionEngine:
 
     def process(self, frame, timestamp, frame_index=None, diagnostics=False, stateless=False):
         frame = normalize_frame(frame)
-        rgb = frame[..., ::-1].copy()
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         with collect_regions() if diagnostics else nullcontext([]) as regions:
             raw_state, data = self.matcher.match(rgb)
         if not stateless:

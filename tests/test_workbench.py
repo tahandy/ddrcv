@@ -29,7 +29,7 @@ def make_video(path, count=8, fps=20, size=(1280, 720)):
     if not writer.isOpened():
         raise RuntimeError('Test video encoder unavailable')
     for i in range(count):
-        frame = np.full((size[1], size[0], 3), i * 20, dtype=np.uint8)
+        frame = np.full((size[1], size[0], 3), (i * 20) % 256, dtype=np.uint8)
         writer.write(frame)
     writer.release()
 
@@ -168,6 +168,32 @@ class WorkbenchTests(unittest.TestCase):
         self.assertIsNone(status['published']['score'])
         self.assertEqual(status['diagnostics']['decisions']['p1_score'], 'diagnostic_only')
 
+    def test_normal_speed_sustains_30fps_without_skipping_frames(self):
+        make_video(self.path, count=45, fps=30)
+        observations = []
+        original = self.wb.engine.process
+        def record(*args, **kwargs):
+            result = original(*args, **kwargs)
+            observations.append(result['frame_index'])
+            return result
+        self.wb.engine.process = record
+        self.open()
+        started = time.perf_counter()
+        self.wb.submit('play')
+        wait_until(lambda: self.wb.status()['phase'] == 'Ended')
+        elapsed = time.perf_counter() - started
+        self.assertEqual(observations, list(range(45)))
+        # Allow scheduling noise, but catch the former Windows ~21 fps cadence.
+        self.assertGreater(elapsed, 1.35)
+        self.assertLess(elapsed, 1.85)
+
+    def test_rgb_conversion_preserves_recognition_pixels(self):
+        import numpy as np
+        frame = np.random.default_rng(0).integers(0, 256, (720, 1280, 3), dtype=np.uint8)
+        self.wb.engine.process(frame, 0, diagnostics=True)
+        passed_rgb = self.wb.engine.matcher.match.call_args.args[0]
+        np.testing.assert_array_equal(passed_rgb, frame[..., ::-1])
+
     def test_money_and_ex_modes_use_the_same_session(self):
         self.open()
         for _ in range(6):
@@ -258,6 +284,49 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(self.wb.settings['source']['path'], str(self.path))
         self.assertEqual(self.wb.settings['score_mode'], 'ex')
         self.assertFalse(self.wb.playing)
+
+    def test_stream_views_follow_steps_without_advancing_paused_parser(self):
+        from ddrcv.workbench.app import create_app
+        self.open()
+        client = create_app(self.wb).test_client()
+        self.assertEqual(client.get('/stream.mjpg?view=invalid').status_code, 400)
+        clean = client.get('/stream.mjpg', buffered=False)
+        monitored = client.get('/stream.mjpg?view=monitored', buffered=False)
+        try:
+            sequence = self.wb.sequence
+            header = b'X-Frame-Sequence: ' + str(sequence).encode() + b'\r\n'
+            self.assertIn(header, next(clean.response))
+            self.assertIn(header, next(monitored.response))
+            self.assertFalse(self.wb.wait_for_frame(sequence, timeout=.05))
+            self.wb.submit('step')
+            header = b'X-Frame-Sequence: ' + str(self.wb.sequence).encode() + b'\r\n'
+            self.assertIn(header, next(clean.response))
+            self.assertIn(header, next(monitored.response))
+            self.assertEqual(self.wb.packet.index, 1)
+            self.assertFalse(self.wb.playing)
+        finally:
+            clean.close()
+            monitored.close()
+
+    def test_preview_clients_share_encoding_and_do_not_modify_source(self):
+        import cv2
+        import numpy as np
+        from concurrent.futures import ThreadPoolExecutor
+        self.open()
+        original_frame = self.wb.frame.copy()
+        encode = cv2.imencode
+        def slow_encode(*args, **kwargs):
+            time.sleep(.02)
+            return encode(*args, **kwargs)
+        with patch('ddrcv.workbench.controller.cv2.imencode', side_effect=slow_encode) as encoder:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                images = list(pool.map(lambda _: self.wb.image('clean'), range(2)))
+            self.assertEqual(encoder.call_count, 1)
+            self.assertEqual(images[0], images[1])
+        for view in ('monitored', 'annotated', 'p1', 'p2'):
+            self.wb.image(view)
+        np.testing.assert_array_equal(self.wb.frame, original_frame)
+        self.assertEqual(self.wb.image('clean'), images[0])
 
     def test_port_conflict_is_reported_without_killing_other_service(self):
         from ddrcv.publish.websocket_publisher import WebSocketPublisher

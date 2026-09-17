@@ -234,15 +234,23 @@ async function poll() {
       text(player + '-glyphs', glyphs.length ? 'Digit match: ' + glyphs.map(g => `${g.glyph_class} (${Number(g.match_value).toFixed(3)})`).join(' · ') : s.diagnostics ? 'No digit matches' : 'No frame');
     }
     text('performance', s.diagnostics ? `${s.processing_ms.toFixed(1)} ms/frame · ${s.actual_fps} frames/s${s.lagging ? ' · Below requested speed; every frame is kept.' : ''}` : simulated ? 'Simulation is active. Open a source to return to recognition.' : 'Playback is silent. Every recorded frame is processed.');
+    $('performance').title = `Video decode: ${s.decode_ms ?? 0} ms; recognition and publication: ${s.recognition_ms ?? 0} ms. Preview delivery runs separately, up to 30 fps.`;
     $('performance').className = s.lagging ? 'warning' : 'muted';
     text('message', JSON.stringify(s.published, null, 2));
     text('feed-status', s.publisher.running ? `Score feed :${s.publisher.port} · ${s.publisher.clients} subscriber${s.publisher.clients === 1 ? '' : 's'}` : 'Score feed stopped: ' + (s.publisher.error || 'not started'));
     text('renderer-status', s.renderer.running ? 'Renderer process: running' : `Renderer process: stopped${s.renderer.exit_code !== null ? ' (exit ' + s.renderer.exit_code + ')' : ''}`);
     text('capture-age', !s.diagnostics || s.frame_age === null ? '' : !s.playing ? 'Playback held at the displayed frame.' : `Last frame ${s.frame_age.toFixed(1)}s ago${s.frame_age > 2 ? ' — check capture' : ''}`);
     if (s.error) fail(s.error, 'server'); else clearError('server');
+    // Video delivery is independent of the slower diagnostic/status polling.
+    // Replacing the JPEG URL here used to cap the entire preview at 4 fps.
+    const previewURL = `/stream.mjpg?view=${$('show-regions').checked ? 'monitored' : 'clean'}`;
+    $('preview').hidden = !s.diagnostics;
+    if (s.diagnostics) {
+      if ($('preview').getAttribute('src') !== previewURL) $('preview').src = previewURL;
+    } else $('preview').removeAttribute('src');
     if (s.sequence !== lastSequence && performance.now() - lastImages > 90) {
       lastSequence = s.sequence; lastImages = performance.now();
-      for (const [id, view] of [['preview', $('show-regions').checked ? 'monitored' : 'clean'], ['p1-crop', 'p1'], ['p2-crop', 'p2']]) {
+      for (const [id, view] of [['p1-crop', 'p1'], ['p2-crop', 'p2']]) {
         $(id).hidden = !s.diagnostics;
         if (s.diagnostics) $(id).src = `/frame.jpg?view=${view}&sequence=${s.sequence}`; else $(id).removeAttribute('src');
       }

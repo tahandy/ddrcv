@@ -72,6 +72,13 @@ not shown as though they were checked. A matching marker still needs temporal
 confirmation. The toggle also works on paused frames and images, and affects
 only the inspection preview; the OBS browser source stays clean.
 
+The picture streams at up to **30 frames/s**, independently of the diagnostic
+text and crop updates (four times per second). Paused pictures remain still;
+viewers do not cause additional recognition. Hover over the processing-time
+readout to see video decoding and recognition/publication time separately.
+The processing budget is 33.3 ms for 30 fps footage at 1×, or 16.7 ms at 2×.
+The displayed frame rate measures parsing, not the browser's display rate.
+
 Recognition uses **source timestamps**, independent of playback speed. Pausing
 adds no observations. Seeking, restarting, looping, and changing source clear
 scores and confirmation history; a paused seek therefore stays **warming up**
@@ -158,6 +165,9 @@ metadata refer to one position. Share that folder, not local settings.
 | State is right, OBS scene is wrong | Connection check, mapped scene names, automation paused/enabled |
 | Replay cannot keep up | Processing time and throughput; reduce playback speed; no frames are discarded |
 
+For the Windows playback timing and preview fixes, including measured before
+and after results, see [Rehearsal performance](rehearsal_performance.md).
+
 The default confirmation window is 0.2 seconds, at least three observations,
 and 75% agreement. Unknown requires one second; a gap over 0.5 seconds clears
 voting evidence. Scores update only when both raw and confirmed state are
@@ -195,6 +205,12 @@ available and defaults to **EX score**, unchanged from tournament operation:
 .venv\Scripts\python.exe -m ddrcv.apps.driver_ddr_tbd5 --video "D:\recordings\game.mkv" --config apps\scripts\driver_config.example.json
 .venv\Scripts\python.exe -m ddrcv.apps.driver_ddr_tbd5 --image "D:\recordings\frame.png"
 ```
+
+For the separate legacy OBS launchers in `apps/scripts`, first copy
+`obs_config.example.json` to `obs_config.json` in that directory and edit the
+local copy. Machine-specific `obs_config.json` and `driver_config.json` files
+are ignored by Git; share the example templates instead. The workbench keeps
+its own integration settings under `.workbench/` and does not need this copy.
 
 Use `--resize-to-720p` to opt into full-frame normalization. JSON capture options
 use `{"ingest": {"video": {"path": "D:/recordings/game.mkv", "resize_to_720p": false}}}`

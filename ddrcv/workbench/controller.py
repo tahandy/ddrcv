@@ -93,6 +93,8 @@ class Workbench:
         self.publisher = WebSocketPublisher(host='127.0.0.1', port=self.settings['port'])
         self.obs = OBSService()
         self.lock = threading.RLock()
+        self.frame_ready = threading.Condition(self.lock)
+        self.image_lock = threading.Lock()
         self.commands = Queue()
         self.closed = threading.Event()
         self.source = None
@@ -113,6 +115,8 @@ class Workbench:
         self.deadline = 0
         self.last_frame_wall = None
         self.processing_ms = 0
+        self.decode_ms = 0
+        self.recognition_ms = 0
         self.frame_times = deque(maxlen=120)
         self.renderer = None
         self.pickers = set()
@@ -144,10 +148,18 @@ class Workbench:
     def _run(self):
         while not self.closed.is_set():
             try:
-                timeout = max(0, min(.05, self.deadline - time.monotonic())) if self.playing else .05
-                action, args, future = self.commands.get(timeout=timeout)
+                # Timed queue waits use coarse Windows synchronization timers.
+                # Python 3.12 sleep uses a high-resolution waitable timer. Short
+                # sleeps keep controls responsive without busy-waiting or
+                # changing the system-wide timer resolution.
+                action, args, future = self.commands.get_nowait() if self.playing else self.commands.get(timeout=.05)
             except Empty:
                 action = None
+                if self.playing:
+                    remaining = self.deadline - time.perf_counter()
+                    if remaining > 0:
+                        time.sleep(min(.01, remaining))
+                        continue
             if action:
                 try:
                     result = self._command(action, **args)
@@ -156,7 +168,7 @@ class Workbench:
                 except Exception as error:
                     self.error = str(error)
                     future.set_exception(error)
-            if self.playing and time.monotonic() >= self.deadline:
+            if self.playing and time.perf_counter() >= self.deadline:
                 try:
                     self._next()
                 except Exception as error:
@@ -210,10 +222,12 @@ class Workbench:
                 self.frame = self.packet = None
                 self.error = None
                 self.last_frame_wall = None
+                self.sequence += 1
+                self.frame_ready.notify_all()
             self.source.start()
             self.playing = kind in ('camera', 'rtsp')
             self.phase = 'Waiting for capture' if self.playing else 'Image' if kind == 'image' else 'Paused'
-            self.deadline = time.monotonic()
+            self.deadline = time.perf_counter()
             if kind in ('image', 'video'):
                 self._next()
             self.log.info('Opened %s source', kind)
@@ -224,7 +238,7 @@ class Workbench:
                 self.source.seek(0)
                 self._reset()
             self.frame_times.clear()
-            self.playing, self.phase, self.deadline = True, 'Playing', time.monotonic()
+            self.playing, self.phase, self.deadline = True, 'Playing', time.perf_counter()
         elif action == 'pause':
             self.playing, self.phase = False, 'Paused'
         elif action in ('seek', 'restart'):
@@ -243,7 +257,7 @@ class Workbench:
             speed = float(args.get('speed', self.speed))
             if speed not in (.25, .5, 1, 2):
                 raise ValueError('Choose 0.25, 0.5, 1, or 2 times speed')
-            self.speed, self.loop, self.deadline = speed, bool(args.get('loop', self.loop)), time.monotonic()
+            self.speed, self.loop, self.deadline = speed, bool(args.get('loop', self.loop)), time.perf_counter()
             self.frame_times.clear()
         elif action == 'score_mode':
             mode = args['mode']
@@ -273,6 +287,7 @@ class Workbench:
                 self.frame = self.packet = self.result = None
                 self.message = message
                 self.sequence += 1
+                self.frame_ready.notify_all()
             self.publisher.send_message(message)
         elif action == 'publisher':
             port = int(args.get('port', 9000))
@@ -292,12 +307,13 @@ class Workbench:
             with self.lock:
                 self.frame = self.packet = None
                 self.sequence += 1
+                self.frame_ready.notify_all()
         else:
             raise ValueError(f'Unknown action: {action}')
         return {'ok': True}
 
     def _next(self):
-        began = time.monotonic()
+        began = time.perf_counter()
         if self.kind in ('video', 'image'):
             packet = self.source.read()
             if packet is None:
@@ -317,13 +333,20 @@ class Workbench:
             frame = normalize_frame(frame, self.settings['source']['resize_to_720p'])
             self.meta.update(width=width, height=height, resized=(width, height) != (1280, 720))
             packet = FramePacket(frame, began, 0 if self.packet is None else self.packet.index + 1)
+        decoded = time.perf_counter()
         self._process(packet)
-        elapsed = time.monotonic() - began
+        finished = time.perf_counter()
+        elapsed = finished - began
+        self.decode_ms = (decoded - began) * 1000
+        self.recognition_ms = (finished - decoded) * 1000
         self.processing_ms = elapsed * 1000
         # Sequential replay never skips frames to catch up. Processing time is
         # included in each frame's wall-time budget, while recognition uses PTS.
         interval = 1 / self.source.fps / self.speed if self.kind == 'video' else 0
-        self.deadline = began + max(interval, elapsed)
+        # Advance the existing schedule so an OS wakeup delay isn't added to
+        # every subsequent frame. If parsing is slow, process the next frame
+        # immediately; replay still never skips frames.
+        self.deadline = max(self.deadline + interval, finished)
         if self.playing:
             self.phase = 'Playing'
 
@@ -338,8 +361,9 @@ class Workbench:
             self.frame = packet.image
             self.packet = packet
             self.sequence += 1
-            self.last_frame_wall = time.monotonic()
+            self.last_frame_wall = time.perf_counter()
             self.frame_times.append(self.last_frame_wall)
+            self.frame_ready.notify_all()
         if previous_state != self.message['state']:
             self.log.info('Frame %s at %.3fs: confirmed %s -> %s',
                           packet.index, packet.timestamp, previous_state, self.message['state'])
@@ -363,20 +387,32 @@ class Workbench:
                               diagnostics=deepcopy(self.result), published=deepcopy(self.message),
                               settings=redact(deepcopy(self.settings)), error=self.error,
                               processing_ms=round(self.processing_ms, 2), actual_fps=round(actual_fps, 1),
+                              decode_ms=round(self.decode_ms, 2), recognition_ms=round(self.recognition_ms, 2),
                               lagging=bool(desired_fps and (self.processing_ms > 1000 / desired_fps
                                            or (self.playing and len(times) >= 8 and actual_fps < desired_fps * .9))),
-                              frame_age=None if self.last_frame_wall is None else time.monotonic() - self.last_frame_wall,
+                              frame_age=None if self.last_frame_wall is None else time.perf_counter() - self.last_frame_wall,
                               publisher=self.publisher.status,
                               renderer=dict(running=self.renderer is not None and self.renderer.poll() is None,
                                             exit_code=self.renderer.poll() if self.renderer else None)))
 
     def image(self, view='clean'):
+        # Multiple panel/OBS viewers reuse one encoding of each view/frame.
+        with self.image_lock:
+            return self._image(view)
+
+    def wait_for_frame(self, sequence, timeout=.5):
+        with self.frame_ready:
+            return self.frame_ready.wait_for(lambda: self.sequence != sequence or self.closed.is_set(), timeout)
+
+    def _image(self, view):
         with self.lock:
             if self.frame is None:
                 return None, self.sequence
             if (self.sequence, view) in self.image_cache:
                 return self.image_cache[(self.sequence, view)], self.sequence
-            frame, result, sequence = self.frame.copy(), deepcopy(self.result), self.sequence
+            # Published frames/results are replaced, never modified in place.
+            # Copy pixels only for the overlays that draw on them.
+            frame, result, sequence = self.frame, self.result, self.sequence
         if view in ('p1', 'p2'):
             top, left, height, width = ScoreExtractor.p1_roi if view == 'p1' else ScoreExtractor.p2_roi
             frame = frame[top:top + height, left:left + width].copy()
@@ -386,8 +422,10 @@ class Workbench:
                 cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 1)
             frame = cv2.resize(frame, (720, 135), interpolation=cv2.INTER_NEAREST)
         elif view == 'monitored' and result:
+            frame = frame.copy()
             draw_monitored_regions(frame, result.get('monitored_regions', []))
         elif view == 'annotated' and result:
+            frame = frame.copy()
             for top, left, height, width in (ScoreExtractor.p1_roi, ScoreExtractor.p2_roi):
                 cv2.rectangle(frame, (left, top), (left + width, top + height), (0, 255, 0), 2)
             label = f"Frame {result['frame_index']} | {result['timestamp']:.3f}s | {result['raw_state']} -> {result['confirmed_state']}"
@@ -528,6 +566,7 @@ class Workbench:
         finally:
             self.closed.set()
             with self.lock:
+                self.frame_ready.notify_all()
                 for picker in tuple(self.pickers):
                     if picker.poll() is None:
                         picker.terminate()
