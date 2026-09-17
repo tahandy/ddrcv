@@ -3,7 +3,10 @@ import os
 import json
 from pathlib import Path
 
-from ddrcv.discord.song_results_embed import push_song_results_screenshot
+from copy import deepcopy
+import threading
+
+from ddrcv.results.service import ResultsService, load_config, source_identity
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
@@ -16,7 +19,6 @@ import time
 
 import cv2
 
-from ddrcv.misc.screenshot import Screenshot
 from ddrcv.ingest.rtsp_frame_fetcher import RTSPFrameFetcher
 from ddrcv.ingest.simple_frame_fetcher import SimpleFrameFetcher
 from ddrcv.score.score_extractor import ScoreExtractor
@@ -68,17 +70,31 @@ def main(config, logger):
     # missing-template errors cannot leave a camera thread running.
     state_determination = StateRotation(**config['state'])
     score_extractor = ScoreExtractor(config['score_extractor']['glyph_dir'])
+    config = deepcopy(config)
+    mode = config.get('score_mode', 'ex')
+    if mode not in ('ex', 'money'):
+        raise ValueError('score_mode must be ex or money')
+    config.setdefault('score_filter', {})['max_per_frame'] = 12 if mode == 'ex' else None
     engine = RecognitionEngine(config, matcher=state_determination, extractor=score_extractor)
-    session = engine.session
     fetcher = create_frame_fetcher(config['ingest'], logger)
     publisher = create_publisher(config['publish'], logger=logger)
     result_config = config.get('results', {})
-    screenshot = None
-    if result_config.get('enabled', False) and result_config.get('discord', False) and not result_config.get('webhook'):
-        raise ValueError('Set results.webhook explicitly before enabling Discord publication')
+    feed_lock = threading.RLock()
+    latest_info = deepcopy(engine.session.info)
+    results = None
+
+    def publish_results_status():
+        if results is not None:
+            with feed_lock:
+                latest_info['results'] = results.feed_status()
+                publisher.send_message(deepcopy(latest_info))
+
     if result_config.get('enabled', False):
-        screenshot = Screenshot(result_config['screenshot_directory'],
-                                timestamp_fmt=result_config['timestamp_format'])
+        results = ResultsService(result_config.get('outbox_directory', '.workbench/results'),
+                                 result_config, notify=publish_results_status)
+        kind = next(iter(config['ingest']))
+        source_id, recorded = source_identity(dict(kind=kind, path=config['ingest'][kind].get('path', '')))
+        results.reset(source_id, recorded, mode)
     previous_state = 'unknown'
     try:
         fetcher.start()
@@ -93,28 +109,20 @@ def main(config, logger):
             now = fetcher.source_time if isinstance(fetcher, FileSource) else time.monotonic()
             still = isinstance(fetcher, FileSource) and fetcher.kind == 'image'
             result = engine.process(frame, now, diagnostics=still, stateless=still)
-            frame_rgb = frame[..., ::-1].copy()
             info = result['published']
             if still:
                 logger.info('Image diagnostics: %s', result)
             if info['state'] != previous_state:
                 logger.info('Confirmed state: %s -> %s', previous_state, info['state'])
                 previous_state = info['state']
-            # Publish before optional screenshot/Discord work. The settling
-            # delay is a deadline, not a sleep that stalls screen detection.
-            publisher.send_message(info)
-            if (screenshot is not None
-                    and session.screenshot_due(now, result_config['processing_delay'])
-                    and (not result_config.get('only_duo', False) or all(info['players']))):
-                screenshot_file = screenshot.save(frame_rgb)
-                session.results_saved = True
-                logger.info('Results screenshot: %s', screenshot_file)
-                if result_config.get('discord', False):
-                    try:
-                        push_song_results_screenshot(title='Results', screenshot_path=screenshot_file,
-                                                     webhook_url=result_config.get('webhook'))
-                    except Exception:
-                        logger.exception('Discord publication failed; screenshot remains saved')
+            if results is not None and not still:
+                results.submit(frame, now, result['raw_state'], info['state'], info['players'],
+                               fetcher.index - 1 if isinstance(fetcher, FileSource) else None)
+            with feed_lock:
+                latest_info = deepcopy(info)
+                if results is not None:
+                    latest_info['results'] = results.feed_status()
+                publisher.send_message(deepcopy(latest_info))
             if config['driver_debug']['render_frame']:
                 cv2.imshow('DDR Capture', frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -123,6 +131,8 @@ def main(config, logger):
         pass
     finally:
         fetcher.stop()
+        if results is not None:
+            results.close()
         publisher.stop()
         if config['driver_debug']['render_frame']:
             cv2.destroyAllWindows()
@@ -148,6 +158,7 @@ def cli():
     parser.add_argument('--debug', action='store_true',
                         help='Turn on debug options')
     parser.add_argument('--config', type=Path, help='JSON overrides for driver settings')
+    parser.add_argument('--score-mode', choices=('ex', 'money'))
     args = parser.parse_args()
 
     camera_uri = 0
@@ -211,11 +222,11 @@ def cli():
             "prebuilt_database": r'/home/tim/persistent/database/db_effnetb0-20241126.pkl',
             "cache_dir": r'/home/tim/persistent/database/cache'
         },
+        "score_mode": "ex",
         "results": {
             "enabled": False,
-            "screenshot_directory": r'D:\TBD5\screenshots',
-            "timestamp_format": "%Y%m%d_%H%M",
-            "processing_delay": 5,
+            "outbox_directory": ".workbench/results",
+            "settling_seconds": 2,
             "only_duo": False,
             "discord": False,
             'webhook': None
@@ -225,9 +236,12 @@ def cli():
         }
     }
 
+    config['results'].update(load_config(Path(__file__).resolve().parents[2] / '.workbench/results_config.json'))
     if args.config:
         with args.config.open(encoding='utf-8') as stream:
             merge_config(config, json.load(stream))
+    if args.score_mode:
+        config['score_mode'] = args.score_mode
     if args.video or args.image:
         kind = 'video' if args.video else 'image'
         config['ingest'] = {kind: {'path': args.video or args.image, 'resize_to_720p': args.resize_to_720p}}

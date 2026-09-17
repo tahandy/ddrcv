@@ -16,3 +16,6 @@ OBS integration, live capture, and the maintained TBD5 CLI.
 
 Optional persistent, thread-safe crop OCR is documented in
 [ddrcv/ocr/README.md](ddrcv/ocr/README.md), including installation and offline use.
+
+Automatic name/large-score capture, stable screenshots, and background Discord
+publishing are documented in [Results publishing](doc/results_publishing.md).

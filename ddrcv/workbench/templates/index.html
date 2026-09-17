@@ -67,6 +67,19 @@
     <details class="message"><summary>Published message</summary><pre id="message"></pre></details>
   </aside>
 </main>
+<section class="section results-panel" aria-label="Results and Discord">
+  <h2>Results and Discord</h2>
+  <div class="row">
+    <label class="check"><input id="results-enabled" type="checkbox">Capture results</label>
+    <label class="check"><input id="results-discord" type="checkbox">Automatically publish to Discord</label>
+    <label class="check"><input id="results-rehearsal" type="checkbox">Label posts as rehearsal</label>
+    <label class="grow">Discord webhook<input id="results-webhook" type="password" autocomplete="off" placeholder="Leave blank to keep configured webhook"></label>
+    <button id="results-apply">Apply</button>
+  </div>
+  <p id="results-status" role="status" aria-live="polite">Results capture disabled</p>
+  <p class="muted">Reads names and the large score in the selected score mode. Lower tabs are ignored. Retrying a lost response may produce a duplicate Discord post.</p>
+  <div id="results-list"></div>
+</section>
 <section id="check-results" class="setup-results" hidden><div class="section-heading"><h2>Setup checks</h2><button id="checks-dismiss">Close checks</button></div><div id="check-list"></div></section>
 <details class="section" id="renderer-panel"><summary>Renderer and score feed</summary>
   <div class="row"><label class="grow">Renderer repository<input id="renderer-path"></label><button id="renderer-browse">Browse folder…</button><button id="renderer-start">Start renderer</button><button id="renderer-stop" disabled>Stop renderer</button></div>

@@ -183,3 +183,6 @@ Desktop.ini
 
 # Local rehearsal settings, credentials, logs, and snapshots
 .workbench/
+
+# Isolated dependency and replay caches
+.cache/

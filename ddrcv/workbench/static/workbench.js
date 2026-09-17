@@ -175,6 +175,60 @@ bind('obs-disconnect', () => post('/api/obs', {action: 'disconnect'}));
 bind('obs-manual', () => post('/api/obs', {action: 'scene', name: $('manual-scene').value}));
 bind('logs-refresh', async () => { const data = await fetch('/api/logs').then(r => r.json()); if (data.error) throw new Error(data.error); text('logs', data.join('\n')); });
 bind('shutdown', async () => { await post('/api/shutdown'); shutdown = true; notice('Workbench stopped. You may close this tab.', true); });
+bind('results-apply', async () => {
+  const values = {enabled: $('results-enabled').checked, discord: $('results-discord').checked,
+    rehearsal: $('results-rehearsal').checked};
+  if ($('results-webhook').value) values.webhook = $('results-webhook').value;
+  await action('results_config', values);
+  $('results-webhook').value = '';
+  notice('Results settings saved.');
+});
+let resultsInitialized = false, resultsVersion = '';
+function renderResults(status) {
+  if (!status) return;
+  if (!resultsInitialized) {
+    $('results-enabled').checked = status.enabled;
+    $('results-discord').checked = status.discord;
+    $('results-rehearsal').checked = status.rehearsal;
+    resultsInitialized = true;
+  }
+  text('results-status', `${status.phase} · ${status.webhook_configured ? 'Webhook configured' : 'No webhook'}${status.error ? ' · ' + status.error : ''}`);
+  const version = JSON.stringify([status.records, status.discord, status.webhook_configured]);
+  if (version === resultsVersion) return;
+  resultsVersion = version;
+  $('results-list').replaceChildren();
+  for (const record of [...status.records].reverse()) {
+    const card = document.createElement('article'); card.className = 'result-card';
+    const image = document.createElement('img'); image.alt = 'Saved results screenshot';
+    image.src = `/api/results/${encodeURIComponent(record.event_id)}/screenshot`;
+    image.loading = 'lazy';
+    const details = document.createElement('div');
+    const heading = document.createElement('h3');
+    heading.textContent = record.players.map((p, i) => p.present ? (p.name || `P${i+1} (name unread)`) : `P${i+1} absent`).join(' vs ');
+    const scores = document.createElement('p');
+    scores.textContent = `${record.score_mode.toUpperCase()}: ` + record.players.map(p => p.present ? (p.score?.toLocaleString() ?? 'unconfirmed') : 'absent').join(' / ');
+    const winner = document.createElement('p');
+    const o = record.outcome;
+    winner.textContent = o.kind === 'tie' ? 'TIE' : o.kind === 'winner' ? `Winner: ${record.players[o.winner].name || 'P'+(o.winner+1)} (+${o.margin} EX)` : 'No confirmed competitive outcome';
+    const delivery = document.createElement('p'); delivery.setAttribute('role', 'status');
+    delivery.textContent = `${record.delivery.state} · attempts: ${record.delivery.attempts}${record.delivery.error ? ' · '+record.delivery.error : ''}`;
+    const evidence = document.createElement('p'); evidence.className = 'muted';
+    evidence.textContent = `${record.partial ? 'Partial result' : 'Confirmed result'} · ${record.screenshot_confirmed ? 'Stable screenshot' : 'Screenshot stability unconfirmed'} · ${timeText(record.timestamp)} · ${record.event_id}`;
+    details.append(heading, scores, winner, delivery, evidence);
+    if (record.delivery.message_url) {
+      const link = document.createElement('a'); link.href = record.delivery.message_url;
+      link.textContent = 'Open Discord message'; link.target = '_blank'; link.rel = 'noopener'; details.append(link);
+    }
+    const state = record.delivery.state;
+    if (['saved', 'failed', 'sent'].includes(state)) {
+      const button = document.createElement('button'); button.textContent = state === 'sent' ? 'Republish this result' : state === 'saved' ? 'Publish saved result' : 'Retry delivery';
+      button.disabled = !status.discord || !status.webhook_configured;
+      button.onclick = () => action(state === 'sent' ? 'results_republish' : 'results_retry', {event_id: record.event_id}).catch(report);
+      details.append(button);
+    }
+    card.append(image, details); $('results-list').append(card);
+  }
+}
 function init(settings) {
   $('kind').value = settings.source.kind; $('path').value = settings.source.path;
   $('resize').checked = settings.source.resize_to_720p; $('score-mode').value = settings.score_mode;
@@ -208,6 +262,7 @@ async function poll() {
     if (!initialized) init(s.settings);
     clearError('connection');
     playbackControls(s);
+    renderResults(s.results);
     text('phase', s.phase === 'Simulation' ? 'Simulation — recognition bypassed' : s.phase === 'Image' ? 'Still image' : s.phase);
     $('phase').classList.toggle('simulation', s.phase === 'Simulation');
     text('position', `${timeText(s.position)} / ${timeText(s.source.duration)}`);

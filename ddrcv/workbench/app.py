@@ -2,7 +2,7 @@
 import threading
 import time
 
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request, send_file
 
 from ddrcv.workbench.controller import Workbench, redact
 
@@ -36,6 +36,16 @@ def create_app(workbench=None):
         args = dict(request.get_json())
         action = args.pop('action')
         return jsonify(wb.submit(action, **args))
+
+    @app.get('/api/results/<event_id>/screenshot')
+    def results_screenshot(event_id):
+        # Resolve only recorded IDs, never a user-provided filesystem path.
+        with wb.results.outbox.lock:
+            record = wb.results.outbox.records.get(event_id)
+            if record is None:
+                return jsonify(error='Unknown result event'), 404
+            path = wb.results.outbox.directory / event_id / 'screenshot.png'
+        return send_file(path, mimetype='image/png')
 
     @app.get('/api/cameras')
     def cameras():
