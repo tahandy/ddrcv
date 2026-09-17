@@ -19,7 +19,11 @@ Use Python **3.11 or newer** (the pinned ONNX Runtime requirement). Tested on
 Windows x64 with Python 3.12.6. Direct requirements: `rapidocr==3.9.2`,
 `onnxruntime==1.30.0`, `numpy==2.2.0`, `opencv-python==4.10.0.84`. Pip installs
 transitive dependencies. These optional dependencies are separate from the
-workbench/tournament requirements. Existing EasyOCR APIs remain available.
+workbench/tournament requirements. The legacy `get_best_match_from_results`
+helper remains for the older parsers and sandbox scripts. The obsolete
+`get_ocr_singleton` EasyOCR factory has been removed; use `get_rapidocr()` for
+new crop recognition. Legacy EasyOCR demos construct their own reader and
+still require EasyOCR; its `readtext` API differs from this component's API.
 
 ## One crop, repeated calls
 

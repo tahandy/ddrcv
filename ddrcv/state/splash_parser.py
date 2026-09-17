@@ -3,7 +3,7 @@ from collections import OrderedDict
 import numpy as np
 from PIL.FontFile import WIDTH
 
-from ddrcv.ocr import get_best_match_from_results, get_ocr_singleton
+from ddrcv.ocr import get_best_match_from_results
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
@@ -113,7 +113,9 @@ if __name__ == "__main__":
     from pprint import pprint
     from ddrcv.jacket_database.database.database import DatabaseLookup
 
-    reader = get_ocr_singleton()  # this needs to run only once to load the model into memory
+    from easyocr import Reader
+
+    reader = Reader(['en'])
     img = cv2.imread('../../state_images/song_splash_updated_p2.png', cv2.IMREAD_UNCHANGED)
 
     # cv2.imshow('tmp', img)

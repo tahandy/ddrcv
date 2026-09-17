@@ -9,7 +9,6 @@ from pprint import pprint
 
 from ddrcv.discord.song_results_embed import push_song_results
 from ddrcv.misc.screenshot import Screenshot
-from ddrcv.ocr import get_ocr_singleton
 from ddrcv.state.results_parser import ResultsParser
 from ddrcv.state.splash_parser import SplashParser
 
@@ -88,7 +87,6 @@ def main(config, logger):
     screenshot = Screenshot(config['results']['screenshot_directory'],
                             timestamp_fmt=config['results']['timestamp_format'])
 
-    # reader = get_ocr_singleton()  # this needs to run only once to load the model into memory
     # results_parser = ResultsParser(reader, db)
     # splash_parser = SplashParser(reader, db, do_name=False)
 
