@@ -217,7 +217,7 @@ use `{"ingest": {"video": {"path": "D:/recordings/game.mkv", "resize_to_720p": f
 (or the `image` key instead of `video`). Set
 `score_filter.max_per_frame` to `null` for money footage. The old
 `driver_ddr_tbd5_v2` module calls the same driver. Results screenshots/Discord
-remain opt-in CLI features; the workbench exports manual diagnostic snapshots.
+are configurable in both the CLI and workbench. See [Results publishing](results_publishing.md) for RapidOCR setup, delivery feedback, and retries.
 
 Run all focused validation checks with:
 
@@ -227,4 +227,4 @@ Run all focused validation checks with:
 
 This workbench supports manual inspection and evidence export. It has no
 annotation/expected-result runner, synchronized audio, broadcast cropping,
-automatic scene creation, or song-database/results-OCR setup.
+automatic scene creation, or song-database lookup. Results OCR is configured separately as described in [Results publishing](results_publishing.md).

@@ -147,7 +147,8 @@ class Desk:
             # Saved profiles work from CLI regardless of its current directory.
             for section, key in ((next(iter(config['ingest'].values())), 'path'),
                                  (config['state'], 'pkl_dir'), (config['score_extractor'], 'glyph_dir'),
-                                 (config['results'], 'screenshot_directory'), (config['renderer'], 'path')):
+                                 (config['results'], 'screenshot_directory'), (config['results'], 'outbox_directory'),
+                                 (config['renderer'], 'path')):
                 if section.get(key):
                     section[key] = str(Path(section[key]).expanduser().resolve())
             write_json(target, config)

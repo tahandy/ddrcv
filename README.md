@@ -20,3 +20,6 @@ Optional persistent, thread-safe crop OCR is documented in
 For event operation, the [tournament desktop app](doc/tournament_desktop.md) adds
 a persistent tray backend, a disposable WebView2 panel, shared CLI configs, and
 on-demand frame snapshots. Run `setup_desktop.bat`, then `launch_desktop.vbs`.
+
+Automatic name/large-score capture, stable screenshots, and background Discord
+publishing are documented in [Results publishing](doc/results_publishing.md).

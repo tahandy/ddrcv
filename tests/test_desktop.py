@@ -261,6 +261,29 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(self.desk.applied, previous)
         self.assertTrue(self.desk.config()['pending'])
 
+    def test_results_score_mode_alias_keeps_custom_filters_and_gui_edits(self):
+        self.assertIsNone(validate_config({'score_mode':'money'})['score_filter']['max_per_frame'])
+        cfg = validate_config({'score_mode':'money', 'score_filter': {'max_per_frame':36}})
+        self.assertEqual(cfg['score_filter']['max_per_frame'], 36)
+        self.assertEqual(cfg['score_mode'], 'ex')
+        cfg['score_filter']['max_per_frame'] = None
+        self.assertEqual(validate_config(cfg)['score_mode'], 'money')
+        with self.assertRaises(ValueError):
+            validate_config({'score_mode':'invalid'})
+        legacy = validate_config({'results': {'screenshot_directory':str(self.root), 'processing_delay':5}})
+        self.assertEqual(legacy['results']['outbox_directory'], str(self.root))
+        self.assertEqual(legacy['results']['settling_seconds'], 5)
+
+    def test_cli_score_mode_flag_overrides_profile_filter(self):
+        from ddrcv.apps import driver_ddr_tbd5 as driver
+        profile = self.root / 'mode.json'
+        profile.write_text('{"score_filter":{"max_per_frame":36}}')
+        with patch('sys.argv', ['driver', '--config', str(profile), '--score-mode', 'money']), patch.object(driver, 'main') as main, patch.object(driver, 'load_results_config', return_value={}):
+            driver.cli()
+        cfg = main.call_args.args[0]
+        self.assertIsNone(cfg['score_filter']['max_per_frame'])
+        self.assertEqual(cfg['score_mode'], 'money')
+
     def test_invalid_values_are_rejected(self):
         for patch_config in ({'score_filter': {'game_fps': float('nan')}},
                              {'publish': {'websocket': {'port': True}}},
@@ -578,29 +601,67 @@ class RecoveryTests(unittest.TestCase):
                 self.assertLess(time.monotonic() - before, 1)
 
     def test_results_save_and_delivery_do_not_stall_recognition(self):
-        from ddrcv.apps.tournament_runtime import TournamentRuntime
+        from ddrcv.results.service import ResultsService
         with tempfile.TemporaryDirectory() as tmp:
-            runtime = RuntimeTests().make_runtime(tmp)
+            runtime = RuntimeTests().make_runtime(tmp, config={'results': {
+                'enabled': True, 'outbox_directory': str(Path(tmp) / 'outbox'),
+                'discord': True, 'webhook': 'https://discord.com/api/webhooks/1/test',
+                'settling_seconds': .01, 'min_frames': 1, 'confirmation_seconds': .01}})
+            runtime.engine.matcher.match.return_value = ('song_result', None)
             entered, release = threading.Event(), threading.Event()
-            def save(image):
+            reader = Mock()
+            reader.read.return_value = [dict(name='P1', score=120), dict(name='P2', score=150)]
+            def sender(*args):
                 entered.set()
                 release.wait(3)
-                return Path(tmp) / 'result.png'
-            runtime.screenshot = Mock()
-            runtime.screenshot.save.side_effect = save
-            runtime.engine.session.screenshot_due = Mock(return_value=True)
-            runtime.config['results']['processing_delay'] = 0
-            # Enqueue once even though this synthetic session forces due=True.
-            runtime.engine.session.screenshot_due.side_effect = [True] + [False] * 1000
+                return dict(message_id='123')
+            runtime.results_factory = lambda directory, config, notify: ResultsService(
+                directory, config, reader=reader, sender=sender, notify=notify)
             runtime.start()
             try:
                 self.assertTrue(entered.wait(2))
                 before = runtime.sequence
                 wait_for(lambda: runtime.sequence > before + 8)
+                runtime.fetcher.get_frame.side_effect = lambda: None
+                time.sleep(.05)
+                before = runtime.sequence
+                release.set()
+                wait_for(lambda: runtime.publisher.send_message.call_args.args[0].get(
+                    'results', {}).get('latest', {}).get('delivery', {}).get('state') == 'sent')
+                self.assertEqual(runtime.sequence, before)
+                record = runtime.results.status()['records'][0]
+                self.assertTrue(Path(record['screenshot_path']).is_file())
             finally:
                 release.set()
                 runtime.stop()
-            runtime.screenshot.save.assert_called_once()
+
+    def test_results_start_lazily_and_reset_on_camera_switch_without_restarting(self):
+        import numpy as np
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = RuntimeTests().make_runtime(tmp, config={'results': {'enabled': True},
+                                                             'score_filter': {'max_per_frame': None}})
+            service = Mock()
+            service.feed_status.return_value = {'phase': 'idle'}
+            factory = Mock(return_value=service)
+            runtime.results_factory = factory
+            factory.assert_not_called()
+            candidate = Mock()
+            candidate.get_frame.return_value = np.zeros((720, 1280, 3), dtype=np.uint8)
+            runtime.start()
+            try:
+                wait_for(lambda: runtime.sequence > 3)
+                first_identity = service.reset.call_args.args[0]
+                with patch.object(runtime, '_create_fetcher', return_value=candidate):
+                    runtime.switch_source({'simple': {'uri': 2}})
+                factory.assert_called_once()
+                self.assertEqual(service.reset.call_count, 2)
+                self.assertNotEqual(service.reset.call_args.args[0], first_identity)
+                self.assertEqual(service.reset.call_args.args[2], 'money')
+                service.finish.assert_called_once()
+                service.close.assert_not_called()
+            finally:
+                runtime.stop()
+            service.close.assert_called_once()
 
     def test_renderer_service_controls_only_its_owned_process(self):
         from ddrcv.apps.tournament_integrations import Integrations

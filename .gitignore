@@ -187,3 +187,6 @@ Desktop.ini
 # Local tournament app state and validation artifacts
 .tournament/
 .desktop-validation/
+
+# Isolated dependency and replay caches
+.cache/

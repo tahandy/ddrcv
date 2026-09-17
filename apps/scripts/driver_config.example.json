@@ -12,12 +12,12 @@
     },
     "results": {
         "enabled": false,
-        "screenshot_directory": "screenshots",
-        "timestamp_format": "%Y%m%d_%H%M%S",
-        "processing_delay": 5,
         "only_duo": false,
         "discord": false,
-        "webhook": null
+        "webhook": null,
+        "outbox_directory": ".workbench/results",
+        "settling_seconds": 2,
+        "rehearsal": false
     },
     "obs": {
         "enabled": false,
@@ -30,5 +30,6 @@
     "renderer": {
         "enabled": false,
         "path": "../ddr_score_render"
-    }
+    },
+    "score_mode": "ex"
 }

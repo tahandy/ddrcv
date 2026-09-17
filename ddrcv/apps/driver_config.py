@@ -47,9 +47,8 @@ def default_config():
         },
         "results": {
             "enabled": False,
-            "screenshot_directory": r'D:\TBD5\screenshots',
-            "timestamp_format": "%Y%m%d_%H%M",
-            "processing_delay": 5,
+            "outbox_directory": ".workbench/results",
+            "settling_seconds": 2,
             "only_duo": False,
             "discord": False,
             'webhook': None
@@ -71,9 +70,32 @@ def merge_config(defaults, overrides):
     return defaults
 
 
+def normalize_score_mode(overrides):
+    """Explicit filter settings win; a mode-only profile selects its preset."""
+    result = deepcopy(overrides)
+    mode = result.get('score_mode', 'ex')
+    if mode not in ('ex', 'money'):
+        raise ValueError('score_mode must be ex or money')
+    filt = result.setdefault('score_filter', {})
+    if not isinstance(filt, dict):
+        raise ValueError('score_filter must be an object')
+    if 'max_per_frame' not in filt:
+        filt['max_per_frame'] = None if mode == 'money' else 12
+    # Custom positive limits remain custom; they use the EX results crop.
+    result['score_mode'] = 'money' if filt['max_per_frame'] is None else 'ex'
+    return result
+
+
 def normalize_config(overrides):
     if not isinstance(overrides, dict):
         raise ValueError('Configuration must be a JSON object')
+    overrides = normalize_score_mode(overrides)
+    legacy = overrides.get('results', {})
+    if isinstance(legacy, dict):
+        if 'outbox_directory' not in legacy and legacy.get('screenshot_directory'):
+            legacy['outbox_directory'] = legacy['screenshot_directory']
+        if 'settling_seconds' not in legacy and 'processing_delay' in legacy:
+            legacy['settling_seconds'] = legacy['processing_delay']
     result = default_config()
     result['obs'] = dict(enabled=False, automation=False, host='localhost', port=4455,
                          password='', scene_map=None)
@@ -143,12 +165,10 @@ def validate_config(overrides):
     result = config['results']
     for key in ('enabled', 'discord', 'only_duo'):
         boolean(result, key, False)
-    number(result['processing_delay'], 'results.processing_delay', 0)
-    if result['enabled']:
-        if not result.get('screenshot_directory') or not isinstance(result.get('timestamp_format'), str):
-            raise ValueError('Results require a screenshot directory and timestamp format')
-        if result['discord'] and not result.get('webhook'):
-            raise ValueError('Set results.webhook explicitly before enabling Discord publication')
+    if not isinstance(result.get('outbox_directory'), str) or not result['outbox_directory']:
+        raise ValueError('Results require an outbox directory')
+    from ddrcv.results.service import ResultsService, DEFAULTS as RESULTS_DEFAULTS
+    ResultsService._validate({**RESULTS_DEFAULTS, **result})
     boolean(config['driver_debug'], 'render_frame', False)
     obs = config['obs']
     boolean(obs, 'enabled', False)

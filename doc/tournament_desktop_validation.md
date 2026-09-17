@@ -121,3 +121,21 @@ programmatically as described above.
 The rehearsal workbench remains separate. Existing CLI entry points/configs and
 public score WebSocket messages are preserved. No changes were made in the
 original `ddrcv` checkout; sibling renderer source was not edited.
+
+## Merge with RapidOCR results publishing
+
+Reconciled with `dia-del-ritmo` commit `19644b7` before integration. The shared
+runtime now uses its durable results service instead of the prior screenshot-only
+worker. Source handoff resets OCR confirmation without recreating the outbox,
+results workers start only on Start, and late delivery feedback updates the
+publisher without requiring a new capture frame. Explicit custom filters survive
+mode normalization; `--score-mode` selects an explicit preset.
+
+Merge checks: 35 desktop tests passed, including blocked-delivery responsiveness,
+delivery updates without frames, source handoff, lazy startup, legacy config
+mapping and CLI mode overrides. The results/OCR/tournament/workbench/region suite
+ran 117 tests: 112 passed, five optional real-model tests skipped because RapidOCR
+and ONNX Runtime are not installed in this validation environment. Merged browser
+acceptance passed with the isolated backend; artifacts are in
+`.desktop-validation/merge-ui/` and `.desktop-validation/merge-*-tests.log`.
+Existing live hardware and native-window rehearsal limits still apply.

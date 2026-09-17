@@ -31,7 +31,7 @@ close OBS or terminate another driver's publisher.
 ## Shared CLI configuration
 
 The existing launchers and `--config`, `--choose-camera`, `--video`, `--image`,
-`--resize-to-720p`, and `--debug` arguments are preserved. Both TBD5 entry points
+`--resize-to-720p`, `--score-mode`, and `--debug` arguments are preserved. Both TBD5 entry points
 use the same shared runtime as the desktop. For example:
 
 ```bat
@@ -46,9 +46,23 @@ semantics; launch from this checkout for the same interpretation.
 
 The score mode sets `score_filter.max_per_frame` to `12` for EX or `null` for
 Money. Existing custom positive values are preserved and shown as Custom.
-Legacy defaults remain EX; the separate rehearsal workbench still defaults to
+A mode-only profile may use `score_mode: "ex"` or `"money"`; an explicit
+`score_filter.max_per_frame` takes precedence so custom filters and GUI edits
+survive round trips. The CLI `--score-mode` flag explicitly selects its preset.
+Custom positive filters use EX results crops. Legacy defaults remain EX; the separate rehearsal workbench still defaults to
 Money. Live capture remains fixed at 1280×720. Optional resizing applies only to
 full 16:9 files.
+
+When results are enabled, both CLI and desktop use the durable RapidOCR results
+service described in [Results publishing](results_publishing.md). It starts only
+with capture, publishes delivery status even while frames are unavailable, and
+keeps its outbox alive across camera switches. A switch finalizes retained old
+source evidence and resets confirmation for the new source. Legacy
+`results.screenshot_directory` and `processing_delay` map to `outbox_directory`
+and `settling_seconds` when the new keys are absent; screenshot naming follows
+the durable event-directory format. CLI additionally inherits the workbench's
+local results settings before applying its explicit JSON overrides. Desktop
+profiles retain their own results settings.
 
 Two optional sections extend the driver JSON. Existing files leave both disabled:
 

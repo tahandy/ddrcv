@@ -2,7 +2,7 @@ import argparse
 import os
 from pathlib import Path
 
-from ddrcv.discord.song_results_embed import push_song_results_screenshot
+from ddrcv.results.service import ResultsService, load_config as load_results_config
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
@@ -15,7 +15,6 @@ import time
 
 import cv2
 
-from ddrcv.misc.screenshot import Screenshot
 from ddrcv.ingest.rtsp_frame_fetcher import RTSPFrameFetcher
 from ddrcv.ingest.simple_frame_fetcher import SimpleFrameFetcher
 from ddrcv.score.score_extractor import ScoreExtractor
@@ -64,6 +63,8 @@ def create_publisher(pub_config, logger):
 
 def create_runtime(config, logger, data_dir=None, desktop=False):
     from ddrcv.apps.tournament_runtime import TournamentRuntime
+    from ddrcv.apps.driver_config import normalize_score_mode
+    config = normalize_score_mode(config)
     matcher = StateRotation(**config['state'])
     extractor = ScoreExtractor(config['score_extractor']['glyph_dir'])
     engine = RecognitionEngine(config, matcher=matcher, extractor=extractor)
@@ -72,8 +73,7 @@ def create_runtime(config, logger, data_dir=None, desktop=False):
         publisher = create_publisher(config['publish'], logger=logger)
         return TournamentRuntime(config, engine, fetcher, publisher, logger,
                                  data_dir=data_dir, clock=time, desktop=desktop,
-                                 screenshot_factory=Screenshot,
-                                 discord_callback=push_song_results_screenshot)
+                                 results_factory=ResultsService)
     except BaseException:
         fetcher.stop()
         raise
@@ -97,6 +97,7 @@ def cli():
     parser.add_argument('--debug', action='store_true',
                         help='Turn on debug options')
     parser.add_argument('--config', type=Path, help='JSON overrides for driver settings')
+    parser.add_argument('--score-mode', choices=('ex', 'money'))
     args = parser.parse_args()
 
     camera_uri = 0
@@ -121,17 +122,20 @@ def cli():
                     break
                 print(f"Invalid input. Please enter a valid camera index from the list {valid_indices}.")
 
-    config = default_config()
+    config = {'results': load_results_config(Path(__file__).resolve().parents[2] / '.workbench/results_config.json')}
 
     if args.config:
         merge_config(config, read_config(args.config))
+    if args.score_mode:
+        config['score_mode'] = args.score_mode
+        config.setdefault('score_filter', {})['max_per_frame'] = None if args.score_mode == 'money' else 12
     if args.video or args.image:
         kind = 'video' if args.video else 'image'
         config['ingest'] = {kind: {'path': args.video or args.image, 'resize_to_720p': args.resize_to_720p}}
     if args.debug:
-        config['driver_debug']['render_frame'] = True
+        config.setdefault('driver_debug', {})['render_frame'] = True
     if args.choose_camera:
-        config['ingest'] = {'simple': {**config['ingest'].get('simple', {}), 'uri': camera_uri,
+        config['ingest'] = {'simple': {**config.get('ingest', {}).get('simple', {}), 'uri': camera_uri,
                                        'width': 1280, 'height': 720}}
 
     # Configure logging

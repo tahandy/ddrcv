@@ -20,6 +20,8 @@ from uuid import uuid4
 import cv2
 
 from ddrcv.apps.recognition_engine import RecognitionEngine
+from ddrcv.results.service import ResultsService, load_config, source_identity
+from ddrcv.results.delivery import redact_error
 from ddrcv.ingest.file_source import FileSource, FramePacket, normalize_frame
 from ddrcv.ingest.simple_frame_fetcher import SimpleFrameFetcher
 from ddrcv.ingest.rtsp_frame_fetcher import RTSPFrameFetcher
@@ -53,6 +55,7 @@ def redact(value):
     if isinstance(value, (list, tuple)):
         return [redact(item) for item in value]
     if isinstance(value, str) and '://' in value:
+        value = redact_error(value) if '/webhooks/' in value else value
         def scrub(match):
             try:
                 parsed = urlsplit(match.group())
@@ -121,6 +124,11 @@ class Workbench:
         self.renderer = None
         self.pickers = set()
         self.renderer_stop = self.data_dir / 'renderer.stop'
+        self.results_config_path = self.data_dir / 'results_config.json'
+        self.results = ResultsService(self.data_dir / 'results', load_config(self.results_config_path))
+        self.results.notify = self._results_changed
+        self.results_source_id = ''
+        self.results_recorded = False
         self.publisher.send_message(self.message)
         if start_publisher:
             try:
@@ -131,6 +139,26 @@ class Workbench:
         self.worker.start()
         self.obs_worker = threading.Thread(target=self._obs_loop, name='rehearsal-obs', daemon=True)
         self.obs_worker.start()
+
+    def _results_changed(self):
+        with self.lock:
+            self.message['results'] = self.results.feed_status()
+            self.publisher.send_message(deepcopy(self.message))
+
+    def configure_results(self, values):
+        allowed = {'enabled', 'discord', 'webhook', 'rehearsal'}
+        if set(values) - allowed:
+            raise ValueError('Unknown results setting')
+        values = dict(values)
+        if values.get('webhook') == '[redacted]':
+            values.pop('webhook')
+        config = {**self.results.config, **values}
+        self.results._validate(config)
+        temporary = self.results_config_path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(config, indent=2), encoding='utf-8')
+        temporary.replace(self.results_config_path)
+        self.results.configure(**values)
+        return {'ok': True}
 
     def save_settings(self):
         with self.lock:
@@ -177,6 +205,7 @@ class Workbench:
 
     def _reset(self):
         message = self.engine.reset()
+        self.results.reset(self.results_source_id, self.results_recorded, self.settings['score_mode'])
         with self.lock:
             self.epoch += 1
             self.result = None
@@ -193,6 +222,11 @@ class Workbench:
     def _command(self, action, **args):
         if action == 'snapshot':
             return self.snapshot()
+        if action == 'results_config':
+            return self.configure_results(args)
+        if action in ('results_retry', 'results_republish'):
+            self.results.retry(args['event_id'], republish=action == 'results_republish')
+            return {'ok': True}
         if action == 'open':
             kind = args.get('kind', 'video')
             resize = bool(args.get('resize_to_720p', False))
@@ -215,6 +249,7 @@ class Workbench:
                 raise ValueError('Choose video, image, camera, or RTSP')
             self._stop_source()
             self.source, self.kind, self.meta = source, kind, meta
+            self.results_source_id, self.results_recorded = source_identity(meta)
             self.settings['source'] = dict(kind=kind, path=path, resize_to_720p=resize)
             self.save_settings()
             self._reset()
@@ -301,6 +336,7 @@ class Workbench:
             self.save_settings()
             self.error = None
         elif action == 'stop':
+            self.results.finish()
             self._stop_source()
             self.kind, self.phase, self.meta = None, 'Stopped', {}
             self._reset()
@@ -317,6 +353,7 @@ class Workbench:
         if self.kind in ('video', 'image'):
             packet = self.source.read()
             if packet is None:
+                self.results.finish()
                 if self.kind == 'video' and self.loop and self.playing:
                     self.source.seek(0)
                     self._reset()
@@ -353,10 +390,15 @@ class Workbench:
     def _process(self, packet):
         result = self.engine.process(packet.image, packet.timestamp, packet.index,
                                      diagnostics=True, stateless=self.kind == 'image')
+        if self.kind != 'image':
+            self.results.submit(packet.image, packet.timestamp, result['raw_state'],
+                                result['published']['state'], result['published']['players'], packet.index)
         with self.lock:
             previous_state = self.message['state']
             self.result = plain(result)
-            self.message = result['published']
+            self.message = deepcopy(result['published'])
+            if self.results.config['enabled']:
+                self.message['results'] = self.results.feed_status()
             self.image_cache.clear()
             self.frame = packet.image
             self.packet = packet
@@ -391,6 +433,7 @@ class Workbench:
                               lagging=bool(desired_fps and (self.processing_ms > 1000 / desired_fps
                                            or (self.playing and len(times) >= 8 and actual_fps < desired_fps * .9))),
                               frame_age=None if self.last_frame_wall is None else time.perf_counter() - self.last_frame_wall,
+                              results=self.results.status(),
                               publisher=self.publisher.status,
                               renderer=dict(running=self.renderer is not None and self.renderer.poll() is None,
                                             exit_code=self.renderer.poll() if self.renderer else None)))
@@ -575,5 +618,6 @@ class Workbench:
             self.obs_worker.join(timeout=3)
             self.obs.disconnect()
             self.stop_renderer()
+            self.results.close()
             self.publisher.stop()
             logging.getLogger().removeHandler(self.logs)
