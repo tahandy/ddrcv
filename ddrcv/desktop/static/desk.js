@@ -503,6 +503,21 @@ handle('stop', () => api('action', 'POST', {
   action: 'stop'
 }));
 handle('apply', () => act('apply'));
+handle('test-discord-webhook', async () => {
+  const button = $('test-discord-webhook');
+  if (button.disabled) return;
+  button.disabled = true;
+  $('discord-test-feedback').textContent = 'Sending test message…';
+  try {
+    await flush();
+    const result = await api('action', 'POST', {action: 'test_discord_webhook'});
+    $('discord-test-feedback').textContent = result.message;
+  } catch (e) {
+    $('discord-test-feedback').textContent = 'Webhook test failed: ' + e.message;
+  } finally {
+    button.disabled = false;
+  }
+});
 handle('apply-results', async () => {
   await flush();
   await api('action', 'POST', {action: 'apply_results'});

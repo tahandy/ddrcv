@@ -1,4 +1,4 @@
-"""Durable outbox. Only this worker makes network requests; no capture locks."""
+"""Durable outbox and explicit webhook probes; network I/O holds no capture locks."""
 from copy import deepcopy
 from datetime import datetime, timezone
 import json
@@ -178,6 +178,20 @@ def edit_record(webhook, record):
             return receipt
     except requests.RequestException as error:
         raise DeliveryError(redact_error(error, webhook), retryable=True) from None
+
+
+def send_test_message(webhook):
+    """Send one text-only probe and require Discord to acknowledge the message."""
+    payload = dict(content='DDRCV webhook test: Discord delivery is working.',
+                   allowed_mentions={'parse': []})
+    try:
+        with requests.post(webhook, params={'wait': 'true'}, json=payload,
+                           timeout=(3, 10)) as response:
+            body = response_body(response)
+    except requests.RequestException as error:
+        raise DeliveryError(redact_error(error, webhook), retryable=True) from None
+    if not isinstance(body, dict) or not all(str(body.get(key, '')).isdigit() for key in ('id', 'channel_id')):
+        raise DeliveryError('Discord response did not confirm the test message; check the channel before trying again')
 
 
 def send_record(webhook, record, image_path):

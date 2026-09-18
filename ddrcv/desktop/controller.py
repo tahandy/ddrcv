@@ -235,6 +235,21 @@ class Desk:
             raise ValueError('Start the driver before controlling integrations')
         return runtime.integrations.command(action, **args)
 
+    def test_discord_webhook(self):
+        from ddrcv.results.delivery import redact_error, send_test_message
+        with self.lock:
+            if self.closed:
+                raise ValueError('Application is shutting down')
+            webhook = self.draft['results'].get('webhook')
+        if not isinstance(webhook, str) or not webhook.strip():
+            raise ValueError('Enter a Discord webhook URL first')
+        # Network I/O stays on the API thread, without capture or desk locks.
+        try:
+            send_test_message(webhook.strip())
+        except Exception as error:
+            raise ValueError(redact_error(error, webhook.strip())) from None
+        return dict(ok=True, message='Test message sent to Discord. Check your channel.')
+
     def apply_results(self):
         """Apply only the Results tab controls, preserving unrelated draft edits."""
         keys = ('enabled', 'discord', 'webhook', 'parse_names', 'screenshots_only', 'output_directory', 'include_player_names')

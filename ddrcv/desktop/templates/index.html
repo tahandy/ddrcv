@@ -100,6 +100,9 @@
       <label class="check wide"><input data-path="results.discord" type="checkbox"> Publish results to Discord</label>
       <label class="wide">Webhook URL<input data-path="results.webhook" type="password" autocomplete="off" spellcheck="false" placeholder="https://discord.com/api/webhooks/…"></label>
     </div>
+    <button id="test-discord-webhook" type="button">Test Discord Webhook</button>
+    <p class="quiet">Sends a test message using the URL above, even when capture and publishing are off.</p>
+    <p id="discord-test-feedback" role="status" aria-live="polite"></p>
     <p class="quiet">Enabling publishing also enables results capture. Disabling publishing pauses queued deliveries; a post already being sent may finish.</p>
   </section>
   <section class="integration-panel" aria-labelledby="results-heading">

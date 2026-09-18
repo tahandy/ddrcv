@@ -955,6 +955,38 @@ class DeliveryTests(unittest.TestCase):
             with self.assertRaises(DeliveryError):send_record('x',record(),image)
 
 
+class WebhookProbeTests(unittest.TestCase):
+    def test_text_probe_requires_acknowledgement_and_handles_delivery_failures(self):
+        import requests
+        from ddrcv.results.delivery import send_test_message
+        hook = 'https://discord.com/api/webhooks/1/private-test-token'
+        response = Mock()
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        response.status_code = 200
+        response.json.return_value = dict(id='123', channel_id='456')
+        with patch('ddrcv.results.delivery.requests.post', return_value=response) as post:
+            send_test_message(hook)
+            self.assertEqual(post.call_args.kwargs['params'], {'wait': 'true'})
+            self.assertEqual(post.call_args.kwargs['timeout'], (3, 10))
+            self.assertEqual(post.call_args.kwargs['json']['allowed_mentions'], {'parse': []})
+            self.assertIn('webhook test', post.call_args.kwargs['json']['content'])
+            self.assertNotIn('files', post.call_args.kwargs)
+            for code in (401, 404, 429, 503):
+                response.status_code = code
+                response.json.return_value = {'retry_after': 2}
+                with self.subTest(code=code), self.assertRaises(DeliveryError):
+                    send_test_message(hook)
+            response.status_code = 200
+            response.json.return_value = {}
+            with self.assertRaisesRegex(DeliveryError, 'did not confirm'):
+                send_test_message(hook)
+            post.side_effect = requests.Timeout(f'Timed out: {hook}')
+            with self.assertRaises(DeliveryError) as caught:
+                send_test_message(hook)
+            self.assertNotIn('private-test-token', str(caught.exception))
+
+
 @unittest.skipUnless(os.environ.get('DDRCV_RESULTS_VIDEO') and os.environ.get('DDRCV_TEST_OCR_MODEL'), 'Set local video/model paths')
 class RealResultsTests(unittest.TestCase):
     def test_tab_independent_names_and_headline_ex(self):

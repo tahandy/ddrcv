@@ -1,5 +1,10 @@
 # Results capture and Discord delivery
 
+In the desktop **Results** tab, use **Test Discord Webhook** to send a text-only
+test message to the URL currently entered. Capture and automatic publishing can
+remain off, and no screenshot is required. The button shows delivery success or
+an error; testing does not apply pending results settings or enable publishing.
+
 The tournament CLI, desktop app, and workbench use the same background results service. It reads
 player names and the **large score**, captures the supporting clean frame, and
 publishes a compact Discord embed. Lower-panel tabs, judgments, difficulty, stage,

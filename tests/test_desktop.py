@@ -238,6 +238,69 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(saved['output_directory'], str(self.root / 'exports'))
         self.assertFalse(saved['include_player_names'])
 
+    def test_webhook_probe_uses_masked_draft_without_capture_or_applying_settings(self):
+        config = self.desk.config()['draft']
+        hook = 'https://discord.com/api/webhooks/1/private-test-token'
+        config['results'].update(webhook=hook, enabled=False, discord=False)
+        config['obs']['port'] = ''  # An unfinished unrelated edit must not block the probe.
+        self.desk.edit(config)
+        self.desk.edit(self.desk.config()['draft'])  # Roundtrip the masked URL.
+        applied = deepcopy(self.desk.applied)
+        client = create_app(self.desk, 'test').test_client()
+        args = {'action': 'test_discord_webhook'}
+        with patch('ddrcv.results.delivery.send_test_message') as sender:
+            self.assertEqual(client.post('/api/action', json=args).status_code, 403)
+            sender.assert_not_called()
+            response = client.post('/api/action', json=args, headers={'X-Desk-Token': 'test'})
+            self.assertEqual(response.status_code, 200, response.json)
+            self.assertTrue(response.json['ok'])
+            sender.assert_called_once_with(hook)
+        self.assertIsNone(self.desk.runtime)
+        self.assertEqual(self.desk.applied, applied)
+        self.assertFalse(self.desk.draft['results']['discord'])
+
+    def test_webhook_probe_rejects_empty_url_and_redacts_failures(self):
+        client = create_app(self.desk, 'test').test_client()
+        args = {'action': 'test_discord_webhook'}
+        headers = {'X-Desk-Token': 'test'}
+        with patch('ddrcv.results.delivery.send_test_message') as sender:
+            response = client.post('/api/action', json=args, headers=headers)
+            self.assertEqual(response.status_code, 400)
+            self.assertIn('webhook URL', response.json['error'])
+            sender.assert_not_called()
+            hook = 'https://discord.com/api/webhooks/1/private-test-token'
+            config = self.desk.config()['draft']
+            config['results']['webhook'] = hook
+            self.desk.edit(config)
+            sender.side_effect = RuntimeError(f'Failed {hook}: private-test-token')
+            response = client.post('/api/action', json=args, headers=headers)
+            self.assertEqual(response.status_code, 400)
+            self.assertNotIn('private-test-token', response.json['error'])
+
+    def test_webhook_probe_does_not_block_runtime_controls(self):
+        self.desk.start()
+        config = self.desk.config()['draft']
+        config['results']['webhook'] = 'https://discord.com/api/webhooks/1/test'
+        self.desk.edit(config)
+        entered, release = threading.Event(), threading.Event()
+        def send(_):
+            entered.set()
+            release.wait(5)
+        with patch('ddrcv.results.delivery.send_test_message', side_effect=send):
+            worker = threading.Thread(target=self.desk.test_discord_webhook)
+            worker.start()
+            try:
+                self.assertTrue(entered.wait(2))
+                self.assertTrue(self.desk.lock.acquire(timeout=.5))
+                self.desk.lock.release()
+                self.assertTrue(self.desk.operations.acquire(timeout=.5))
+                self.desk.operations.release()
+                self.desk.stop()
+                self.assertEqual(self.desk.runtime.stop_calls, 1)
+            finally:
+                release.set()
+                worker.join(2)
+
     def test_invalid_results_controls_preserve_running_config(self):
         self.desk.start()
         previous = deepcopy(self.desk.applied)
