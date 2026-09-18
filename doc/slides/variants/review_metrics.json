@@ -1,0 +1,94 @@
+{
+  "variants": {
+    "a_field_manual": {
+      "slides": 10,
+      "words": [
+        96,
+        72,
+        64,
+        111,
+        92,
+        90,
+        100,
+        102,
+        102,
+        101
+      ],
+      "text_boxes": 249,
+      "text_bounds": "pass",
+      "text_collisions": "none",
+      "pptx_zip": "pass",
+      "notes": "10/10",
+      "pdf_titles": "10/10",
+      "pdf_rendered": "10/10",
+      "copy_hash": "0ba4c58d00a8ddf784ff9d66ceb31ba2cf281fe9d8a62a95401c58d52888195a",
+      "pdf_method": "Same measured layout; not a native PowerPoint export"
+    },
+    "b_control_room": {
+      "slides": 10,
+      "words": [
+        96,
+        72,
+        64,
+        111,
+        92,
+        90,
+        100,
+        102,
+        102,
+        101
+      ],
+      "text_boxes": 349,
+      "text_bounds": "pass",
+      "text_collisions": "none",
+      "pptx_zip": "pass",
+      "notes": "10/10",
+      "pdf_titles": "10/10",
+      "pdf_rendered": "10/10",
+      "copy_hash": "0ba4c58d00a8ddf784ff9d66ceb31ba2cf281fe9d8a62a95401c58d52888195a",
+      "pdf_method": "Same measured layout; not a native PowerPoint export"
+    },
+    "c_editorial": {
+      "slides": 10,
+      "words": [
+        96,
+        72,
+        64,
+        111,
+        92,
+        90,
+        100,
+        102,
+        102,
+        101
+      ],
+      "text_boxes": 249,
+      "text_bounds": "pass",
+      "text_collisions": "none",
+      "pptx_zip": "pass",
+      "notes": "10/10",
+      "pdf_titles": "10/10",
+      "pdf_rendered": "10/10",
+      "copy_hash": "0ba4c58d00a8ddf784ff9d66ceb31ba2cf281fe9d8a62a95401c58d52888195a",
+      "pdf_method": "Same measured layout; not a native PowerPoint export"
+    }
+  },
+  "identical_content": true,
+  "original_slides": 21,
+  "revised_slides": 10,
+  "slide_reduction_percent": 52.4,
+  "original_native_words_including_chrome": 1472,
+  "revised_content_words": 930,
+  "revised_content_words_per_slide": [
+    96,
+    72,
+    64,
+    111,
+    92,
+    90,
+    100,
+    102,
+    102,
+    101
+  ]
+}

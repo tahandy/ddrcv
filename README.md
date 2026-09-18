@@ -3,6 +3,14 @@
 Read DDR World gameplay scores and publish them to the tournament score renderer
 and OBS scene controller.
 
+**New operators:** follow the [setup and operator walkthrough](doc/operator_walkthrough.md)
+from installation through a complete rehearsal. Keep the
+[operator quick reference](doc/operator_reference.md) nearby for event controls,
+Results recovery, and troubleshooting.
+
+For a training session or handoff, use the [operator slide deck](doc/slides/README.md)
+(editable PowerPoint, PDF, and speaker notes).
+
 On Windows with Python 3.12:
 
 1. Run **setup_workbench.bat** once.

@@ -1,0 +1,24 @@
+{
+  "slides": 10,
+  "words": [
+    100,
+    88,
+    65,
+    147,
+    107,
+    113,
+    104,
+    109,
+    110,
+    106
+  ],
+  "text_boxes": 343,
+  "text_bounds": "pass",
+  "text_collisions": "none",
+  "pptx_zip": "pass",
+  "notes": "10/10",
+  "pdf_titles": "10/10",
+  "pdf_rendered": "10/10",
+  "copy_hash": "2f27ee1999ffe421a787e7dff27ebf91dce512bcfa45d5da1aec3b12c6689942",
+  "pdf_method": "Same measured layout; not a native PowerPoint export"
+}

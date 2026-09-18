@@ -1,5 +1,8 @@
 # Tournament desktop
 
+For step-by-step setup, start with the [operator walkthrough](operator_walkthrough.md).
+For event-day controls and recovery, use the [operator quick reference](operator_reference.md).
+
 The Windows tournament app uses a persistent Python tray backend and a separate
 pywebview/WebView2 window. Closing the window saves its draft and releases its UI
 processes. Capture, recognition, score publishing, OBS automation, and an owned
