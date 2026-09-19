@@ -18,6 +18,13 @@ On Windows with Python 3.12:
 3. Open a local video or image and inspect recognition before connecting capture
    hardware. New rehearsal sessions default to Money score.
 
+**Record camera footage:** double-click
+[ffmpeg_record_gui.bat](apps/scripts/ffmpeg_record_gui.bat) to record a camera or
+capture device with optional audio to timestamped `.mkv` files. The lightweight
+GUI uses Python/Tkinter and FFmpeg with no additional pip packages, and includes
+an FFmpeg download link. See the [recorder guide](doc/ffmpeg_record_gui.md) for setup
+and controls.
+
 The [rehearsal and tournament handoff guide](doc/tournament_handoff.md) covers
 recorded footage, diagnostics, the sibling `ddr_score_render` checkout, optional
 OBS integration, live capture, and the maintained TBD5 CLI.
