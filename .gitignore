@@ -167,8 +167,17 @@ Desktop.ini
 *.mov
 *.m4v
 *.webm
+*.wmv
+*.flv
+*.mpeg
+*.mpg
+*.mts
+*.m2ts
 /recordings/
 /screenshots/
+
+# Downloaded legacy jacket-model weights and generated checksums
+/ddrcv/jacket_database/database/cache/
 
 # Scratch template captures, not the production templates under ddrcv/state
 /state_images/test*.pkl
