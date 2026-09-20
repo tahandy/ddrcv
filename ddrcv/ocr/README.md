@@ -11,14 +11,13 @@ state, song database, or network service is required for inference.
 From the repository root, in your application's environment:
 
 ```console
-python -m pip install -r requirements-ocr.txt
-python -m pip install -e .
+python -m pip install -e ".[ocr]"
 ```
 
-Use Python **3.11 or newer** (the pinned ONNX Runtime requirement). Tested on
+The supported package requires **64-bit CPython 3.12**. Tested on
 Windows x64 with Python 3.12.6. Direct requirements: `rapidocr==3.9.2`,
-`onnxruntime==1.30.0`, `numpy==2.2.0`, `opencv-python==4.10.0.84`. Pip installs
-transitive dependencies. Tournament, desktop, and workbench requirements include
+`onnxruntime==1.30.0`, `numpy==2.2.0`, `opencv-python==4.10.0.84`. Pip resolves
+transitive dependencies; the application setup scripts use `uv.lock`. Tournament, desktop, and workbench requirements include
 these dependencies. Both application setup scripts provision the cached model
 and require a successful real-model splash smoke test. Run
 `python -B -m ddrcv.ocr.check` for an offline readiness check, or add `--provision`

@@ -190,3 +190,6 @@ Desktop.ini
 
 # Isolated dependency and replay caches
 .cache/
+
+# Checkout-local Python and installer tools
+.tools/

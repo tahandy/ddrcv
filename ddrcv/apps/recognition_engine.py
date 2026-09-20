@@ -5,7 +5,7 @@ import cv2
 
 from ddrcv.apps.tournament_session import TournamentSession
 from ddrcv.score.score_extractor import ScoreExtractor
-from ddrcv.state.tbd5_states import StateRotation
+from ddrcv.state.world_states import StateRotation
 from ddrcv.ingest.file_source import normalize_frame
 from ddrcv.state.region_monitor import collect_regions
 

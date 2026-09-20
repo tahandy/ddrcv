@@ -1,5 +1,8 @@
 # Results capture and Discord delivery
 
+For custom renderers consuming gameplay state, scores, names, or the optional
+`results` status object, see the [streaming state specification](streaming_state.md).
+
 In the desktop **Results** tab, use **Test Discord Webhook** to send a text-only
 test message to the URL currently entered. Capture and automatic publishing can
 remain off, and no screenshot is required. The button shows delivery success or
@@ -36,7 +39,7 @@ corrected by inspecting the lower statistics tab.
 The CLI loads the same local results config, then applies explicit JSON overrides:
 
 ```bat
-.venv\Scripts\python.exe -B -m ddrcv.apps.driver_ddr_tbd5 --video C:\code\ddrcv\apps\scripts\2025-03-27_15-52-48.mkv --score-mode ex
+.venv\Scripts\python.exe -B -m ddrcv.apps.driver_ddr --video C:\code\ddrcv\apps\scripts\2025-03-27_15-52-48.mkv --score-mode ex
 ```
 
 Run from this checkout's root. The default outbox is `.workbench/results`;

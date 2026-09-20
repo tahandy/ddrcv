@@ -12,10 +12,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(HAS_RUNTIME, 'Requires rehearsal dependencies')
 class RegionTests(unittest.TestCase):
+    def test_legacy_state_import_and_bundled_template_path_still_work(self):
+        from ddrcv.state import tbd5_states, world_states
+        self.assertIs(tbd5_states.StateRotation, world_states.StateRotation)
+        default = world_states.StateRotation()
+        legacy = tbd5_states.StateRotation(pkl_dir=ROOT / 'ddrcv/state/tbd5')
+        self.assertEqual([state.tag for state in legacy.states],
+                         [state.tag for state in default.states])
+        self.assertTrue(all(state.pkl_dir == ROOT / 'ddrcv/state/world'
+                            for state in legacy.states))
+
     def test_strided_rgb_preserves_real_state_and_glyph_matches(self):
         import cv2
         import numpy as np
-        from ddrcv.state.tbd5_states import StateRotation
+        from ddrcv.state.world_states import StateRotation
         from ddrcv.score.score_extractor import ScoreExtractor
         reference_state, view_state = StateRotation(), StateRotation()
         reference_scores, view_scores = ScoreExtractor(), ScoreExtractor()
@@ -41,7 +51,7 @@ class RegionTests(unittest.TestCase):
         return marker
 
     def test_short_circuit_and_rotation_report_only_checks_actually_run(self):
-        from ddrcv.state.tbd5_states import StateRotation, SongPlaying, SimpleState
+        from ddrcv.state.world_states import StateRotation, SongPlaying, SimpleState
         from ddrcv.state.region_monitor import collect_regions
         gameplay = SongPlaying.__new__(SongPlaying)
         gameplay.tag, gameplay.measure_gutters = 'song_playing', False
@@ -68,7 +78,7 @@ class RegionTests(unittest.TestCase):
         self.assertEqual(len(checks), 2)  # Earlier frame evidence is immutable.
 
     def test_splash_tracks_both_presence_checks_and_trace_does_not_leak(self):
-        from ddrcv.state.tbd5_states import SongSplash, StateRotation
+        from ddrcv.state.world_states import SongSplash, StateRotation
         from ddrcv.state.region_monitor import collect_regions
         splash = SongSplash.__new__(SongSplash)
         splash.tag = 'song_splash'

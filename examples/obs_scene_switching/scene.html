@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>DDRCV Demo — {{TITLE}}</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #101725; color: #f4f6fb; font-family: "Segoe UI", Arial, sans-serif; }
+    main { height: 100vh; padding: 48px 64px; border-top: 10px solid {{COLOR}}; background: radial-gradient(ellipse at top right, #243552, transparent 65%), #101725; }
+    .label { color: {{COLOR}}; font-size: 18px; letter-spacing: 3px; text-transform: uppercase; }
+    h1 { margin: 28px 0 12px; font-size: 88px; font-weight: 650; letter-spacing: -3px; }
+    .description { margin: 0; font-size: 24px; color: #c4cedd; }
+    .mapping { margin-top: 32px; display: inline-block; padding: 14px 20px; background: #1e2c40; border-left: 4px solid {{COLOR}}; font: 19px Consolas, monospace; }
+    iframe { position: absolute; bottom: 14px; left: 52px; width: 960px; height: 240px; border: 0; }
+    .example { position: absolute; right: 48px; bottom: 28px; color: #9eadc2; font-size: 13px; text-align: right; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="label">DDRCV / State-driven OBS example</div>
+    <h1>{{TITLE}}</h1>
+    <p class="description">{{DESCRIPTION}}</p>
+    <div class="mapping">{{STATES}}</div>
+    <iframe src="overlay/index.html" title="DDRCV state feed and scores"></iframe>
+    <div class="example">Example scene<br>Replace with your event layout</div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=77,<83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ddrcv"
+version = "0.1.0"
+description = "Computer vision utilities for DDR tournament capture and publishing"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [{name = "Zvidun", email = "none.of@your.business"}]
+dependencies = [
+    "numpy==2.2.0",
+    "opencv-python==4.10.0.84",
+    "Pillow==11.0.0",
+]
+
+[project.urls]
+Repository = "https://github.com/tahandy/ddrcv"
+
+[project.optional-dependencies]
+ocr = ["rapidocr==3.9.2", "onnxruntime==1.30.0"]
+tournament = [
+    "ddrcv[ocr]",
+    "matplotlib==3.10.0",
+    "scikit-image==0.25.0",
+    "ImageHash==4.3.1",
+    "websockets==14.1",
+    "discord_webhook==1.3.1",
+    "table2ascii==1.1.3",
+    "cv2-enumerate-cameras==1.1.18.3",
+    "obsws-python==1.7.1",
+    "Flask==3.1.0",
+]
+workbench = ["ddrcv[tournament]", "pygame==2.6.1"]
+desktop = ["ddrcv[workbench]", "pywebview==6.2.1", "pystray==0.19.5"]
+
+[project.scripts]
+ddrcv-workbench = "ddrcv.workbench.__main__:main"
+ddrcv-check-ocr = "ddrcv.ocr.check:main"
+
+[project.gui-scripts]
+ddrcv-desktop = "ddrcv.desktop.__main__:main"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["ddrcv", "ddrcv.*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+"ddrcv.desktop" = ["templates/*.html", "static/*"]
+"ddrcv.ocr" = ["README.md", "fixtures/*.png"]
+"ddrcv.score" = ["fonts/*/*.png"]
+"ddrcv.state" = ["world/*.pkl", "data/*.pkl"]
+"ddrcv.workbench" = ["templates/*.html", "static/*"]
+
+[tool.uv]
+required-version = ">=0.10.12"

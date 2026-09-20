@@ -1,0 +1,31 @@
+# Optional historical research/demo dependencies; not part of the supported app lock.
+# Install into a separate environment when working on legacy experiments.
+-e .[tournament]
+aiortc
+beautifulsoup4
+DeepImageSearch
+dill
+discord_webhook
+easyocr
+faiss_cpu
+ffmpeg_python
+Flask
+Flask_SocketIO
+gevent
+ImageHash
+imageio_ffmpeg
+matplotlib
+numpy
+opencv-python
+Pillow
+Requests
+setuptools
+scikit-image
+table2ascii
+timm
+torch
+torchvision
+tqdm
+websockets
+cv2-enumerate-cameras
+obsws-python

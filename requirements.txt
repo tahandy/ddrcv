@@ -1,29 +1,3 @@
-aiortc
-beautifulsoup4
-DeepImageSearch
-DeepImageSearch
-dill
-discord_webhook
-easyocr
-faiss_cpu
-ffmpeg_python
-Flask
-Flask_SocketIO
-gevent
-ImageHash
-imageio_ffmpeg
-matplotlib
-numpy
-opencv-python
-Pillow
-Requests
-setuptools
-scikit-image
-table2ascii
-timm
-torch
-torchvision
-tqdm
-websockets
-cv2-enumerate-cameras
-obsws-python
+# Default Windows application. Legacy research: requirements-legacy.txt.
+# For reproducible installation, use setup_desktop.bat (uv.lock).
+-e .[desktop]

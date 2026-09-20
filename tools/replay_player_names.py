@@ -20,7 +20,7 @@ from ddrcv.apps.recognition_engine import RecognitionEngine
 from ddrcv.apps.tournament_runtime import TournamentRuntime
 from ddrcv.ingest.file_source import FileSource
 from ddrcv.ocr.check import check_ocr
-from ddrcv.state.tbd5_states import StateRotation
+from ddrcv.state.world_states import StateRotation
 
 
 def first_screen(path, screen='song_splash'):

@@ -2,14 +2,14 @@
 
 DDRCV reads the numerical score from a full DDR World game screen. The local
 workbench uses the **same recognition, confirmation, and score filtering engine
-as the TBD5 command-line driver**. Start with a recording before connecting the
+as the DDR World command-line driver**. Start with a recording before connecting the
 tournament capture card or OBS.
 
 ## 1. Set up and open the panel
 
-Use Windows with **64-bit Python 3.12**, including the Python launcher and
-Tkinter (included in the normal Python installer). Keep the repository's digit
-and state templates. For the optional score renderer, put its checkout beside
+Use **64-bit Windows**. Setup installs a local Python 3.12 with Tkinter if
+needed; no Python launcher or system installation is required. Keep the
+repository's digit and state templates. For the optional score renderer, put its checkout beside
 DDRCV:
 
 ```text
@@ -19,12 +19,13 @@ code/
 ```
 
 Double-click `setup_workbench.bat`. It creates or reuses `.venv`, installs the
-rehearsal dependencies, and checks templates and renderer assets. Existing
-local settings are preserved. An existing environment with another Python
-version must be moved aside first. Renderer and OBS availability do not block
-parser-only testing. The runtime dependencies are in
-`requirements-workbench.txt`; the larger research/OCR requirements are not
-needed. Dependencies are directly pinned, not a complete transitive lockfile.
+locked rehearsal dependencies, provisions OCR, and checks templates and renderer
+assets. Existing local settings are preserved. To supply your own interpreter,
+run `setup_workbench.bat -Python "C:\path\to\Python312\python.exe"`.
+Incompatible environments must be renamed as a backup before rerunning setup.
+Renderer and OBS availability do not block parser-only testing.
+`pyproject.toml` declares the dependencies; `uv.lock` pins the complete resolved
+set. See [installation](installation.md) for details.
 
 Double-click `launch_workbench.bat`. It opens **http://localhost:5002/** and owns
 one score publisher at **ws://127.0.0.1:9000**. Leave its console open. Use the
@@ -205,9 +206,9 @@ The workbench is the recommended rehearsal entry point. The CLI remains
 available and defaults to **EX score**, unchanged from tournament operation:
 
 ```bat
-.venv\Scripts\python.exe -m ddrcv.apps.driver_ddr_tbd5 --choose-camera --debug
-.venv\Scripts\python.exe -m ddrcv.apps.driver_ddr_tbd5 --video "D:\recordings\game.mkv" --config apps\scripts\driver_config.example.json
-.venv\Scripts\python.exe -m ddrcv.apps.driver_ddr_tbd5 --image "D:\recordings\frame.png"
+.venv\Scripts\python.exe -m ddrcv.apps.driver_ddr --choose-camera --debug
+.venv\Scripts\python.exe -m ddrcv.apps.driver_ddr --video "D:\recordings\game.mkv" --config apps\scripts\driver_config.example.json
+.venv\Scripts\python.exe -m ddrcv.apps.driver_ddr --image "D:\recordings\frame.png"
 ```
 
 For the separate legacy OBS launchers in `apps/scripts`, first copy
@@ -220,7 +221,8 @@ Use `--resize-to-720p` to opt into full-frame normalization. JSON capture option
 use `{"ingest": {"video": {"path": "D:/recordings/game.mkv", "resize_to_720p": false}}}`
 (or the `image` key instead of `video`). Set
 `score_filter.max_per_frame` to `null` for money footage. The old
-`driver_ddr_tbd5_v2` module calls the same driver. Results screenshots/Discord
+`driver_ddr_tbd5` and `driver_ddr_tbd5_v2` modules are compatibility aliases for
+`driver_ddr`. Results screenshots/Discord
 are configurable in both the CLI and workbench. See [Results publishing](results_publishing.md) for RapidOCR setup, delivery feedback, and retries.
 
 Run all focused validation checks with:

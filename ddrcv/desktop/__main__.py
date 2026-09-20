@@ -23,7 +23,7 @@ def checks():
             detail = str(error)
     result.append(dict(name='WebView2', ok=edge, detail=detail))
     from ddrcv.apps.driver_config import normalize_config
-    from ddrcv.state.tbd5_states import StateRotation
+    from ddrcv.state.world_states import StateRotation
     from ddrcv.score.score_extractor import ScoreExtractor
     try:
         StateRotation(**normalize_config({})['state'])

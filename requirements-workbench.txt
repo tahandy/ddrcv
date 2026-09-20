@@ -1,2 +1,2 @@
--r requirements-tournament.txt
-pygame==2.6.1
+# Compatibility entry point. Dependencies live in pyproject.toml.
+-e .[workbench]

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DDRCV Score Overlay</title>
+  <link rel="stylesheet" href="overlay.css">
+  <script src="overlay.js" defer></script>
+</head>
+<body data-feed="ws://127.0.0.1:9000">
+  <main aria-label="DDRCV live scores">
+    <div class="players">
+      <section class="player" id="p1" aria-label="Player 1">
+        <div class="identity"><span class="side">P1</span><span class="name" id="p1-name">P1</span></div>
+        <div class="score" id="p1-score">—</div>
+      </section>
+      <section class="player" id="p2" aria-label="Player 2">
+        <div class="identity"><span class="side">P2</span><span class="name" id="p2-name">P2</span></div>
+        <div class="score" id="p2-score">—</div>
+      </section>
+    </div>
+    <footer id="status" data-connection="connecting" role="status">
+      <span class="dot" aria-hidden="true"></span><span id="connection">Connecting…</span>
+      <span id="received"></span>
+    </footer>
+  </main>
+</body>
+</html>

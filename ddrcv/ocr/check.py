@@ -12,10 +12,11 @@ def check_ocr(config=None, *, provision=False):
         options = {**(config or {}), 'allow_download': provision}
         recognizer = RapidOCRRecognizer(**options)
         recognizer.warmup()
-        image = cv2.imread(str(Path(__file__).resolve().parents[2] / 'state_images/song_splash_updated.png'))
-        if image is None:
-            raise RuntimeError('Missing tracked splash fixture for OCR readiness test')
-        crops = [prepare_ddr_crop(image[463:497, 62:273]), prepare_ddr_crop(image[463:497, 1006:1218])]
+        fixtures = Path(__file__).with_name('fixtures')
+        images = [cv2.imread(str(fixtures / f'splash_p{player}.png')) for player in (1, 2)]
+        if any(image is None for image in images):
+            raise RuntimeError('Missing packaged splash crops for OCR readiness test')
+        crops = [prepare_ddr_crop(image) for image in images]
         actual = [r.text for r in recognizer.recognize_many(crops)]
         if actual != ['ZERO.', 'PLAYER2']:
             raise RuntimeError(f'Splash OCR smoke test failed: {actual!r}')

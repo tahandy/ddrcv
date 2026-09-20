@@ -8,11 +8,18 @@ pywebview/WebView2 window. Closing the window saves its draft and releases its U
 processes. Capture, recognition, score publishing, OBS automation, and an owned
 score renderer continue. Reopen through the tray or launch the app again.
 
+For an example client of the score feed, see the standalone
+[OBS browser overlay](../examples/browser_overlay/README.md). The desktop's
+Renderer tab controls the optional external renderer.
+
 ## Setup and launch
 
-1. Use 64-bit Windows Python 3.12 and the Microsoft Edge WebView2 Runtime.
-2. Run `setup_desktop.bat` in this checkout. It creates/reuses this checkout's
-   `.venv`, installs the dedicated requirements, and checks WebView2 and templates.
+1. Extract this checkout into a writable folder on 64-bit Windows.
+2. Run `setup_desktop.bat`. Choose local Python, a detected installation, or a
+   manually entered path from the menu. It creates/reuses
+   `.venv`, installs locked dependencies and missing WebView2, and checks OCR and templates.
+   To use your own Python, pass `-Python "C:\path\to\Python312\python.exe"`.
+   See [installation](installation.md) for details.
 3. Double-click **launch_desktop.vbs**. It launches without a console window.
 4. Open a shared JSON configuration, or configure the source and integrations.
    Click **Start** when ready. Restoring a configuration never opens capture.
@@ -34,12 +41,21 @@ close OBS or terminate another driver's publisher.
 ## Shared CLI configuration
 
 The existing launchers and `--config`, `--choose-camera`, `--video`, `--image`,
-`--resize-to-720p`, `--score-mode`, and `--debug` arguments are preserved. Both TBD5 entry points
-use the same shared runtime as the desktop. For example:
+`--resize-to-720p`, `--score-mode`, and `--debug` arguments are preserved.
+The desktop and the DDR World CLI use `ddrcv.apps.driver_ddr.create_runtime`
+to assemble the same shared runtime. For example:
 
 ```bat
-.venv\Scripts\python.exe -B -m ddrcv.apps.driver_ddr_tbd5 --config C:\tournament\event.json
+.venv\Scripts\python.exe -B -m ddrcv.apps.driver_ddr --config C:\tournament\event.json
 ```
+
+The former `ddrcv.apps.driver_ddr_tbd5` and `driver_ddr_tbd5_v2` commands remain
+compatibility aliases. Recognition lives in `ddrcv.state.world_states`, with
+bundled templates under `ddrcv/state/world/`; the old `tbd5_states` import also
+remains an alias. Existing profiles selecting the old bundled template directory
+are redirected to `world/` when that old directory is absent. Other custom
+template directories keep their configured paths. Event-specific OBS scene names
+and capture/integration settings belong in the JSON profile.
 
 Existing partial JSON overrides still work. Ingest selects exactly one source
 (`simple`, `rtsp`, `video`, or `image`). GUI Save/Save As writes the same JSON,

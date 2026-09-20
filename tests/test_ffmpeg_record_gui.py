@@ -1,5 +1,6 @@
 """Focused standard-library tests; Windows acceptance uses synthetic AV, no camera."""
 
+import gc
 import importlib.util
 import json
 import os
@@ -90,6 +91,10 @@ class WindowsAcceptance(unittest.TestCase):
             pass
         self.error_patch.stop()
         self.temp.cleanup()
+        # Collect Tk cycles here on their owning thread, before later runtime
+        # tests start workers that could otherwise trigger Tcl finalization.
+        self.app = self.root = self.error_patch = self.errors = None
+        gc.collect()
 
     def pump_until(self, condition, timeout=15):
         end = time.monotonic() + timeout

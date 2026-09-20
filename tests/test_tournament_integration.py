@@ -20,7 +20,7 @@ HAS_RUNTIME = all(importlib.util.find_spec(name) for name in
 class DriverTests(unittest.TestCase):
     def run_driver(self, tags, shape=(720, 1280, 3)):
         import numpy as np
-        from ddrcv.apps import driver_ddr_tbd5 as driver
+        from ddrcv.apps import driver_ddr as driver
         frame = np.zeros(shape, dtype=np.uint8)
         fetcher = Mock()
         fetcher.get_frame.side_effect = [frame] * len(tags) + [KeyboardInterrupt()]
@@ -60,9 +60,26 @@ class DriverTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Expected 1280x720 capture'):
             self.run_driver(['song_playing'], (1080, 1920, 3))
 
-    def test_both_entry_points_share_the_same_driver(self):
-        from ddrcv.apps import driver_ddr_tbd5, driver_ddr_tbd5_v2
-        self.assertIs(driver_ddr_tbd5.main, driver_ddr_tbd5_v2.main)
+    def test_legacy_entry_points_delegate_to_neutral_driver(self):
+        from ddrcv.apps import driver_ddr, driver_ddr_tbd5, driver_ddr_tbd5_v2
+        for legacy in (driver_ddr_tbd5, driver_ddr_tbd5_v2):
+            self.assertIs(legacy.main, driver_ddr.main)
+            self.assertIs(legacy.cli, driver_ddr.cli)
+        self.assertIs(driver_ddr_tbd5.create_runtime, driver_ddr.create_runtime)
+
+    def test_neutral_and_legacy_commands_accept_help_without_starting_capture(self):
+        import subprocess
+        import sys
+        for module in ('driver_ddr', 'driver_ddr_tbd5', 'driver_ddr_tbd5_v2'):
+            with self.subTest(module=module):
+                result = subprocess.run(
+                    [sys.executable, '-B', '-m', f'ddrcv.apps.{module}', '--help'],
+                    capture_output=True, text=True, timeout=20)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('DDRCV DDR World driver', result.stdout)
+                for option in ('--config', '--choose-camera', '--video', '--image',
+                               '--score-mode', '--resize-to-720p', '--debug'):
+                    self.assertIn(option, result.stdout)
 
     def test_custom_glyph_directory_from_json(self):
         from pathlib import Path

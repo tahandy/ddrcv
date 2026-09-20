@@ -1,0 +1,18 @@
+:root { color-scheme: dark; font-family: "Segoe UI", Arial, sans-serif; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; overflow: hidden; }
+main { width: 100%; padding: 12px; }
+.players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.player { --accent: #71dbff; min-width: 0; padding: 16px 22px; border-top: 4px solid var(--accent); border-radius: 10px; background: rgba(13, 19, 30, .94); color: #fff; }
+#p2 { --accent: #ff92bf; }
+.identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.side { color: var(--accent); font-size: 16px; font-weight: 700; }
+.name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(16px, 3vw, 26px); font-weight: 600; }
+.score { font-size: clamp(24px, 6vw, 56px); font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.2; margin-top: 6px; overflow: hidden; }
+.player[data-present="false"] { opacity: .55; }
+footer { display: flex; align-items: center; gap: 8px; width: fit-content; max-width: 100%; margin-top: 8px; padding: 6px 10px; border-radius: 6px; background: rgba(13, 19, 30, .94); color: #e5eaf2; font-size: 12px; }
+.dot { flex: 0 0 7px; height: 7px; border-radius: 50%; background: #ffcf70; }
+[data-connection="connected"] .dot { background: #7ee5ad; }
+[data-connection="disconnected"] .dot, [data-connection="invalid"] .dot { background: #ff9292; }
+#received { color: #bec7d6; }
+#connection, #received { white-space: nowrap; }

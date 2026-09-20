@@ -76,6 +76,14 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(self.desk.config()['draft']['publish']['websocket']['port'], 19005)
         self.assertTrue(self.desk.config()['pending'])
 
+    def test_desktop_prepares_the_neutral_driver_runtime(self):
+        self.desk.runtime_factory = None
+        config = self.desk.config()['draft']
+        with patch('ddrcv.apps.driver_ddr.create_runtime') as factory:
+            self.assertIs(self.desk._prepare(config), factory.return_value)
+        factory.assert_called_once_with(config, self.desk.log,
+                                        data_dir=self.root, desktop=True)
+
     def test_live_name_switches_apply_only_their_setting(self):
         self.desk.start()
         runtime = self.desk.runtime
@@ -377,7 +385,7 @@ class DeskTests(unittest.TestCase):
         opened.assert_called_once()
 
     def test_cli_source_override_and_utf8_bom_use_shared_loader(self):
-        from ddrcv.apps import driver_ddr_tbd5 as driver
+        from ddrcv.apps import driver_ddr as driver
         image = self.root / 'test.png'
         image.write_bytes(b'fixture')
         profile = self.root / 'bom.json'
@@ -479,7 +487,7 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(legacy['results']['settling_seconds'], 5)
 
     def test_cli_score_mode_flag_overrides_profile_filter(self):
-        from ddrcv.apps import driver_ddr_tbd5 as driver
+        from ddrcv.apps import driver_ddr as driver
         profile = self.root / 'mode.json'
         profile.write_text('{"score_filter":{"max_per_frame":36}}')
         with patch('sys.argv', ['driver', '--config', str(profile), '--score-mode', 'money']), patch.object(driver, 'main') as main, patch.object(driver, 'load_results_config', return_value={}):

@@ -448,10 +448,17 @@ class RealModelReadinessTests(unittest.TestCase):
 
     def test_setup_installs_and_provisions_ocr(self):
         root = Path(__file__).resolve().parents[1]
-        self.assertIn('-r requirements-ocr.txt', (root / 'requirements-tournament.txt').read_text())
+        import tomllib
+        project = tomllib.loads((root / 'pyproject.toml').read_text())['project']
+        extras = project['optional-dependencies']
+        self.assertIn('ddrcv[ocr]', extras['tournament'])
+        self.assertIn('ddrcv[tournament]', extras['workbench'])
+        self.assertIn('ddrcv[workbench]', extras['desktop'])
+        setup = (root / 'tools/setup.ps1').read_text()
+        self.assertIn("'ddrcv.ocr.check', '--provision'", setup)
         for app in ('desktop', 'workbench'):
-            self.assertIn('-r requirements-tournament.txt', (root / f'requirements-{app}.txt').read_text())
-            self.assertIn('-m ddrcv.ocr.check --provision', (root / f'setup_{app}.bat').read_text())
+            self.assertIn(f'-e .[{app}]', (root / f'requirements-{app}.txt').read_text())
+            self.assertIn(f'-App {app} %*', (root / f'setup_{app}.bat').read_text())
 
 
 if __name__ == '__main__':

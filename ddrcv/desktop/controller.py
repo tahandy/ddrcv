@@ -161,7 +161,7 @@ class Desk:
     def _prepare(self, config):
         if self.runtime_factory:
             return self.runtime_factory(config)
-        from ddrcv.apps.driver_ddr_tbd5 import create_runtime
+        from ddrcv.apps.driver_ddr import create_runtime
         return create_runtime(config, self.log, data_dir=self.data_dir, desktop=True)
 
     def apply(self, start=False):

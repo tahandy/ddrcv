@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
-from ddrcv.apps import driver_ddr_tbd5 as driver
+from ddrcv.apps import driver_ddr as driver
 from ddrcv.results.service import ResultsService
 from ddrcv.workbench.app import create_app
 from ddrcv.workbench.controller import Workbench, redact

@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from ddrcv.apps import driver_ddr_tbd5 as driver
+from ddrcv.apps import driver_ddr as driver
 from ddrcv.ingest.file_source import FileSource
 from ddrcv.workbench.controller import Workbench
 from ddrcv.results.service import ResultsService

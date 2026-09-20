@@ -95,7 +95,7 @@ def probe_host(out):
 
 def probe_cli(out):
     from ddrcv.apps.driver_config import load_config
-    from ddrcv.apps.driver_ddr_tbd5 import create_runtime
+    from ddrcv.apps.driver_ddr import create_runtime
     import logging
     runtime = create_runtime(load_config(out / 'profile.json'), logging.getLogger('probe-cli'), out / 'cli')
     def monitor():
@@ -272,7 +272,7 @@ def gameplay_trial(args, out):
     import psutil
     from werkzeug.serving import make_server
     from ddrcv.apps.driver_config import validate_config
-    from ddrcv.apps import driver_ddr_tbd5 as driver
+    from ddrcv.apps import driver_ddr as driver
     from ddrcv.desktop.controller import Desk
     from ddrcv.desktop.app import create_app
     from ddrcv.desktop.host import Panel

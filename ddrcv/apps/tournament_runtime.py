@@ -197,7 +197,7 @@ class TournamentRuntime:
         future.result()
 
     def _create_fetcher(self, ingest):
-        from ddrcv.apps.driver_ddr_tbd5 import create_frame_fetcher
+        from ddrcv.apps.driver_ddr import create_frame_fetcher
         return create_frame_fetcher(ingest, self.log)
 
     def _release_capture(self, fetcher):

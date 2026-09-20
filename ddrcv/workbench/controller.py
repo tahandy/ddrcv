@@ -593,7 +593,7 @@ class Workbench:
             checks.append(dict(name=module, ok=importlib.util.find_spec(module) is not None, detail='Python dependency'))
         glyphs = ROOT / 'ddrcv' / 'score' / 'fonts' / 'World2'
         checks.append(dict(name='Digit templates', ok=all((glyphs / f'{i}.png').is_file() for i in range(10)), detail=str(glyphs)))
-        checks.append(dict(name='State templates', ok=(ROOT / 'ddrcv/state/tbd5/gameplay_1.pkl').is_file(), detail='TBD5'))
+        checks.append(dict(name='State templates', ok=(ROOT / 'ddrcv/state/world/gameplay_1.pkl').is_file(), detail='DDR World'))
         renderer_root = Path(self.settings['renderer_path'])
         checks.append(dict(name='Renderer assets', ok=(renderer_root / 'score_render/assets/fonts/ChangaOne-Regular.ttf').is_file(), detail=str(renderer_root)))
         if self.publisher.status['running']:
