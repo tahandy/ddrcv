@@ -1,5 +1,11 @@
 # Results capture and Discord delivery
 
+The desktop and tournament runtime use the webhook configured in the Results
+settings/profile. Older scripts using `ddrcv.discord.get_webhook_url` instead
+require the `DDRCV_DISCORD_WEBHOOK_URL` environment variable; they fail when it
+is unset rather than falling back to a bundled webhook. Keep credentials in
+local settings or environment variables, never in source files.
+
 For custom renderers consuming gameplay state, scores, names, or the optional
 `results` status object, see the [streaming state specification](streaming_state.md).
 
