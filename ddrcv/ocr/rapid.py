@@ -63,7 +63,9 @@ def _build_engine(model_dir: Path, model_path: Path | None, allow_download: bool
     try:
         installed = version('rapidocr')
         if installed != RAPIDOCR_VERSION:
-            raise RuntimeError(f'Expected rapidocr=={RAPIDOCR_VERSION}, found {installed}; install requirements-ocr.txt')
+            raise RuntimeError(
+                f'Expected rapidocr=={RAPIDOCR_VERSION}, found {installed}; '
+                'from the DDRCV repository root, run: python -m pip install -e ".[ocr]"')
         import rapidocr
         import onnxruntime  # noqa: F401 - give a useful optional-dependency error
         from rapidocr import EngineType, LangRec, ModelType, OCRVersion
@@ -71,7 +73,9 @@ def _build_engine(model_dir: Path, model_path: Path | None, allow_download: bool
         from rapidocr.ch_ppocr_rec.typings import TextRecInput
         from rapidocr.utils.parse_parameters import ParseParams
     except (ImportError, PackageNotFoundError) as exc:
-        raise ImportError('RapidOCR support requires: python -m pip install -r requirements-ocr.txt') from exc
+        raise ImportError(
+            'RapidOCR support requires: python -m pip install -e ".[ocr]" '
+            '(run from the DDRCV repository root)') from exc
 
     cfg = ParseParams.load(Path(rapidocr.__file__).parent / 'config.yaml')
     cfg = ParseParams.update_batch(cfg, {

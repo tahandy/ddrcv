@@ -28,10 +28,12 @@ Renderer and OBS availability do not block parser-only testing.
 set. See [installation](installation.md) for details.
 
 Double-click `launch_workbench.bat`. It opens **http://localhost:5002/** and owns
-one score publisher at **ws://127.0.0.1:9000**. Leave its console open. Use the
-panel's shutdown button or Ctrl+C in that console to stop the workers and the
-renderer launched by this panel. The server binds only to this computer and
-runs without Flask's development reloader.
+one score publisher at **ws://127.0.0.1:9000**. Leave its console open while
+rehearsing. Closing the last control-panel tab shuts down the workers and owned
+renderer after a short grace period and releases the score-feed port. Refreshing
+or keeping another control-panel tab open preserves the session; OBS video views
+do not keep it alive. The shutdown button and Ctrl+C in the console also stop it.
+The server binds only to this computer and runs without Flask's development reloader.
 
 Use **Setup check** whenever something seems missing. It reports dependency,
 template, file/resolution, score-port, renderer-asset, and optional OBS checks.

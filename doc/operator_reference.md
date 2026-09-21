@@ -85,7 +85,7 @@ using the entered URL but does not apply settings or enable automatic publishing
 | Camera switch fails | Read the source error; the old feed remains active. If the hardware cannot open both sources briefly, use **Stop**, select the new camera, then **Start** between songs. |
 | App is still cleaning up after Stop | Wait for capture to release before starting another session; check recent errors. |
 
-For recording demos or development, enable **Results → Allow repeat screenshots and Discord posts from recordings (development)** and click **Apply results settings**. Each replay can save and post again. Keep Capture results and Discord publishing enabled; turn the repeat option off when testing is finished.
+For recording demos or development, enable **Results → Allow repeat screenshots and Discord posts from recordings** and click **Apply results settings**. Each replay can save and post again. Keep Capture results and Discord publishing enabled; turn the repeat option off when testing is finished.
 
 Capture age and accepted-read age describe different things: fresh frames can
 arrive while scores are rejected. **Processing capacity** measures active frame

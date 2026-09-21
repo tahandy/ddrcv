@@ -2,7 +2,7 @@ include uv.lock
 include .python-version
 include setup_desktop.bat setup_workbench.bat
 include launch_desktop.vbs launch_workbench.bat
-include requirements*.txt
+include requirements-legacy.txt
 include tools/setup.ps1
 include tests/test_setup.ps1
 include tests/test_setup_menu.ps1

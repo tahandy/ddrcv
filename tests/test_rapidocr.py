@@ -170,11 +170,13 @@ class RapidOCRTests(unittest.TestCase):
         from importlib.metadata import PackageNotFoundError
         with TemporaryDirectory() as directory:
             with patch('importlib.metadata.version', side_effect=PackageNotFoundError('rapidocr')):
-                with self.assertRaisesRegex(ImportError, 'pip install -r requirements-ocr.txt'):
+                with self.assertRaises(ImportError) as error:
                     RapidOCRRecognizer(model_dir=directory).warmup()
+                self.assertIn('python -m pip install -e ".[ocr]"', str(error.exception))
             with patch('importlib.metadata.version', return_value='0.0.0'):
-                with self.assertRaisesRegex(RuntimeError, 'Expected rapidocr==3.9.2'):
+                with self.assertRaisesRegex(RuntimeError, 'Expected rapidocr==3.9.2') as error:
                     RapidOCRRecognizer(model_dir=directory).warmup()
+                self.assertIn('python -m pip install -e ".[ocr]"', str(error.exception))
 
     def test_ddr_preparation_preserves_original_color(self):
         image = np.full((20, 40, 3), (20, 80, 30), dtype=np.uint8)

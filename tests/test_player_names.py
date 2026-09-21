@@ -457,7 +457,6 @@ class RealModelReadinessTests(unittest.TestCase):
         setup = (root / 'tools/setup.ps1').read_text()
         self.assertIn("'ddrcv.ocr.check', '--provision'", setup)
         for app in ('desktop', 'workbench'):
-            self.assertIn(f'-e .[{app}]', (root / f'requirements-{app}.txt').read_text())
             self.assertIn(f'-App {app} %*', (root / f'setup_{app}.bat').read_text())
 
 

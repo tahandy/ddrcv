@@ -19,13 +19,14 @@ player names and the **large score**, captures the supporting clean frame, and
 publishes a compact Discord embed. Lower-panel tabs, judgments, difficulty, stage,
 and song lookup are not prerequisites.
 
-## Run this worktree
+## Install and run
 
 Use the Python environment inside this checkout. OCR dependencies are
-included in the tournament/workbench/desktop requirements. Both setup scripts
-provision the model and run real inference. Existing environments can install
-`requirements-ocr.txt` and run `python -B -m ddrcv.ocr.check --provision`.
-No changes to another checkout's environment are needed.
+included in the `tournament`, `workbench`, and `desktop` extras in
+`pyproject.toml`. Both setup scripts provision the model and run real inference.
+For a manual OCR-only install in an existing environment, run
+`python -m pip install -e ".[ocr]"` from the repository root, followed by
+`python -B -m ddrcv.ocr.check --provision`.
 
 ```bat
 .venv\Scripts\python.exe -B -m ddrcv.workbench --port 5004
@@ -173,7 +174,7 @@ are independent, so this recording safeguard does not suppress new live songs.
 ### Replaying recordings during development or demos
 
 In **Results → Results capture**, enable **Allow repeat screenshots and Discord
-posts from recordings (development)**, then click **Apply results settings**.
+posts from recordings**, then click **Apply results settings**.
 The profile setting is `results.allow_replay_duplicates: true` (default `false`).
 It applies without restarting capture and is saved with the profile. Each replay
 can create a fresh result, uniquely named screenshot, and automatic Discord post.

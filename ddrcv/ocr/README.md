@@ -17,7 +17,8 @@ python -m pip install -e ".[ocr]"
 The supported package requires **64-bit CPython 3.12**. Tested on
 Windows x64 with Python 3.12.6. Direct requirements: `rapidocr==3.9.2`,
 `onnxruntime==1.30.0`, `numpy==2.2.0`, `opencv-python==4.10.0.84`. Pip resolves
-transitive dependencies; the application setup scripts use `uv.lock`. Tournament, desktop, and workbench requirements include
+transitive dependencies; the application setup scripts use `uv.lock`. The
+`tournament`, `desktop`, and `workbench` extras in `pyproject.toml` include
 these dependencies. Both application setup scripts provision the cached model
 and require a successful real-model splash smoke test. Run
 `python -B -m ddrcv.ocr.check` for an offline readiness check, or add `--provision`

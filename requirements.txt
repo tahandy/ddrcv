@@ -1,3 +1,0 @@
-# Default Windows application. Legacy research: requirements-legacy.txt.
-# For reproducible installation, use setup_desktop.bat (uv.lock).
--e .[desktop]

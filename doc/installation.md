@@ -109,10 +109,15 @@ Experienced users can create an environment with their own Python and pip:
 
 Pip uses the declared direct pins but resolves transitive versions afresh.
 Use the setup scripts for the checked-in lockfile, Python provisioning, and
-WebView2 installation. The `requirements*.txt` application files remain thin
-compatibility entry points; run them from the repository root. Historical
-EasyOCR/Torch/jacket experiments use `requirements-legacy.txt`, outside the
-supported application lock, preferably in a separate environment.
+WebView2 installation. For a smaller manual install, select `.[ocr]`,
+`.[tournament]`, or `.[workbench]` in place of `.[desktop]`; run these commands
+from the repository root. Application dependencies are maintained only in
+`pyproject.toml` and `uv.lock`.
+
+Historical EasyOCR/Torch/jacket experiments use `requirements-legacy.txt`,
+outside the supported application lock, in a separate environment. The
+requirements files under `apps/obs` and `apps/state_simulator` belong to those
+standalone legacy tools; the desktop installer does not use them.
 
 Wheel and source distributions use the standard build interface, without
 `setup.py`. To build and refresh the lock with an installed uv:
