@@ -341,6 +341,27 @@ class WorkbenchTests(unittest.TestCase):
                 second.start()
             second.stop()
 
+    def test_close_releases_score_port_even_when_results_cleanup_fails(self):
+        with socket.socket() as reservation:
+            reservation.bind(('127.0.0.1', 0))
+            self.wb.publisher.port = reservation.getsockname()[1]
+        self.wb.publisher.start()
+        close_results = self.wb.results.close
+
+        def failed_cleanup():
+            close_results()
+            raise RuntimeError('results cleanup failed')
+
+        with patch.object(self.wb.results, 'close', side_effect=failed_cleanup):
+            with self.assertRaisesRegex(RuntimeError, 'results cleanup failed'):
+                self.wb.close()
+        self.assertFalse(self.wb.publisher.status['running'])
+        with socket.socket() as probe:
+            probe.settimeout(.2)
+            self.assertNotEqual(probe.connect_ex(('127.0.0.1', self.wb.publisher.port)), 0)
+        import logging
+        logging.getLogger().removeHandler(self.wb.logs)
+
 
 @unittest.skipUnless(HAS_RUNTIME, 'Requires rehearsal dependencies')
 class OBSServiceTests(unittest.TestCase):

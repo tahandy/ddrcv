@@ -31,6 +31,9 @@ needed for the first setup. When it finishes, double-click **launch_desktop.vbs*
 For recorded-footage rehearsal in a browser, run **setup_workbench.bat**, then
 **launch_workbench.bat** (http://localhost:5002/). New sessions default to Money
 score. Both applications share this checkout's environment.
+Closing the last Workbench tab shuts it down and releases the score feed port
+after a short grace period. Refreshing the page or keeping another Workbench tab
+open keeps the session running. OBS video views do not keep the Workbench alive.
 
 Already have Python? Pass the full path to **64-bit CPython 3.12**:
 

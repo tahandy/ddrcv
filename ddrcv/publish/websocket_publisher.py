@@ -17,6 +17,7 @@ class WebSocketPublisher:
         self._stop = threading.Event()
         self._ready = threading.Event()
         self._thread = None
+        self._loop = self._server = self._async_stop = None
         self._content, self._version = None, 0
         self._clients, self._running, self._error = 0, False, None
 
@@ -51,9 +52,23 @@ class WebSocketPublisher:
 
     def stop(self):
         self._stop.set()
+        loop = self._loop
+        if loop is not None:
+            try:
+                loop.call_soon_threadsafe(self._close_server)
+            except RuntimeError:
+                pass  # The publisher finished and closed its loop concurrently.
         if self._thread and self._thread is not threading.current_thread():
             self._thread.join(timeout=3)
+            if self._thread.is_alive():
+                raise RuntimeError('Score publisher shutdown is still pending; wait before restarting')
         self._thread = None
+
+    def _close_server(self):
+        if self._async_stop is not None:
+            self._async_stop.set()
+        if self._server is not None:
+            self._server.close()
 
     def _run(self):
         try:
@@ -61,11 +76,14 @@ class WebSocketPublisher:
         except Exception as error:
             self._error = f'Cannot start score feed on {self.host}:{self.port}: {error}. Stop the other driver/simulator or select a free port.'
         finally:
+            self._loop = self._server = self._async_stop = None
             self._running = False
             self._clients = 0
             self._ready.set()
 
     async def _serve(self):
+        self._loop = asyncio.get_running_loop()
+        self._async_stop = asyncio.Event()
         clients = set()
 
         async def handler(websocket):
@@ -81,7 +99,8 @@ class WebSocketPublisher:
                 clients.discard(websocket)
                 self._clients = len(clients)
 
-        async with websockets.serve(handler, self.host, self.port, close_timeout=.5):
+        async with websockets.serve(handler, self.host, self.port, close_timeout=.5) as server:
+            self._server = server
             self._running = True
             self._ready.set()
             last_version = -1
@@ -93,4 +112,7 @@ class WebSocketPublisher:
                     if clients:
                         await asyncio.gather(*(client.send(message) for client in tuple(clients)), return_exceptions=True)
                     last_version = version
-                await asyncio.sleep(self.delay)
+                try:
+                    await asyncio.wait_for(self._async_stop.wait(), timeout=self.delay)
+                except TimeoutError:
+                    pass

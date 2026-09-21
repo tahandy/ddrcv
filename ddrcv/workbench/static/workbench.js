@@ -12,6 +12,16 @@ const reasons = {
 const errors = new Map(), dismissedErrors = new Map();
 let initialized = false, lastSequence = -1, lastImages = 0, polling = false, obsPolling = false;
 let shutdown = false, current = null, noticeTimer = null, stickyNotice = false;
+let panelConnection = null;
+function connectPanel() {
+  if (!shutdown && !panelConnection) panelConnection = new EventSource('/api/panel');
+}
+function disconnectPanel() {
+  panelConnection?.close();
+  panelConnection = null;
+}
+window.addEventListener('pagehide', disconnectPanel);
+window.addEventListener('pageshow', connectPanel);
 try { $('show-regions').checked = localStorage.getItem('ddrcv.show-regions') === 'true'; } catch {}
 $('show-regions').onchange = () => {
   try { localStorage.setItem('ddrcv.show-regions', String($('show-regions').checked)); } catch {}
@@ -174,7 +184,7 @@ bind('obs-pause', () => post('/api/obs', {action: 'automation', enabled: false})
 bind('obs-disconnect', () => post('/api/obs', {action: 'disconnect'}));
 bind('obs-manual', () => post('/api/obs', {action: 'scene', name: $('manual-scene').value}));
 bind('logs-refresh', async () => { const data = await fetch('/api/logs').then(r => r.json()); if (data.error) throw new Error(data.error); text('logs', data.join('\n')); });
-bind('shutdown', async () => { await post('/api/shutdown'); shutdown = true; notice('Workbench stopped. You may close this tab.', true); });
+bind('shutdown', async () => { await post('/api/shutdown'); shutdown = true; disconnectPanel(); notice('Workbench stopped. You may close this tab.', true); });
 bind('results-apply', async () => {
   const values = {enabled: $('results-enabled').checked, discord: $('results-discord').checked,
     rehearsal: $('results-rehearsal').checked};
@@ -348,4 +358,5 @@ async function pollObs() {
   } catch { text('obs-status', 'OBS status unavailable'); }
   finally { obsPolling = false; }
 }
+connectPanel();
 setInterval(poll, 250); setInterval(pollObs, 1500); poll(); pollObs();

@@ -633,17 +633,22 @@ class Workbench:
             self.submit('stop')
         finally:
             self.closed.set()
-            with self.lock:
-                self.frame_ready.notify_all()
-                for picker in tuple(self.pickers):
-                    if picker.poll() is None:
-                        picker.terminate()
-                        picker.wait(timeout=3)
-            self.worker.join(timeout=3)
+            try:
+                with self.lock:
+                    self.frame_ready.notify_all()
+                    for picker in tuple(self.pickers):
+                        if picker.poll() is None:
+                            picker.terminate()
+                            picker.wait(timeout=3)
+                self.worker.join(timeout=3)
+            finally:
+                # Drain playback commands before releasing the feed, so a queued
+                # port change cannot reopen it. Other cleanup must not delay or
+                # prevent releasing the listening socket.
+                self.publisher.stop()
             self.obs_worker.join(timeout=3)
             self.obs.disconnect()
             self.stop_renderer()
             self.player_names.close()
             self.results.close()
-            self.publisher.stop()
             logging.getLogger().removeHandler(self.logs)

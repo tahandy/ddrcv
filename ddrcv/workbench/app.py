@@ -27,6 +27,27 @@ def create_app(workbench=None):
     def index():
         return render_template('index.html')
 
+    @app.get('/api/panel')
+    def panel():
+        lifetime = app.config.get('PANEL_LIFETIME')
+        if lifetime is None:
+            return Response(status=204)
+
+        def events():
+            if not lifetime.connect():
+                return
+            try:
+                while not wb.closed.is_set():
+                    # A server heartbeat detects closed/crashed browser tabs even
+                    # when background-page JavaScript timers are throttled.
+                    yield ': panel connected\n\n'
+                    if wb.closed.wait(1):
+                        break
+            finally:
+                lifetime.disconnect()
+
+        return Response(events(), mimetype='text/event-stream', headers={'Cache-Control': 'no-store'})
+
     @app.get('/api/status')
     def status():
         return jsonify(wb.status())

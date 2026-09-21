@@ -105,7 +105,7 @@
   <div class="row"><label>Screen<select id="sim-state"></select></label><label class="check"><input id="sim-p1-present" type="checkbox" checked>P1 present</label><label>P1 score<input id="sim-p1" type="number" value="1234" min="-1"></label><label class="check"><input id="sim-p2-present" type="checkbox" checked>P2 present</label><label>P2 score<input id="sim-p2" type="number" value="1200" min="-1"></label><button id="simulate">Start / update simulation</button></div>
 </details>
 <details class="section"><summary>Logs</summary><button id="logs-refresh">Refresh logs</button><pre id="logs"></pre></details>
-<div class="shutdown"><button id="shutdown">Shut down workbench</button></div>
+<div class="shutdown"><p class="muted">Closing the last workbench tab stops playback and releases the score feed port.</p><button id="shutdown">Shut down workbench</button></div>
 <script src="/static/workbench.js"></script>
 </body>
 </html>

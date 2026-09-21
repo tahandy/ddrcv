@@ -18,10 +18,12 @@ def main():
         from werkzeug.serving import make_server
         from ddrcv.workbench.app import create_app
         from ddrcv.workbench.controller import Workbench
+        from ddrcv.workbench.lifecycle import PanelLifetime
     except ImportError as error:
         parser.exit(1, f'Missing runtime dependency: {error}. Run setup_workbench.bat first.\n')
     wb = Workbench(args.data_dir, start_publisher=not args.check)
     server = None
+    lifetime = None
     try:
         if args.check:
             import json
@@ -35,17 +37,23 @@ def main():
         except (OSError, SystemExit):
             parser.exit(1, f'Panel port {args.port} is occupied. Close the other panel or pass --port.\n')
         app.config['SHUTDOWN'] = server.shutdown
+        lifetime = PanelLifetime(server.shutdown)
+        app.config['PANEL_LIFETIME'] = lifetime
         url = f'http://localhost:{args.port}/'
-        print(f'Rehearsal panel: {url}\nClean OBS browser source: {url}video\nPress Ctrl+C to stop.')
+        print(f'Rehearsal panel: {url}\nClean OBS browser source: {url}video\nClose the last panel tab or press Ctrl+C to stop.')
         if not args.no_browser:
             threading.Timer(.3, lambda: webbrowser.open(url)).start()
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
-        wb.close()
-        if server:
-            server.server_close()
+        if lifetime:
+            lifetime.close()
+        try:
+            wb.close()
+        finally:
+            if server:
+                server.server_close()
 
 
 if __name__ == '__main__':
