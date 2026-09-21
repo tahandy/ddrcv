@@ -115,6 +115,13 @@ class Desk:
                         default_scene_map=deepcopy(DEFAULT_SCENE_MAP),
                         pending=self.draft != self.applied, preferences=deepcopy(self.preferences))
 
+    def reveal_secret(self, path):
+        if path not in ('obs.password', 'results.webhook'):
+            raise ValueError('Unknown credential field')
+        section, key = path.split('.')
+        with self.lock:
+            return self.draft[section].get(key) or ''
+
     def edit(self, config):
         if not isinstance(config, dict):
             raise ValueError('Configuration must be a JSON object')
@@ -252,7 +259,7 @@ class Desk:
 
     def apply_results(self):
         """Apply only the Results tab controls, preserving unrelated draft edits."""
-        keys = ('enabled', 'discord', 'webhook', 'parse_names', 'screenshots_only', 'output_directory', 'include_player_names')
+        keys = ('enabled', 'discord', 'webhook', 'parse_names', 'screenshots_only', 'allow_replay_duplicates', 'output_directory', 'include_player_names')
         with self.operations:
             if self.closed:
                 raise ValueError('Application is shutting down')

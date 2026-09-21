@@ -10,6 +10,7 @@ import cv2
 
 from ddrcv.ingest.file_source import FileSource, normalize_frame
 from ddrcv.apps.tournament_integrations import Integrations
+from ddrcv.apps.thread_qos import desktop_recognition_qos
 from ddrcv.state.player_names import PlayerNameService
 
 
@@ -57,7 +58,8 @@ class TournamentRuntime:
 
     def _background(self):
         try:
-            self.run()
+            with desktop_recognition_qos(self.desktop, self.log):
+                self.run()
         except Exception:
             self.log.exception('Driver stopped')
 
@@ -324,7 +326,7 @@ class TournamentRuntime:
     def configure_results(self, settings):
         """Apply operator controls on the recognition worker without resetting gameplay."""
         from ddrcv.apps.driver_config import validate_config
-        allowed = {'enabled', 'discord', 'webhook', 'parse_names', 'screenshots_only', 'output_directory', 'include_player_names'}
+        allowed = {'enabled', 'discord', 'webhook', 'parse_names', 'screenshots_only', 'allow_replay_duplicates', 'output_directory', 'include_player_names'}
         if set(settings) - allowed:
             raise ValueError('Only Results tab settings can change during capture')
         with self.lock:

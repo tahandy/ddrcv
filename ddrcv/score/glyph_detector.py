@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,6 +24,11 @@ def preprocess_image(image):
     :param image: The RGB image to be preprocessed.
     :return: The preprocessed binary image.
     """
+    if image.dtype == np.uint8 and image.ndim >= 1 and image.shape[-1] == 3:
+        # floor(R*G*B / 255**2) > 128, without float conversion or uint8 overflow.
+        rgb = image.astype(np.uint32)
+        white = rgb[..., 0] * rgb[..., 1] * rgb[..., 2] >= 129 * 255 * 255
+        return np.where(white, 255, 1).astype(np.uint8)
     prod = (255 * np.prod(image / 255, axis=-1)).astype(np.uint8)
     prod[prod > 128] = 255
     prod[prod <= 128] = 1
@@ -74,6 +81,7 @@ class GlyphDetector:
         self.threshold = threshold
         self.optimal_scale = scale
         self.dilation = dilation
+        self._last_detection = None
 
         for glyph_class, (glyph, alpha) in self.glyphs.items():
             scaled_glyph = glyph
@@ -126,6 +134,15 @@ class GlyphDetector:
     #     self.optimal_scale = best_scale
     #     return best_scale
 
+    def _matching_signature(self):
+        # Templates/settings are public and may be changed in place. Identity alone
+        # cannot validate cached results; include exact contents and iteration order.
+        def array_signature(array):
+            return None if array is None else (array.shape, array.dtype.str, array.tobytes())
+        return (self.threshold, self.optimal_scale,
+                tuple((label, array_signature(glyph), array_signature(alpha))
+                      for label, (glyph, alpha) in self.glyphs.items()))
+
     def detect_glyphs(self, image):
         """
         Detect glyphs in the given image.
@@ -135,6 +152,10 @@ class GlyphDetector:
         """
 
         image = preprocess_image(image)
+        signature = self._matching_signature()
+        cached = self._last_detection
+        if cached is not None and cached[0] == signature and np.array_equal(cached[1], image):
+            return deepcopy(cached[2])
 
         # cv2.imshow('blah', image)
         # cv2.waitKey(0)
@@ -162,6 +183,7 @@ class GlyphDetector:
 
         # Apply Non-Maximum Suppression to remove overlapping boxes
         final_glyphs = self.non_maximum_suppression(detected_glyphs)
+        self._last_detection = (signature, image.copy(), deepcopy(final_glyphs))
 
         return final_glyphs
 

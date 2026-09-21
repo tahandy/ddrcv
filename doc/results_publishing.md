@@ -161,6 +161,35 @@ requests. Sealed EOF bundles reserve their intervals before saving, so looping
 cannot duplicate a result while its screenshot is still being written. This does not infer unseen portions
 of a recording after an arbitrary seek.
 
+When replaying a saved interval, the desktop shows **Replay already saved**:
+it reuses the existing result and does not write another screenshot or send
+another automatic Discord post. The screenshot filename retains its original
+capture date, even when you replay the video later. Open **Results → Recent
+results & recovery** to inspect the existing screenshot and delivery. For another
+Discord post, use **More recovery options → Republish** and confirm. A stopped
+and restarted replay still uses the same saved intervals. Live capture events
+are independent, so this recording safeguard does not suppress new live songs.
+
+### Replaying recordings during development or demos
+
+In **Results → Results capture**, enable **Allow repeat screenshots and Discord
+posts from recordings (development)**, then click **Apply results settings**.
+The profile setting is `results.allow_replay_duplicates: true` (default `false`).
+It applies without restarting capture and is saved with the profile. Each replay
+can create a fresh result, uniquely named screenshot, and automatic Discord post.
+Capture results and Discord publishing must still be enabled with a working webhook;
+this setting does not override rehearsal mode or delivery errors.
+
+A continuous results screen still creates only one result, even with the option
+on. Seeking back, looping, or restarting the recording permits another result.
+Enabling it while **Replay already saved** is displayed lets the next frames start
+capture for that screen, so resume playback if paused. Changing this setting does
+not discard an ongoing result's evidence. Turn it off after testing to restore
+saved-interval protection, including intervals captured while it was enabled.
+There is no need to delete screenshots or outbox metadata. Existing installations
+need one full **Exit application…** and relaunch after updating to load the new backend;
+closing and reopening only the desktop panel is insufficient.
+
 Desktop/CLI profiles default to capture enabled, with readable PNG copies in
 `results.output_directory` (default `screenshots`). Explicit `enabled: false`
 settings remain off. The workbench retains its separate opt-in capture setting.

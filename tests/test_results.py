@@ -143,6 +143,69 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(len(self.service.status()['records']),1)
         self.assertGreater(self.service.status()['deduplicated'],0)
 
+    def test_replay_duplicates_save_and_send_fresh_results_across_restart(self):
+        self.assertFalse(self.service.status()['allow_replay_duplicates'])
+        sender = Mock(return_value=dict(message_id='123', message_url=None))
+        self.service.outbox.sender = sender
+        self.service.configure(allow_replay_duplicates=True, discord=True,
+                               webhook='https://discord.com/api/webhooks/1/test',
+                               output_directory=str(Path(self.temp.name) / 'exports'))
+        for count in (1, 2):
+            self.settled()
+            self.feed(4, raw='song_select', state='song_select')
+            wait_for(lambda: len(self.service.status()['records']) == count and
+                     all(r['delivery']['state'] == 'sent' and r.get('screenshot_export_path')
+                         for r in self.service.status()['records']))
+            if count == 1:
+                config = dict(self.service.config)
+                self.service.close()
+                self.service = ResultsService(self.temp.name, config, reader=self.reader, sender=sender)
+                self.service.reset('video', True, 'ex')
+        records = self.service.status()['records']
+        self.assertEqual(sender.call_count, 2)
+        for key in ('event_id', 'screenshot_path', 'screenshot_export_path'):
+            self.assertEqual(len({r[key] for r in records}), 2)
+        for r in records:
+            self.assertTrue(Path(r['screenshot_export_path']).is_file())
+            self.assertIsNotNone(cv2.imread(r['screenshot_path']))
+        self.service.configure(allow_replay_duplicates=False)
+        self.service.reset('video', True, 'ex')
+        self.settled()
+        self.assertEqual(self.service.status()['phase'], 'already_saved')
+        self.assertEqual(len(self.service.status()['records']), 2)
+        self.assertEqual(sender.call_count, 2)
+
+    def test_replay_policy_toggle_preserves_evidence_and_one_result_per_screen(self):
+        self.feed(0)
+        self.feed(2)
+        episode = self.service.active
+        generation, run, evidence = episode.generation, episode.run, episode.evidence
+        self.service.configure(allow_replay_duplicates=True)
+        self.assertIs(self.service.active, episode)
+        self.assertEqual((episode.generation, episode.run), (generation, run))
+        self.assertIs(episode.evidence, evidence)
+        self.settled(2.2)
+        self.assertEqual(len(self.service.status()['records']), 1)
+        self.service.configure(allow_replay_duplicates=False)
+        self.service.configure(allow_replay_duplicates=True)
+        self.settled(6)
+        self.assertEqual(len(self.service.status()['records']), 1)
+
+    def test_enabling_repeats_unlatches_an_already_saved_replay(self):
+        self.settled()
+        self.service.reset('video', True, 'ex')
+        self.feed(0)
+        self.assertEqual(self.service.status()['phase'], 'already_saved')
+        self.service.configure(allow_replay_duplicates=True)
+        self.settled(.2)
+        self.assertEqual(len(self.service.status()['records']), 2)
+        self.assertTrue(self.service.feed_status()['allow_replay_duplicates'])
+
+    def test_replay_duplicates_requires_boolean(self):
+        for value in ('false', 1, None):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'allow_replay_duplicates'):
+                self.service.configure(allow_replay_duplicates=value)
+
     def test_names_disabled_confirms_scores_and_formats_player_labels(self):
         self.service.configure(parse_names=False)
         self.settled()

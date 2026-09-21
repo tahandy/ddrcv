@@ -212,11 +212,17 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(self.desk.runtime.phase, 'Ready')
         self.assertIsNone(self.desk.runtime.thread)
 
+    def test_replay_duplicates_defaults_and_strict_profile_validation(self):
+        self.assertFalse(normalize_config({})['results']['allow_replay_duplicates'])
+        for value in ('false', 1, None):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'allow_replay_duplicates'):
+                validate_config({'results': {'allow_replay_duplicates': value}})
+
     def test_results_controls_apply_live_preserve_other_edits_and_mask_webhook(self):
         self.desk.start()
         runtime = self.desk.runtime
         config = self.desk.config()['draft']
-        config['results'].update(enabled=True, discord=True, parse_names=False,
+        config['results'].update(enabled=True, discord=True, parse_names=False, allow_replay_duplicates=True,
                                  webhook='https://discord.com/api/webhooks/1/desktop-test',
                                  output_directory=str(self.root / 'exports'), include_player_names=False)
         config['obs']['port'] = ''  # Unfinished unrelated edits must not block results controls.
@@ -230,6 +236,7 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(runtime.stop_calls, 0)
         self.assertFalse(runtime.config['results']['parse_names'])
         self.assertTrue(runtime.config['results']['discord'])
+        self.assertTrue(runtime.config['results']['allow_replay_duplicates'])
         self.assertEqual(runtime.config['results']['output_directory'], str(self.root / 'exports'))
         self.assertFalse(runtime.config['results']['include_player_names'])
         self.assertNotEqual(runtime.config['results']['outbox_directory'], 'pending-outbox')
@@ -245,6 +252,38 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(saved['webhook'], runtime.config['results']['webhook'])
         self.assertEqual(saved['output_directory'], str(self.root / 'exports'))
         self.assertFalse(saved['include_player_names'])
+        self.assertTrue(saved['allow_replay_duplicates'])
+
+    def test_saved_credentials_reveal_only_through_authenticated_scoped_endpoint(self):
+        config = self.desk.config()['draft']
+        config['obs']['password'] = 'reveal-test-password'
+        config['results']['webhook'] = 'https://discord.com/api/webhooks/1/reveal-test'
+        self.desk.edit(config)
+        self.desk.close()
+        self.desk = Desk(self.root, FakeRuntime)
+        client = create_app(self.desk, 'test').test_client()
+        headers = {'X-Desk-Token': 'test'}
+        before = deepcopy(self.desk.draft)
+        for path in ('obs.password', 'results.webhook'):
+            section, key = path.split('.')
+            args = {'path': path}
+            self.assertEqual(client.post('/api/config/secret', json=args).status_code, 403)
+            response = client.post('/api/config/secret', json=args, headers=headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json, {'value': config[section][key]})
+            self.assertEqual(response.headers['Cache-Control'], 'no-store')
+            self.assertEqual(client.get('/api/config', headers=headers).json['draft'][section][key], MASK)
+            self.assertEqual(client.post('/api/config/secret', json=args,
+                             headers={**headers, 'Origin': 'https://example.com'}).status_code, 403)
+        for path in ('ingest.rtsp.rtsp_url', 'obs', 'results', 'unknown', None):
+            self.assertEqual(client.post('/api/config/secret', json={'path': path}, headers=headers).status_code, 400)
+        self.assertEqual(self.desk.draft, before)
+        self.assertIsNone(self.desk.runtime)
+        config['obs']['password'] = ''
+        config['results']['webhook'] = None
+        self.desk.edit(config)
+        for path in ('obs.password', 'results.webhook'):
+            self.assertEqual(client.post('/api/config/secret', json={'path': path}, headers=headers).json, {'value': ''})
 
     def test_webhook_probe_uses_masked_draft_without_capture_or_applying_settings(self):
         config = self.desk.config()['draft']
@@ -992,6 +1031,10 @@ class RecoveryTests(unittest.TestCase):
                     self.assertTrue(service.config['parse_names'])
                     runtime.configure_results(dict(screenshots_only=False))
                     self.assertFalse(service.config['screenshots_only'])
+                    runtime.configure_results(dict(allow_replay_duplicates=True))
+                    self.assertTrue(service.status()['allow_replay_duplicates'])
+                    runtime.configure_results(dict(allow_replay_duplicates=False))
+                    self.assertFalse(service.status()['allow_replay_duplicates'])
                     reset.assert_not_called()
                 wait_for(lambda: runtime.sequence > before + 4)
                 self.assertEqual(runtime.engine.session.info['score'], scores)

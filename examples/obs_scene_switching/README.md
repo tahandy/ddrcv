@@ -158,8 +158,20 @@ the actual recognition and scene transitions. Simulation only validates wiring.
   password differs from the entered value/environment variable.
 - Missing collection or scene: run `setup` first. A black Browser source can mean
   its generated HTML moved; rerun setup and refresh it.
-- Correct scene but disconnected scores: check that the HTML's configured feed
-  matches `--feed` / `--feed-port`. Scene control and overlay connection are independent.
+- Correct scene but scores alternate between **Disconnected** and **Connecting**:
+  the default demo setup points the cards at the simulator on **9010**, while
+  desktop capture normally publishes on **9000**. Starting desktop capture does
+  not change the cards' saved address. With OBS outputs stopped, run:
+
+  ```bat
+  .venv\Scripts\python.exe examples\obs_scene_switching\demo.py setup --feed ws://127.0.0.1:9000
+  ```
+
+  This updates and refreshes the Browser sources. Use the desktop's actual
+  publisher port if it differs. For the standalone overlay, update its HTML
+  `data-feed` and refresh the source. Scene control on **4455** and the score-feed
+  connection are independent; successful scene switching does not prove that
+  the cards have the right feed address.
 - State feed messages are complete snapshots with no capture heartbeat; an open
   socket does not prove capture freshness. See the
   [state specification](../../doc/streaming_state.md).

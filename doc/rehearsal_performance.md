@@ -61,6 +61,8 @@ code reloading. No dependency reinstall is needed for these changes.
 
 ## Gameplay capacity follow-up (September 2026)
 
+A [September 20 investigation using the trimmed recording and full tray app](desktop_throughput_investigation.md) compares these measurements with the operator's reported 26 ms/frame and provides a read-only timing recorder.
+
 The reported approximately 33 ms of active gameplay processing was investigated
 separately from the recording's 30 fps playback limit. The initial isolated
 recognizer checks took 4.2–4.7 ms/frame. Attribution runs through the production
@@ -170,3 +172,100 @@ For attribution, add `--profile-stages`; normal comparison runs omit it. Stage
 timings include nested calls and must not be summed. Decode/playback waits are
 reported separately and excluded from active processing capacity. No profiler,
 extra telemetry, or new configuration setting is installed in the application.
+
+## Exact glyph reuse and integer preprocessing (September 20, 2026)
+
+The glyph detector now uses integer preprocessing for RGB `uint8` inputs:
+`R * G * B >= 129 * 255 * 255`, with `uint32` multiplication to avoid overflow.
+It produces the same 255/1 matcher input; other input types retain the original
+floating-point path. Each detector keeps only its last preprocessed crop and
+detections. Reuse requires exact pixel equality plus unchanged threshold, scale,
+and ordered glyph/mask shapes, dtypes, and contents. Returned detections are
+independent copies, including on cache hits. Matching methods, masks, thresholds,
+search regions and suppression are unchanged. Every frame still enters temporal
+score validation with its current timestamp, even when matching is reused.
+
+### Recognition and extraction validation
+
+All **16,777,216 RGB colors** produced exactly the original preprocessing output.
+Focused tests also cover strided/read-only inputs, legacy input types, changed
+pixels, empty detections, template/settings changes, cache isolation, and mutation
+of returned detections. The regression runner passed **244 tests, no skips**,
+including installed-model and recorded-video tests.
+
+The trimmed recording's 10–155 second interval produced **4,350 identical complete
+recognition traces**, covering detection dictionaries, raw/accepted scores,
+temporal decisions, state transitions, and publication. This includes full-combo
+animation and results transitions. Another 111 extraction comparisons checked
+either player absent and both absent. The extraction benchmark also compared
+13,320 complete detection outputs exactly.
+
+Three alternating baseline/optimized trials measured 2,220 player crops each,
+preloaded from 20–40 and 110–127 seconds of
+`2025-03-27_15-52-48_trimmed.mkv`. Times include preprocessing, cache validation,
+matching or reuse, and detection output creation; video decoding is excluded.
+
+| Trial | Baseline ms/player crop | Optimized ms/player crop |
+| --- | ---: | ---: |
+| 1 | 1.669 | 1.227 |
+| 2 | 1.646 | 1.208 |
+| 3 | 1.671 | 1.205 |
+| Median | **1.669** | **1.208** |
+
+Median extraction improved **27.6%**, exceeding the 15% retention requirement.
+That isolated result saves approximately 0.92 ms per two-player frame.
+
+### Native desktop and renderer validation
+
+Six fresh native runs used the actual persistent tray host, WebView2 desktop
+panel, production background recognition thread, and external renderer. Each
+played 15–40 seconds of the same trimmed recording, with 20–40 seconds used for
+the steady gameplay comparison after warmup. The saved operator settings were
+copied to isolated profiles, ports, and output directories. OBS control and
+Discord delivery were disabled. Python was 3.12.6, OpenCV 4.10.0 with one OpenCV
+thread; stage profiling was disabled. Order alternated baseline/optimized,
+optimized/baseline, baseline/optimized.
+
+| Trial | Whole replay mean, baseline → optimized | After warmup mean, baseline → optimized | Highest sampled two-second mean, baseline → optimized |
+| --- | ---: | ---: | ---: |
+| 1 | 9.24 → 7.02 ms | 9.93 → 7.50 ms | 12.20 → 9.52 ms |
+| 2 | 9.14 → 5.98 ms | 9.19 → 6.73 ms | 12.38 → 9.79 ms |
+| 3 | 9.87 → 7.67 ms | 10.84 → 8.32 ms | 12.21 → 9.98 ms |
+
+Whole replay means include all 750 frames per trial, including warmup; pooled
+means were **9.42 → 6.89 ms/frame**. After warmup, pooled means across 1,800 frames
+per variant were **9.99 → 7.52 ms/frame**, a **24.7%** reduction. The corresponding
+p95 was **14.74 → 13.73 ms**, and p99 **16.98 → 15.71 ms**. The desktop's rolling
+two-second metric was sampled about every 0.5 seconds throughout playback,
+including warmup; the table reports the highest observed samples, not a guarantee
+of the absolute maximum between samples. There was no material processing-time
+regression in these runs.
+
+Active processing excludes video decode and playback pacing. Actual delivered
+throughput remained **26.86 → 26.89 fps**, constrained by the existing file-source
+cadence. These measured desktop gains are workload-specific and do **not** show
+that the intermittent 26 ms slowdown has been fixed. The native runs cover this
+25-second slice, not the entire recording or a live capture/OBS/Discord workload.
+
+### Reproduction and receipts
+
+The pre-change detector is available at commit `193b7a4`. From the repository
+root, these commands create a baseline snapshot and repeat the exact-recognition
+and crop-extraction comparison (use a new output directory for a new run):
+
+```bat
+.venv\Scripts\python.exe -c "from pathlib import Path; import subprocess; p=Path('.desktop-validation/glyph-baseline.py'); p.parent.mkdir(exist_ok=True); p.write_bytes(subprocess.check_output(['git','show','193b7a4:ddrcv/score/glyph_detector.py']))"
+.venv\Scripts\python.exe -B tools\validate_glyph_optimization.py --baseline .desktop-validation\glyph-baseline.py --video D:\TBD5\2025-03-27_15-52-48_trimmed.mkv --out .desktop-validation\glyph-recheck
+.venv\Scripts\python.exe -B tools\run_results_tests.py --video apps\scripts\2025-03-27_15-52-48.mkv
+```
+
+Local measurement receipts are in `.desktop-validation/glyph-optimization/`:
+`parity-and-speed/report.json`, `native-summary.json`, and each
+`native-<trial>-<variant>/report.json` and `frames.json`. The local
+`native_trial.py`/`run_native_matrix.py` probes preserve the actual tray-host
+comparison procedure and machine-specific configuration. These probes and raw
+artifacts are ignored by Git; the crop comparison tool and regression tests are
+part of the repository. No dependency or operator setting was added.
+
+Fully **Exit application** from the desktop/tray and relaunch to load the change.
+Closing and reopening just the panel keeps the existing Python backend running.

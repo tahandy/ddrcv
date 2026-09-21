@@ -178,7 +178,7 @@ paused. If Results initialization fails, the object can contain only
 | --- | --- |
 | `phase` | String: `disabled`, `idle`, `settling`, `capturing`, `confirming`, `saving`, `saved`, `already_saved`, `single_player_skipped`, `ocr_failed`, or `failed`. This is capture/service status, not Discord delivery state. |
 | `error` | Error string or `null`. |
-| `enabled`, `discord`, `parse_names`, `screenshots_only`, `rehearsal`, `webhook_configured` | Boolean configuration/status flags. `discord=true` alone does not mean a result has been sent. |
+| `enabled`, `discord`, `parse_names`, `screenshots_only`, `allow_replay_duplicates`, `rehearsal`, `webhook_configured` | Boolean configuration/status flags. `discord=true` alone does not mean a result has been sent. |
 | `pending`, `replaced_frames`, `deduplicated` | Integer diagnostics: queued OCR episodes, replaced pending samples, and reused recorded results, respectively. |
 | `needs_attention` | Number of persisted records with failed delivery or failed name updates; can include older records. |
 | `last_sent_at` | Unix seconds of the latest successful send, or `null`. |

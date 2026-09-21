@@ -76,7 +76,12 @@
       <label class="check"><input data-path="obs.enabled" type="checkbox"> Connect on Start</label>
       <label class="check"><input data-path="obs.automation" type="checkbox"> Enable scene automation on Start</label>
       <label>Host<input data-path="obs.host" type="text"></label><label>Port<input data-path="obs.port" type="number"></label>
-      <label class="wide">Password<input data-path="obs.password" type="password" autocomplete="off"></label>
+      <div class="wide credential-field"><label for="obs-password">Password</label><div class="inline">
+        <input id="obs-password" data-path="obs.password" type="password" autocomplete="off">
+        <button id="reveal-obs-password" class="reveal-secret" type="button" data-reveal="obs-password" data-label="OBS password" aria-controls="obs-password" aria-label="Show OBS password" aria-pressed="false" title="Show OBS password">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+        </button>
+      </div></div>
     </div>
     <label class="mapping">State → scene mapping<textarea id="scene-map" rows="6" spellcheck="false" aria-label="OBS scene mapping"></textarea></label>
     <div class="toolbar wrap"><button data-action="obs_connect">Connect</button><button data-action="obs_disconnect">Disconnect</button><button data-action="obs_check">Check scenes</button><button id="automation">Enable automation</button></div>
@@ -98,7 +103,12 @@
     <div class="section-title"><h2 id="discord-heading">Discord <span id="discord-status" class="badge">Disabled</span></h2></div>
     <div class="form-grid">
       <label class="check wide"><input data-path="results.discord" type="checkbox"> Publish results to Discord</label>
-      <label class="wide">Webhook URL<input data-path="results.webhook" type="password" autocomplete="off" spellcheck="false" placeholder="https://discord.com/api/webhooks/…"></label>
+      <div class="wide credential-field"><label for="discord-webhook">Webhook URL</label><div class="inline">
+        <input id="discord-webhook" data-path="results.webhook" type="password" autocomplete="off" spellcheck="false" placeholder="https://discord.com/api/webhooks/…">
+        <button id="reveal-discord-webhook" class="reveal-secret" type="button" data-reveal="discord-webhook" data-label="Discord webhook" aria-controls="discord-webhook" aria-label="Show Discord webhook" aria-pressed="false" title="Show Discord webhook">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+        </button>
+      </div></div>
     </div>
     <button id="test-discord-webhook" type="button">Test Discord Webhook</button>
     <p class="quiet">Sends a test message using the URL above, even when capture and publishing are off.</p>
@@ -116,6 +126,8 @@
     <p class="quiet">Applies immediately. When Screenshots only is off, scores post as soon as confirmed; names that confirm later update the same Discord message.</p>
     <p class="quiet">Screenshots use UTC timestamps and a unique suffix. Names are included only when successfully parsed.</p>
     <p class="quiet">Turn off name parsing if names are being read incorrectly. Results will use P1 and P2 labels and continue reading scores.</p>
+    <label class="check"><input data-path="results.allow_replay_duplicates" type="checkbox"> Allow repeat screenshots and Discord posts from recordings (development)</label>
+    <p class="quiet">Apply results settings to enable this for replay testing. Each replay saves a new result and can post again; one continuous results screen still produces one result. This preference is saved in your profile. Turn it off for normal event operation.</p>
     <div class="source-actions"><button id="apply-results" class="primary">Apply results settings</button><span id="results-feedback" role="status" class="quiet"></span></div>
     <p class="quiet">Applies these controls without restarting capture or resetting scores. A result still being read starts confirmation again; saved results stay unchanged.</p>
     <p id="results-detail" class="quiet">Start capture to process results.</p>

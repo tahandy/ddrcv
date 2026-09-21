@@ -51,8 +51,67 @@ def main(video, out):
             def bridge():
                 page.evaluate('token => {window.pywebview={api:{session:async()=>({token}),pick:async()=>null,close_ready:async()=>{window.probeClosed=true}}};window.dispatchEvent(new Event("pywebviewready"));}', meta['token'])
             page.goto(meta['url'])
+            # Native restore/visibility callbacks can precede pywebviewready.
+            page.evaluate('window.deskVisibility(true)')
+            page.wait_for_timeout(400)
+            assert not [r for r in requests if '/api/' in r], 'Request sent before session initialization'
+            expect(page.locator('#error')).to_be_hidden()
+            initial_failures = []
+            def initial_config(route):
+                if not initial_failures:
+                    initial_failures.append(True)
+                    route.abort('failed')
+                else:
+                    route.continue_()
+            page.route('**/api/config', initial_config)
             bridge()
-            expect(page.locator('#phase')).to_have_text('Stopped')
+            expect(page.locator('#phase')).to_have_text('Stopped', timeout=10000)
+            page.unroute('**/api/config', initial_config)
+            expect(page.locator('#error')).to_be_hidden()
+            # A temporary outage recovers without leaving a stale red banner.
+            status_failures = []
+            def unavailable_status(route):
+                status_failures.append(True)
+                route.abort('failed')
+            page.route('**/api/status', unavailable_status)
+            expect(page.locator('#connection')).to_contain_text('Reconnecting')
+            expect(page.locator('#error')).to_be_hidden()
+            page.unroute('**/api/status', unavailable_status)
+            expect(page.locator('#connection')).to_have_text('Connected locally')
+            assert status_failures
+            # A bad token refreshes through the native bridge, without reloading the draft.
+            page.evaluate("token = 'expired-test-token'")
+            expect(page.locator('#connection')).to_have_text('Connected locally')
+            page.wait_for_function('token !== "expired-test-token"')
+            expect(page.locator('#error')).to_be_hidden()
+            # A genuinely stale native session stays actionable and does not flood retries.
+            stale_requests = []
+            def stale_session(route):
+                stale_requests.append(True)
+                route.fulfill(status=403, json={'error': 'Invalid desk session'})
+            page.route('**/api/status', stale_session)
+            expect(page.locator('#connection')).to_contain_text('Close and reopen this panel')
+            page.wait_for_timeout(1300)
+            assert len(stale_requests) <= 3
+            expect(page.locator('#error')).to_be_hidden()
+            page.unroute('**/api/status', stale_session)
+            expect(page.locator('#connection')).to_have_text('Connected locally', timeout=10000)
+            # Repeated bridge-ready events must not reload and discard unsaved edits.
+            page.evaluate("config.connection_probe = 'pending draft'")
+            bridge()
+            page.wait_for_timeout(300)
+            assert page.evaluate('config.connection_probe') == 'pending draft'
+            page.evaluate('delete config.connection_probe')
+            # Network failure after a write must not retry a potentially completed action.
+            failed_actions = []
+            def failed_action(route):
+                failed_actions.append(True)
+                route.abort('failed')
+            page.route('**/api/action', failed_action)
+            message = page.evaluate("async () => {try {await api('action', 'POST', {action:'start'});} catch(e) {return e.message;}}")
+            assert 'check its status' in message
+            assert len(failed_actions) == 1
+            page.unroute('**/api/action', failed_action)
             page.locator('#start').click()
             expect(page.locator('#phase')).to_have_text('Running', timeout=15000)
             expect(page.locator('#start')).to_be_disabled()
@@ -77,7 +136,22 @@ def main(video, out):
             expect(page.locator('#panel-session')).not_to_be_visible()
             expect(page.locator('#panel-obs')).to_be_visible()
             page.screenshot(path=str(out / 'obs.png'), full_page=True)
-            page.locator('[data-path="obs.password"]').fill('desktop-ui-test-secret')
+            password = page.locator('[data-path="obs.password"]')
+            password_eye = page.locator('#reveal-obs-password')
+            expect(password_eye).to_be_visible()
+            password_eye.click()
+            expect(password).to_have_attribute('type', 'text')
+            expect(password).to_have_value('')
+            password_eye.press('Enter')
+            expect(password).to_have_attribute('type', 'password')
+            password.fill('desktop-ui-test-secret')
+            page.locator('#obs-heading').click()
+            expect(password_eye).to_be_visible()
+            password_eye.click()
+            expect(password).to_have_value('desktop-ui-test-secret')
+            expect(password).to_have_attribute('type', 'text')
+            password_eye.click()
+            expect(password).to_have_attribute('type', 'password')
             page.wait_for_timeout(600)
             assert 'desktop-ui-test-secret' not in page.locator('#config-json').input_value()
             page.locator('#tab-renderer').click()
@@ -89,6 +163,9 @@ def main(video, out):
             expect(page.locator('#panel-renderer')).not_to_be_visible()
             expect(page.locator('#panel-results h2').first).to_contain_text('Discord')
             expect(page.locator('[data-path="results.enabled"]')).to_be_checked()
+            replay_duplicates = page.locator('[data-path="results.allow_replay_duplicates"]')
+            expect(replay_duplicates).not_to_be_checked()
+            replay_duplicates.check()
             filename_names = page.locator('[data-path="results.include_player_names"]')
             expect(filename_names).to_be_checked()
             filename_names.uncheck()
@@ -121,6 +198,7 @@ def main(video, out):
             page.locator('[data-path="results.enabled"]').uncheck()
             page.locator('#apply-results').click()
             expect(page.locator('#results-feedback')).to_have_text('Results settings applied')
+            expect(page.locator('#results-detail')).to_contain_text('Replay repeats enabled')
             expect(page.locator('#phase')).to_have_text('Running')
             assert 'desktop-ui-test' not in page.locator('#config-json').input_value()
             page.screenshot(path=str(out / 'results.png'), full_page=True)
@@ -176,6 +254,22 @@ def main(video, out):
             page.locator('#tab-results').click()
             expect(names).not_to_be_checked()
             expect(webhook).to_have_value('[unchanged secret]')
+            webhook_eye = page.locator('#reveal-discord-webhook')
+            expect(webhook_eye).to_be_visible()
+            webhook_eye.click()
+            expect(webhook).to_have_attribute('type', 'text')
+            expect(webhook).to_have_value('https://discord.com/api/webhooks/1/desktop-ui-test')
+            expect(webhook_eye).to_have_attribute('aria-label', 'Hide Discord webhook')
+            assert '/desktop-ui-test' not in page.locator('#config-json').input_value()
+            # Editing a revealed credential must persist the new value, not the placeholder.
+            webhook.fill('https://discord.com/api/webhooks/1/desktop-ui-replacement')
+            webhook_eye.click()
+            expect(webhook).to_have_attribute('type', 'password')
+            webhook_eye.click()
+            expect(webhook).to_have_value('https://discord.com/api/webhooks/1/desktop-ui-replacement')
+            webhook.fill('https://discord.com/api/webhooks/1/desktop-ui-test')
+            webhook_eye.click()
+            expect(webhook_eye).to_be_visible()
             expect(filename_names).not_to_be_checked()
             expect(page.locator('[data-path="results.output_directory"]')).to_have_value(export_folder)
             page.locator('#tab-results').press('ArrowLeft')
@@ -185,7 +279,15 @@ def main(video, out):
             expect(page.locator('#tab-session')).to_be_focused()
             page.locator('#tab-session').press('ArrowRight')
             expect(page.locator('#panel-obs')).to_be_visible()
-            expect(page.locator('[data-path="obs.password"]')).not_to_have_value('')
+            expect(password).to_have_value('[unchanged secret]')
+            expect(password_eye).to_be_visible()
+            password_eye.click()
+            expect(password).to_have_attribute('type', 'text')
+            expect(password).to_have_value('desktop-ui-test-secret')
+            expect(password_eye).to_have_attribute('aria-pressed', 'true')
+            assert 'desktop-ui-test-secret' not in page.locator('#config-json').input_value()
+            password_eye.click()
+            expect(password).to_have_attribute('type', 'password')
             page.locator('#tab-session').click()
             expect(page.locator('#phase')).to_have_text('Running')
             saved = out / 'saved-profile.json'
@@ -197,6 +299,7 @@ def main(video, out):
             assert load_config(saved)['results']['webhook'].endswith('/desktop-ui-test')
             assert load_config(saved)['results']['output_directory'] == export_folder
             assert load_config(saved)['results']['include_player_names'] is False
+            assert load_config(saved)['results']['allow_replay_duplicates'] is True
             page.locator('[data-path="publish.websocket.port"]').fill(str(port + 1 if port < 65535 else port - 1))
             page.wait_for_timeout(600)
             expect(page.locator('#pending')).to_have_text('Draft changes · not applied')
@@ -256,6 +359,19 @@ def main(video, out):
             def status_fixture(route):
                 route.fulfill(json=visual)
             page.route('**/api/status', status_fixture)
+            # A repeated recording must explain why it creates no new outputs.
+            saved_results = deepcopy(visual.get('results'))
+            visual['results'] = dict(enabled=True, discord=True, phase='already_saved',
+                                     error=None, deduplicated=1, needs_attention=0)
+            expect(page.locator('#results-summary')).to_contain_text('Replay already saved')
+            page.locator('#tab-results').click()
+            expect(page.locator('#results-detail')).to_contain_text('no new screenshot or automatic Discord post')
+            expect(page.locator('#results-detail')).to_contain_text('Recent results & recovery')
+            visual['results']['error'] = 'Screenshot folder is unavailable'
+            expect(page.locator('#results-detail')).to_have_text('Screenshot folder is unavailable')
+            visual['results'] = saved_results
+            page.locator('#tab-session').click()
+            expect(page.locator('#results-summary')).not_to_contain_text('Replay already saved')
             page.locator('#camera-index').fill('1')
             page.locator('#cameras').evaluate("el => el.replaceChildren(new Option('1: USB Capture', '1'))")
             page.locator('[data-path="publish.websocket.port"]').fill('9005')
@@ -337,7 +453,8 @@ def main(video, out):
                         name_update_retry=True, republish_confirmation=True,
                         camera_action_failure_ui=True, snapshots_on_demand=True,
                         draft_survived_reopen=True, close_preserved_capture=True,
-                        hidden_polling_stopped=True, secrets_masked=True, gui_save_cli_load=True, failed_save_close_recoverable=True))
+                        hidden_polling_stopped=True, session_startup_gated=True, connection_recovery=True,
+                        expired_session_recovery=True, writes_not_retried=True, secrets_masked=True, gui_save_cli_load=True, failed_save_close_recoverable=True))
             browser.close()
         print('Dashboard browser acceptance passed')
     finally:

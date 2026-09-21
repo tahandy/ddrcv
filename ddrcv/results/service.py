@@ -15,7 +15,7 @@ from .delivery import Outbox, redact_error
 from .recognition import Evidence, ResultsReader, outcome, EX_BOXES, MONEY_BOXES
 
 LOG = logging.getLogger('ddrcv.results')
-DEFAULTS = dict(enabled=False, discord=False, webhook=None, parse_names=True, screenshots_only=False, confidence=.8,
+DEFAULTS = dict(enabled=False, discord=False, webhook=None, parse_names=True, screenshots_only=False, allow_replay_duplicates=False, confidence=.8,
                 output_directory=None, include_player_names=True,
                 sample_hz=5, settling_seconds=2., min_frames=5, confirmation_seconds=1.,
                 max_gap=.75, deadline_seconds=10., only_duo=False, rehearsal=False)
@@ -117,6 +117,8 @@ class ResultsService:
     @staticmethod
     def _validate(config):
         import math
+        if type(config['allow_replay_duplicates']) is not bool:
+            raise ValueError('results.allow_replay_duplicates must be a boolean')
         if type(config['screenshots_only']) is not bool:
             raise ValueError('results.screenshots_only must be a boolean')
         if type(config['parse_names']) is not bool:
@@ -145,7 +147,12 @@ class ResultsService:
             self._validate(config)
             if config == self.config:
                 return
-            if all(config[k] == self.config.get(k) for k in config if k not in ('parse_names', 'screenshots_only')):
+            resume_replay = (self.recorded and self.phase == 'already_saved' and self.active is None
+                             and config['enabled'] and config['allow_replay_duplicates'])
+            if all(config[k] == self.config.get(k) for k in config if k != 'allow_replay_duplicates'):
+                # Replay policy affects admission of the next episode, not current OCR/evidence.
+                self.config = config
+            elif all(config[k] == self.config.get(k) for k in config if k not in ('parse_names', 'screenshots_only', 'allow_replay_duplicates')):
                 mode_changed = config['screenshots_only'] != self.config['screenshots_only']
                 self.config = config
                 ep = self.active
@@ -178,6 +185,9 @@ class ResultsService:
                         ep.pending = None
             else:
                 self._configure_reset(config)
+            if resume_replay:
+                self.latched = False
+                self.phase = 'idle'
         self.outbox.configure(config['webhook'], config['discord'])
         self._announce()
 
@@ -218,6 +228,7 @@ class ResultsService:
                           deduplicated=self.deduplicated, pending=len(self.jobs), enabled=self.config['enabled'],
                           discord=self.config['discord'], parse_names=self.config['parse_names'],
                           screenshots_only=self.config['screenshots_only'],
+                          allow_replay_duplicates=self.config['allow_replay_duplicates'],
                           rehearsal=self.config['rehearsal'], webhook_configured=bool(self.config['webhook']))
         outbox = self.outbox.snapshot()
         status['records'] = outbox['records']
@@ -273,7 +284,8 @@ class ResultsService:
                     return
                 if not any(presence):
                     return
-                existing = self.outbox.find(self.source_id, timestamp, self.mode) if self.recorded else None
+                existing = (self.outbox.find(self.source_id, timestamp, self.mode)
+                            if self.recorded and not self.config['allow_replay_duplicates'] else None)
                 if existing:
                     self.deduplicated += 1
                     self.phase = 'already_saved'

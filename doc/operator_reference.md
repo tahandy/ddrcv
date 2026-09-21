@@ -34,6 +34,10 @@ This reference uses the **DDRCV Tournament** desktop app's button labels.
 | Window close / Alt+F4 | Closes the panel; capture and the backend continue. Reopen from the tray or launcher. |
 | **Exit application…** | Stops the backend and its owned integrations after confirmation. OBS itself stays open. |
 
+The eye button beside the OBS password and Discord webhook shows or hides the
+entered value, including saved values after reopening the panel or loading a
+profile. The configuration JSON preview remains masked.
+
 OBS and renderer settings use the main configuration controls. Apply edited
 host, password, mapping, repository path, or publisher port before using their
 integration buttons. Save the profile separately to retain changes in that file.
@@ -75,9 +79,13 @@ using the entered URL but does not apply settings or enable automatic publishing
 | One accepted score is stuck incorrectly high | Verify the image and score mode, then use that player's **Reset tracking** control. This does not fix a bad source or edit saved results. |
 | Renderer blank while accepted scores are correct | Check publisher clients, renderer status/path, and its actual window. Apply changed paths/ports before relaunching it. |
 | OBS scene is wrong | Check connection, exact scene names, **Check scenes**, and whether automation is enabled. |
+| Replaying a recording produces no new screenshot or Discord post | **Replay already saved** means that result was previously captured. Open **Results → Recent results & recovery** to view it. **More recovery options → Republish** deliberately creates another Discord post. Existing screenshot filenames keep their original capture date; live camera results are separate events. |
+| Panel says **Reconnecting to desktop backend…** | Wait for automatic reconnection. If it persists or says the desktop session expired, close and reopen the panel from the tray. Closing the panel preserves capture. If the backend exited, relaunch DDRCV. For an interrupted button action, check its status before repeating it. |
 | Port 9000 or Results outbox is already in use | Stop the other desktop/workbench/CLI session. A closed desktop panel can still have a running backend. |
 | Camera switch fails | Read the source error; the old feed remains active. If the hardware cannot open both sources briefly, use **Stop**, select the new camera, then **Start** between songs. |
 | App is still cleaning up after Stop | Wait for capture to release before starting another session; check recent errors. |
+
+For recording demos or development, enable **Results → Allow repeat screenshots and Discord posts from recordings (development)** and click **Apply results settings**. Each replay can save and post again. Keep Capture results and Discord publishing enabled; turn the repeat option off when testing is finished.
 
 Capture age and accepted-read age describe different things: fresh frames can
 arrive while scores are rejected. **Processing capacity** measures active frame

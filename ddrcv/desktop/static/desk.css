@@ -69,7 +69,7 @@ button.primary:not(:disabled):hover { background: #7bb4f6; }
 button.danger { color: var(--danger); }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 24px; }
-label { display: grid; grid-template-columns: 128px minmax(0, 1fr); align-items: center; gap: 10px; min-width: 0; }
+label, .credential-field { display: grid; grid-template-columns: 128px minmax(0, 1fr); align-items: center; gap: 10px; min-width: 0; }
 .wide { grid-column: 1 / -1; }
 input, select, textarea { width: 100%; min-width: 0; background: var(--field); border: 1px solid #575757; color: var(--text); border-radius: 3px; padding: 4px 8px; min-height: 30px; }
 input[type=checkbox] { width: 16px; height: 16px; min-height: 0; margin: 0; accent-color: var(--accent); }
@@ -111,7 +111,7 @@ footer { display: flex; align-items: center; justify-content: space-between; fle
   .session-grid { grid-template-columns: minmax(0, 1fr) 145px; gap: 12px; }
   .session-state { padding-left: 12px; }
   .form-grid { column-gap: 16px; }
-  label { grid-template-columns: 112px minmax(0, 1fr); }
+  label, .credential-field { grid-template-columns: 112px minmax(0, 1fr); }
   .camera-index { grid-template-columns: 112px 54px; }
   .camera-picker { grid-template-columns: auto minmax(90px, 1fr); }
   .scores th, .scores td { padding-right: 6px; padding-left: 6px; }
@@ -126,3 +126,10 @@ footer { display: flex; align-items: center; justify-content: space-between; fle
   .camera-picker { flex-basis: 100%; }
   .scene-choice { flex-wrap: wrap; }
 }
+
+.credential-field > label { display: block; }
+.reveal-secret { flex: 0 0 36px; display: grid; place-items: center; padding: 4px; }
+.reveal-secret svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.reveal-secret .eye-slash { display: none; }
+.reveal-secret[aria-pressed=true] .eye-slash { display: block; }
+.credential-field input::-ms-reveal { display: none; }

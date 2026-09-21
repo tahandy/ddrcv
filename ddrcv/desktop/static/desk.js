@@ -15,6 +15,35 @@ let token = '',
   switchingSource = false,
   sourceRevision = null;
 let historyVersion = '', historyBusy = false, historyEpoch = 0, historyUrls = [];
+let configRevision = 0;
+let bridgeReady = false, initializing = false, initTimer = null, sessionRefresh = null, pollFailures = 0;
+
+class DeskConnectionError extends Error {
+  constructor(message, connectionMessage = message) {
+    super(message);
+    this.connectionMessage = connectionMessage;
+  }
+}
+
+async function refreshSession() {
+  if (!sessionRefresh) {
+    sessionRefresh = Promise.resolve().then(() => window.pywebview.api.session()).then(session => {
+      if (!session?.token) throw Error('Missing session');
+      token = session.token;
+    }).catch(() => {
+      throw new DeskConnectionError('Desktop session unavailable. Close and reopen this panel.');
+    }).finally(() => { sessionRefresh = null; });
+  }
+  await sessionRefresh;
+}
+
+function secretVisibility(button, visible) {
+  $(button.dataset.reveal).type = visible ? 'text' : 'password';
+  button.setAttribute('aria-pressed', String(visible));
+  const label = `${visible ? 'Hide' : 'Show'} ${button.dataset.label}`;
+  button.setAttribute('aria-label', label);
+  button.title = label;
+}
 
 function clearHistory() {
   historyEpoch++;
@@ -27,9 +56,7 @@ function historyVisible() {
   return nativeVisible && $('results-history').open && !$('panel-results').hidden;
 }
 async function historyImage(eventId, candidate, parent, epoch) {
-  const response = await fetch(`/api/results/${encodeURIComponent(eventId)}/${encodeURIComponent(candidate)}`, {
-    headers: {'X-Desk-Token': token}
-  });
+  const response = await deskRequest(`results/${encodeURIComponent(eventId)}/${encodeURIComponent(candidate)}`);
   if (!response.ok) throw Error('Saved screenshot could not be loaded');
   const blob = await response.blob();
   if (epoch !== historyEpoch || !historyVisible()) return;
@@ -119,15 +146,39 @@ function error(message) {
   $('error').textContent = message || '';
   $('error').hidden = !message;
 }
+async function deskRequest(path, method = 'GET', body) {
+  if (!token || (!loaded && !(path === 'config' && method === 'GET'))) {
+    throw new DeskConnectionError('Desktop panel is still connecting. Try again shortly.');
+  }
+  const send = async () => {
+    try {
+      return await fetch('/api/' + path, {
+        method,
+        headers: {'X-Desk-Token': token, 'Content-Type': 'application/json'},
+        body: body === undefined ? undefined : JSON.stringify(body)
+      });
+    } catch {
+      // A write may already have reached the backend. Never replay it on network failure.
+      throw new DeskConnectionError(method === 'GET' ?
+        'Cannot reach the desktop backend. Try again once connected.' :
+        'Connection interrupted. The action may have completed; check its status before trying again.',
+        'Reconnecting to desktop backend…');
+    }
+  };
+  const sentToken = token;
+  let response = await send();
+  if (response.status === 403 && (await response.clone().json()).error === 'Invalid desk session') {
+    if (token === sentToken) await refreshSession();
+    // Authentication rejected the request before any action; retry only with a refreshed token.
+    if (token !== sentToken) response = await send();
+    if (response.status === 403) {
+      throw new DeskConnectionError('Desktop session expired. Close and reopen this panel.');
+    }
+  }
+  return response;
+}
 async function api(path, method = 'GET', body) {
-  const r = await fetch('/api/' + path, {
-    method,
-    headers: {
-      'X-Desk-Token': token,
-      'Content-Type': 'application/json'
-    },
-    body: body === undefined ? undefined : JSON.stringify(body)
-  });
+  const r = await deskRequest(path, method, body);
   if (!r.ok) {
     let d;
     try {
@@ -165,6 +216,8 @@ function source() {
 }
 
 function renderConfig(data) {
+  configRevision++;
+  document.querySelectorAll('[data-reveal]').forEach(button => secretVisibility(button, false));
   config = data.draft;
   loaded = true;
   advancedDirty = false;
@@ -353,10 +406,13 @@ async function pollOnce() {
   $('renderer-status').textContent = status.renderer.running ? 'Running' : 'Stopped';
   $('renderer-detail').textContent = status.renderer.error || 'Capture its window in OBS after checking the output.';
   const results = status.results;
-  $('results-summary').textContent = results ? `Results: ${results.last_sent_at ? 'last sent '+new Date(results.last_sent_at * 1000).toLocaleTimeString() : 'no delivery yet'} · ${results.needs_attention || 0} need attention` : 'Results: not started';
+  const replaySaved = results?.phase === 'already_saved';
+  const replayPolicy = results?.allow_replay_duplicates ? ' · Replay repeats enabled' : '';
+  const replayNotice = 'Replay already saved · no new screenshot or automatic Discord post';
+  $('results-summary').textContent = results ? `Results: ${replaySaved ? replayNotice : results.last_sent_at ? 'last sent '+new Date(results.last_sent_at * 1000).toLocaleTimeString() : 'no delivery yet'} · ${results.needs_attention || 0} need attention${replayPolicy}` : 'Results: not started';
   for (const id of ['reset-p1', 'reset-p2']) $(id).disabled = status.phase !== 'Running';
   $('discord-status').textContent = results?.discord ? 'Publishing enabled' : 'Disabled';
-  $('results-detail').textContent = results?.error || (results ? `Results: ${title(results.phase)}${results.screenshots_only ? ' · Screenshots only' : ''}${results.latest ? ' · Latest delivery: ' + title(results.latest.delivery?.state) : ''}` : 'Start capture with results enabled to process results.');
+  $('results-detail').textContent = results?.error || (replaySaved ? `${replayNotice}. Open Recent results & recovery to view the saved screenshot. For replay testing, enable Allow repeat screenshots and Discord posts from recordings and apply results settings. For one additional post, use Republish.` : results ? `Results: ${title(results.phase)}${replayPolicy}${results.screenshots_only ? ' · Screenshots only' : ''}${results.latest ? ' · Latest delivery: ' + title(results.latest.delivery?.state) : ''}` : 'Start capture with results enabled to process results.');
   $('apply-results').disabled = status.phase === 'Starting';
   $('read-details').textContent = JSON.stringify({
     raw_scores: status.raw_scores,
@@ -369,26 +425,29 @@ async function pollOnce() {
 }
 async function poll() {
   clearTimeout(pollTimer);
-  if (polling || !nativeVisible || document.hidden) return;
+  if (!loaded || !token || polling || !nativeVisible || document.hidden) return;
   polling = true;
   try {
     await pollOnce();
+    pollFailures = 0;
   } catch (e) {
-    $('connection').textContent = 'Backend unavailable';
-    error(e.message);
+    pollFailures++;
+    $('connection').textContent = e instanceof DeskConnectionError ? e.connectionMessage : 'Backend unavailable';
+    if (!(e instanceof DeskConnectionError)) error(e.message);
   } finally {
     polling = false;
-    if (nativeVisible && !document.hidden) pollTimer = setTimeout(poll, 250);
+    if (nativeVisible && !document.hidden) pollTimer = setTimeout(poll,
+      pollFailures ? Math.min(5000, 500 * 2 ** Math.min(pollFailures, 4)) : 250);
   }
 }
 window.deskVisibility = visible => {
   nativeVisible = visible;
   clearTimeout(pollTimer);
-  if (visible && !document.hidden) poll();
+  if (visible && !document.hidden) loaded ? poll() : initialize();
 };
 document.addEventListener('visibilitychange', () => {
   clearTimeout(pollTimer);
-  if (!document.hidden && nativeVisible) poll();
+  if (!document.hidden && nativeVisible) loaded ? poll() : initialize();
 });
 window.deskClose = async () => {
   try {
@@ -412,6 +471,26 @@ function handle(id, fn) {
     }
   });
 }
+for (const button of document.querySelectorAll('[data-reveal]')) handle(button.id, async () => {
+  const input = $(button.dataset.reveal);
+  if (input.type === 'text') {
+    secretVisibility(button, false);
+    return;
+  }
+  if (input.value === '[unchanged secret]') {
+    const revision = configRevision;
+    const previous = input.value;
+    button.disabled = true;
+    try {
+      await flush();
+      const result = await api('config/secret', 'POST', {path: input.dataset.path});
+      // A profile load or edit while the request runs takes precedence.
+      if (revision !== configRevision || input.value !== previous) return;
+      input.value = result.value;
+    } finally { button.disabled = false; }
+  }
+  secretVisibility(button, true);
+});
 for (const el of document.querySelectorAll('[data-path]')) el.addEventListener('input', async () => {
   if (['player_names.enabled', 'results.parse_names', 'results.screenshots_only'].includes(el.dataset.path)) {
     const previous = get(el.dataset.path);
@@ -595,11 +674,7 @@ async function save(as) {
 handle('save-config', () => save(false));
 handle('save-as', () => save(true));
 handle('snapshot', async () => {
-  const r = await fetch('/api/frame', {
-    headers: {
-      'X-Desk-Token': token
-    }
-  });
+  const r = await deskRequest('frame');
   if (r.status === 204) throw Error('No captured frame is available yet. Start capture first.');
   if (!r.ok) throw Error('Snapshot request failed');
   const meta = JSON.parse(r.headers.get('X-Frame-Metadata'));
@@ -654,12 +729,25 @@ document.querySelector('details').addEventListener('toggle', async e => {
     }
   }
 });
-window.addEventListener('pywebviewready', async () => {
+async function initialize() {
+  clearTimeout(initTimer);
+  if (!bridgeReady || loaded || initializing || !nativeVisible || document.hidden) return;
+  initializing = true;
+  let retry = false;
   try {
-    token = (await window.pywebview.api.session()).token;
+    await refreshSession();
     await loadConfig();
     poll();
   } catch (e) {
-    error(e.message);
+    retry = e instanceof DeskConnectionError;
+    $('connection').textContent = retry ? e.connectionMessage : 'Backend unavailable';
+    if (!retry) error(e.message);
+  } finally {
+    initializing = false;
+    if (retry) initTimer = setTimeout(initialize, 1000);
   }
+}
+window.addEventListener('pywebviewready', () => {
+  bridgeReady = true;
+  initialize();
 });

@@ -56,6 +56,10 @@ def create_app(desk, token, open_panel=None, shutdown=None):
             return jsonify(desk.save(args.get('path')))
         raise ValueError('Unknown file action')
 
+    @app.post('/api/config/secret')
+    def reveal_secret():
+        return jsonify(value=desk.reveal_secret(request.get_json().get('path')))
+
     @app.post('/api/action')
     def action():
         args = request.get_json()

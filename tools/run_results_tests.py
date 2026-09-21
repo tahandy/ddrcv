@@ -28,7 +28,7 @@ def main():
     os.environ['DDRCV_TEST_OCR_MODEL']=str(model)
     if args.video:os.environ['DDRCV_RESULTS_VIDEO']=str(Path(args.video).resolve())
     patterns=('test_results*.py','test_tournament*.py','test_rapidocr.py','test_player_names.py',
-              'test_desktop.py','test_workbench.py','test_monitored_regions.py')
+              'test_desktop.py','test_workbench.py','test_monitored_regions.py','test_glyph_optimization.py')
     suite=unittest.TestSuite(unittest.defaultTestLoader.discover('tests',pattern=pattern) for pattern in patterns)
     result=unittest.TextTestRunner(verbosity=1).run(suite)
     raise SystemExit(not result.wasSuccessful())
