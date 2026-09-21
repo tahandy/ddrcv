@@ -90,6 +90,15 @@ textarea { font: 12px/1.5 Consolas, monospace; resize: vertical; }
 .mapping textarea { min-height: 145px; }
 .scene-choice { margin-top: 12px; }
 .integration-panel > p { margin-top: 12px; }
+.results-options { display: grid; gap: 14px; }
+.results-capture .check { align-items: flex-start; }
+.results-capture input[type=checkbox] { flex: 0 0 16px; margin-top: 2px; }
+.results-option { display: grid; gap: 4px; }
+.results-option > p { margin-left: 24px; max-width: 85ch; }
+.results-option .check .quiet { display: inline-block; margin-left: 8px; }
+.results-apply { margin-top: 16px; }
+.results-apply .source-actions { margin-top: 0; }
+.results-apply > p { margin-top: 6px; }
 details { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 8px; }
 summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 details p { margin: 10px 0; }

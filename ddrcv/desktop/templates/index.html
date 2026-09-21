@@ -115,22 +115,38 @@
     <p id="discord-test-feedback" role="status" aria-live="polite"></p>
     <p class="quiet">Enabling publishing also enables results capture. Disabling publishing pauses queued deliveries; a post already being sent may finish.</p>
   </section>
-  <section class="integration-panel" aria-labelledby="results-heading">
+  <section class="integration-panel results-capture" aria-labelledby="results-heading">
     <div class="section-title"><h2 id="results-heading">Results capture</h2></div>
-    <label class="check"><input data-path="results.enabled" type="checkbox"> Capture results</label>
-    <label>Screenshot folder<div class="inline"><input data-path="results.output_directory" type="text"><button id="browse-results">Browse…</button></div></label>
-    <label class="check"><input data-path="results.include_player_names" type="checkbox"> Include parsed player names in filenames</label>
-    <label class="check"><input data-path="results.screenshots_only" type="checkbox"> Screenshots only <span class="quiet">Applies immediately</span></label>
-    <p class="quiet">Skip results score and name parsing. Automatically save and post a screenshot when the results screen ends or after ten seconds. Gameplay scores continue. Capture results and Discord publishing must be enabled for automatic posts.</p>
-    <label class="check"><input data-path="results.parse_names" type="checkbox"> Read names on results</label>
-    <p class="quiet">Applies immediately. When Screenshots only is off, scores post as soon as confirmed; names that confirm later update the same Discord message.</p>
-    <p class="quiet">Screenshots use UTC timestamps and a unique suffix. Names are included only when successfully parsed.</p>
-    <p class="quiet">Turn off name parsing if names are being read incorrectly. Results will use P1 and P2 labels and continue reading scores.</p>
-    <label class="check"><input data-path="results.allow_replay_duplicates" type="checkbox"> Allow repeat screenshots and Discord posts from recordings (development)</label>
-    <p class="quiet">Apply results settings to enable this for replay testing. Each replay saves a new result and can post again; one continuous results screen still produces one result. This preference is saved in your profile. Turn it off for normal event operation.</p>
-    <div class="source-actions"><button id="apply-results" class="primary">Apply results settings</button><span id="results-feedback" role="status" class="quiet"></span></div>
-    <p class="quiet">Applies these controls without restarting capture or resetting scores. A result still being read starts confirmation again; saved results stay unchanged.</p>
+    <div class="results-options">
+      <label class="check"><input data-path="results.enabled" type="checkbox"><span>Capture results</span></label>
+      <label>Screenshot folder<div class="inline"><input data-path="results.output_directory" type="text"><button id="browse-results">Browse…</button></div></label>
+      <label class="check"><input data-path="results.include_player_names" type="checkbox"><span>Include parsed player names in filenames</span></label>
+      <div class="results-option">
+        <label class="check"><input data-path="results.screenshots_only" type="checkbox" aria-describedby="screenshots-only-help"><span>Screenshots only <span class="quiet">Applies immediately</span></span></label>
+        <p id="screenshots-only-help" class="quiet">Save screenshots without reading results scores or names. Gameplay scores continue.</p>
+      </div>
+      <div class="results-option">
+        <label class="check"><input data-path="results.parse_names" type="checkbox" aria-describedby="results-names-help"><span>Read names on results <span class="quiet">Applies immediately</span></span></label>
+        <p id="results-names-help" class="quiet">When Screenshots only is off, turn off name reading to use P1/P2 labels and keep reading scores.</p>
+      </div>
+      <div class="results-option">
+        <label class="check"><input data-path="results.allow_replay_duplicates" type="checkbox" aria-describedby="results-replay-help"><span>Allow repeat screenshots and Discord posts from recordings</span></label>
+        <p id="results-replay-help" class="quiet">For replay testing; turn off for events. Use Apply results settings to enable.</p>
+      </div>
+    </div>
+    <div class="results-apply">
+      <div class="source-actions"><button id="apply-results" class="primary">Apply results settings</button><span id="results-feedback" role="status" class="quiet"></span></div>
+      <p class="quiet">Applies without restarting capture or resetting scores.</p>
+    </div>
     <p id="results-detail" class="quiet">Start capture to process results.</p>
+    <details id="results-capture-details">
+      <summary>Capture behavior &amp; filenames</summary>
+      <p class="quiet">Screenshots only saves when the results screen ends or after ten seconds. Enable Capture results and Discord publishing for automatic posts.</p>
+      <p class="quiet">With Screenshots only off, scores post as soon as confirmed. Names that confirm later update the same Discord message.</p>
+      <p class="quiet">Filenames use UTC timestamps and a unique suffix. Player names are included only when enabled and successfully parsed.</p>
+      <p class="quiet">Allowing repeats saves a new result on each replay and can post again. One continuous results screen still produces one result. Save your profile to keep this preference.</p>
+      <p class="quiet">Applying settings restarts confirmation for a result still being read. Saved results stay unchanged.</p>
+    </details>
     <details id="results-history"><summary>Recent results &amp; recovery</summary><p id="history-status" class="quiet"></p><div id="results-list"></div></details>
   </section>
 </div>
