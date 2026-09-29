@@ -11,12 +11,12 @@ import cv2
 from ddrcv.ingest.file_source import FileSource, normalize_frame
 from ddrcv.apps.tournament_integrations import Integrations
 from ddrcv.apps.thread_qos import desktop_recognition_qos
-from ddrcv.state.player_names import PlayerNameService
+from ddrcv.jacket_lookup.service import SplashService
 
 
 class TournamentRuntime:
     def __init__(self, config, engine, fetcher, publisher, logger, *, data_dir=None,
-                 clock=time, desktop=False, results_factory=None):
+                 clock=time, desktop=False, results_factory=None, prepared_lookup=None):
         self.config = deepcopy(config)
         self.engine, self.fetcher, self.publisher = engine, fetcher, publisher
         self.log, self.clock, self.desktop = logger, clock, desktop
@@ -49,6 +49,8 @@ class TournamentRuntime:
         self.latest_info = deepcopy(engine.session.info)
         self.latest_message = {**deepcopy(self.latest_info), 'player_names': dict(p1=None, p2=None)}
         self.player_names = None
+        self.splash = None
+        self.prepared_lookup = prepared_lookup
 
     def start(self):
         if self.thread:
@@ -70,7 +72,10 @@ class TournamentRuntime:
             # Claim the publisher before opening hardware; conflicts never touch another driver.
             self.publisher.start()
             self.feed_active = True
-            self.player_names = PlayerNameService(self.config.get('player_names'))
+            self.splash = SplashService(self.config.get('song_lookup'), self.config.get('player_names'),
+                                        lookup=self.prepared_lookup)
+            self.prepared_lookup = None
+            self.player_names = self.splash.names
             self._start_results()
             self.fetcher.start()
             candidate_thread = getattr(self.fetcher, 'thread', None)
@@ -78,8 +83,8 @@ class TournamentRuntime:
             self.integrations.start()
             self.phase = 'Running'
             while not self.stop_requested.is_set():
-                if self.player_names.changed.is_set():
-                    self.player_names.changed.clear()
+                if self.splash.has_changes():
+                    self.splash.clear_changes()
                     self._publish()
                 self._poll_results_update()
                 self._poll_control_update()
@@ -111,7 +116,7 @@ class TournamentRuntime:
                                         self.fetcher.index - 1 if isinstance(self.fetcher, FileSource) else None)
                 with self.feed_lock:
                     if not still:
-                        self.player_names.submit(frame, now, result['raw_state'], info['state'],
+                        self.splash.submit(frame, now, result['raw_state'], info['state'],
                                                  info['players'], self.engine.session.song_generation)
                     self._publish(info, integrations=not still)
                 wall = time.perf_counter()
@@ -275,7 +280,7 @@ class TournamentRuntime:
             self._reset_results_source()
         with self.feed_lock:
             if self.player_names is not None:
-                self.player_names.reset(self.engine.session.song_generation)
+                self.splash.reset(self.engine.session.song_generation)
             self._publish(info, integrations=True)
         self._finish_source_switch()
         return True, frame
@@ -405,8 +410,8 @@ class TournamentRuntime:
             if integrations is not None:
                 self.feed_integrations = integrations
             message = deepcopy(self.latest_info)
-            message['player_names'] = (self.player_names.snapshot() if self.player_names is not None
-                                       else dict(p1=None, p2=None))
+            message.update(self.splash.snapshot() if self.splash is not None else
+                           dict(song=None, player_names=dict(p1=None, p2=None)))
             if self.results is not None:
                 message['results'] = self.results.feed_status()
             elif self.results_error:
@@ -417,8 +422,8 @@ class TournamentRuntime:
                 self.integrations.update(message)
 
     def _stop_names(self):
-        if self.player_names is not None:
-            self.player_names.close()
+        if self.splash is not None:
+            self.splash.close()
 
     def _publish_results_status(self):
         # Delivery can complete during capture loss; publish the latest confirmed
@@ -446,13 +451,14 @@ class TournamentRuntime:
             if self.thread.is_alive():
                 raise RuntimeError('Driver shutdown is still pending; wait before restarting')
             for worker in (self.capture_thread, self.integrations.thread, *self._results_workers(),
-                           self.player_names.worker if self.player_names is not None else None,
+                           *(self.splash.threads() if self.splash is not None else ()),
                            *(worker for _, worker in self.retired_captures)):
                 if worker and worker.is_alive():
                     raise RuntimeError('Background cleanup is still pending; wait before restarting')
         elif not self.finished.is_set():
             # A prepared runtime may be discarded before starting.
             self.fetcher.stop()
+            self.prepared_lookup = None
             self.finished.set()
 
     def status(self):
@@ -491,6 +497,8 @@ class TournamentRuntime:
             snapshot['published'] = deepcopy(self.latest_message)
             if self.player_names is not None:
                 snapshot['player_name_status'] = self.player_names.status()
+            if self.splash is not None:
+                snapshot['song_lookup_status'] = self.splash.status()
         return snapshot
 
     def snapshot(self):

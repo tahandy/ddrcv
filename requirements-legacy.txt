@@ -4,10 +4,7 @@
 -e .[tournament]
 aiortc
 beautifulsoup4
-DeepImageSearch
-dill
 easyocr
-faiss_cpu
 ffmpeg_python
 Flask_SocketIO
 gevent

@@ -64,6 +64,10 @@ def create_app(desk, token, open_panel=None, shutdown=None):
     def action():
         args = request.get_json()
         name = args['action']
+        if name == 'song_info':
+            return jsonify(desk.catalog_preparation.describe(args['config']))
+        if name in ('song_prepare', 'song_refresh', 'song_check'):
+            return jsonify(desk.prepare_song_lookup(prepare=name != 'song_check', refresh=name == 'song_refresh'))
         if name == 'start':
             return jsonify(desk.start())
         if name == 'stop':

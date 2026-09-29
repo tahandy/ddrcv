@@ -1,0 +1,245 @@
+{
+  "catalogs": {
+    "event": {
+      "file": "experiments\\jacket_lookup\\artifacts\\integration\\dia_del_ritmo_26.ddrcatalog",
+      "bytes": 73457698,
+      "gallery_images": 1577,
+      "jacket_queries": {
+        "negative": 21,
+        "clean": 11,
+        "withheld": 11,
+        "synthetic": 77,
+        "transition": 22
+      },
+      "splash_comparisons": 54,
+      "load_ms": {
+        "folder": {
+          "n": 3,
+          "median": 757.4134999886155,
+          "p95": 775.2752600004897,
+          "p99": 776.8629720015451,
+          "maximum": 777.259900001809
+        },
+        "container": {
+          "n": 3,
+          "median": 1072.5411999737844,
+          "p95": 1077.1593700395897,
+          "p99": 1077.569874045439,
+          "maximum": 1077.6725000469014
+        }
+      },
+      "loaded_memory_delta_bytes": {
+        "folder": {
+          "n": 3,
+          "median": 150659072.0,
+          "p95": 168269004.8,
+          "p99": 169834332.16,
+          "maximum": 170225664.0
+        },
+        "container": {
+          "n": 3,
+          "median": 155934720.0,
+          "p95": 163075276.8,
+          "p99": 163709992.96,
+          "maximum": 163868672.0
+        }
+      },
+      "warm_template_splash_ms": {
+        "folder": {
+          "n": 55,
+          "median": 7.494700024835765,
+          "p95": 8.24192991713062,
+          "p99": 10.590034062042832,
+          "maximum": 10.669900104403496
+        },
+        "container": {
+          "n": 55,
+          "median": 7.4943999061360955,
+          "p95": 8.885189995635296,
+          "p99": 10.642229963559657,
+          "maximum": 10.969199938699603
+        }
+      }
+    },
+    "full": {
+      "file": "experiments\\jacket_lookup\\artifacts\\integration\\full-world.ddrcatalog",
+      "bytes": 73854314,
+      "gallery_images": 1577,
+      "jacket_queries": {
+        "negative": 21,
+        "clean": 11,
+        "withheld": 11,
+        "synthetic": 77,
+        "transition": 22
+      },
+      "splash_comparisons": 54,
+      "load_ms": {
+        "folder": {
+          "n": 3,
+          "median": 968.5854999115691,
+          "p95": 975.3363099764101,
+          "p99": 975.9363819821738,
+          "maximum": 976.0863999836147
+        },
+        "container": {
+          "n": 3,
+          "median": 1210.696000023745,
+          "p95": 1276.4979699393734,
+          "p99": 1282.3470339318737,
+          "maximum": 1283.8092999299988
+        }
+      },
+      "loaded_memory_delta_bytes": {
+        "folder": {
+          "n": 3,
+          "median": 119644160.0,
+          "p95": 124609740.8,
+          "p99": 125051125.76,
+          "maximum": 125161472.0
+        },
+        "container": {
+          "n": 3,
+          "median": 133328896.0,
+          "p95": 143153152.0,
+          "p99": 144026419.2,
+          "maximum": 144244736.0
+        }
+      },
+      "warm_template_splash_ms": {
+        "folder": {
+          "n": 55,
+          "median": 7.591799949295819,
+          "p95": 8.433399978093803,
+          "p99": 8.565717961173505,
+          "maximum": 8.64039990119636
+        },
+        "container": {
+          "n": 55,
+          "median": 7.557600038126111,
+          "p95": 8.297930064145476,
+          "p99": 8.40324999531731,
+          "maximum": 8.472100016660988
+        }
+      }
+    }
+  },
+  "differences": [],
+  "transfer": {
+    "ok": true,
+    "files_copied": 1,
+    "extracted": false,
+    "source_access": false,
+    "network_access": false,
+    "max_ex": 1881
+  },
+  "ok": true,
+  "metadata_refresh": {
+    "ok": true,
+    "reencoded": false,
+    "network": false,
+    "metadata_equal": true,
+    "max_ex": 1881,
+    "old_session_unchanged": true,
+    "commit": "c62053faa82df55ebc926812a7af684f520ae704"
+  },
+  "installation": {
+    "checks": [
+      {
+        "name": "fresh",
+        "ok": true
+      },
+      {
+        "name": "sentinel",
+        "ok": true
+      },
+      {
+        "name": "repeat",
+        "ok": true
+      },
+      {
+        "name": "existing-update",
+        "ok": true
+      },
+      {
+        "name": "repeat-update",
+        "ok": true
+      },
+      {
+        "name": "preserved",
+        "ok": true
+      },
+      {
+        "name": "wheel",
+        "ok": true
+      },
+      {
+        "name": "wheel-assets",
+        "ok": true
+      },
+      {
+        "name": "wheel-offline",
+        "ok": true
+      },
+      {
+        "name": "minimal-install",
+        "ok": true
+      },
+      {
+        "name": "minimal-offline",
+        "ok": true
+      },
+      {
+        "name": "browser-tools",
+        "ok": true
+      }
+    ]
+  },
+  "browser": [
+    {
+      "surface": "desktop",
+      "ok": true,
+      "checks": [
+        "song-tab",
+        "full-mode-disables-event",
+        "catalog-version-and-date",
+        "storage-and-sharing",
+        "catalog-file-browse",
+        "opt-in",
+        "default-event",
+        "high-qos",
+        "readiness",
+        "difficulty-toggle",
+        "song-and-max-ex-rendering"
+      ]
+    },
+    {
+      "surface": "workbench",
+      "ok": true,
+      "checks": [
+        "song-tab",
+        "full-mode-disables-event",
+        "catalog-version-and-date",
+        "storage-and-sharing",
+        "catalog-file-browse",
+        "active-version",
+        "opt-in",
+        "readiness",
+        "apply",
+        "song-and-max-ex-rendering"
+      ]
+    }
+  ],
+  "tests": {
+    "run": 381,
+    "skipped": 12,
+    "failures": 0,
+    "archive_tests": 11
+  },
+  "limitations": [
+    "Storage parity against the existing labelled corpus, not new accuracy evidence.",
+    "Warm measurements include jacket lookup and difficulty templates, not name OCR.",
+    "Load timings use three alternating repetitions in one process with OS caches warm.",
+    "Working-set deltas are allocator-sensitive and are not peak-memory measurements.",
+    "Native file selection is stubbed in headless browser checks; no live capture rehearsal."
+  ]
+}

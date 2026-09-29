@@ -30,12 +30,13 @@ from ddrcv.publish.obs_service import OBSService
 from ddrcv.score.score_extractor import ScoreExtractor
 from ddrcv.publish.obs_policy import DEFAULT_SCENE_MAP
 from ddrcv.workbench.regions import draw_monitored_regions
-from ddrcv.state.player_names import PlayerNameService
+from ddrcv.jacket_lookup.service import SplashService
+from ddrcv.jacket_lookup.operations import CatalogPreparation
 
 ROOT = Path(__file__).resolve().parents[2]
 STATES = ['unknown', 'login', 'song_select', 'song_splash', 'song_playing', 'song_result', 'total_result']
 DEFAULTS = dict(source=dict(kind='video', path='', resize_to_720p=False), score_mode='money',
-                player_names=dict(enabled=False),
+                player_names=dict(enabled=False), song_lookup=dict(enabled=False),
                 port=9000, renderer_path=str(ROOT.parent / 'ddr_score_render'),
                 obs=dict(host='localhost', port=4455, password='', scene_map=DEFAULT_SCENE_MAP))
 
@@ -131,7 +132,9 @@ class Workbench:
         self.results.notify = self._results_changed
         self.results_source_id = ''
         self.results_recorded = False
-        self.player_names = PlayerNameService(self.settings['player_names'])
+        self.catalog_preparation = CatalogPreparation()
+        self.splash = SplashService(self.settings['song_lookup'], self.settings['player_names'])
+        self.player_names = self.splash.names
         self.message['player_names'] = self.player_names.snapshot()
         self.publisher.send_message(self.message)
         if start_publisher:
@@ -148,6 +151,13 @@ class Workbench:
         with self.lock:
             self.message['results'] = self.results.feed_status()
             self.publisher.send_message(deepcopy(self.message))
+
+    def configure_song_lookup(self, values):
+        from ddrcv.jacket_lookup.config import validate_config
+        from ddrcv.jacket_lookup.assets import load
+        cfg = validate_config(values)
+        lookup = load(cfg) if cfg['enabled'] else None
+        return self.submit('song_lookup', config=cfg, lookup=lookup)
 
     def configure_results(self, values):
         allowed = {'enabled', 'discord', 'webhook', 'rehearsal'}
@@ -179,12 +189,12 @@ class Workbench:
 
     def _run(self):
         while not self.closed.is_set():
-            if self.player_names.changed.is_set():
-                self.player_names.changed.clear()
+            if self.splash.has_changes():
+                self.splash.clear_changes()
                 with self.lock:
-                    self.message['player_names'] = self.player_names.snapshot()
+                    self.message.update(self.splash.snapshot())
                     if self.result is not None:
-                        self.result['published']['player_names'] = dict(self.message['player_names'])
+                        self.result['published'].update(self.splash.snapshot())
                     if self.kind != 'image':
                         self.publisher.send_message(self.message)
             try:
@@ -220,8 +230,8 @@ class Workbench:
         self.results.reset(self.results_source_id, self.results_recorded, self.settings['score_mode'])
         with self.lock:
             self.epoch += 1
-            self.player_names.reset(self.engine.session.song_generation)
-            message['player_names'] = self.player_names.snapshot()
+            self.splash.reset(self.engine.session.song_generation)
+            message.update(self.splash.snapshot())
             self.result = None
             self.message = message
             self.frame_times.clear()
@@ -234,6 +244,26 @@ class Workbench:
         self.source = None
 
     def _command(self, action, **args):
+        if action == 'song_lookup':
+            cfg, lookup = args['config'], args['lookup']
+            if not self.splash.close():
+                # Keep the closed coordinator so every child remains accounted
+                # for and a later Apply can retry cleanup. Clear the wire output
+                # immediately while capture/scoring continue without recognition.
+                with self.lock:
+                    empty = self.splash.snapshot()
+                    self.message.update(empty)
+                    if self.result is not None:
+                        self.result['published'].update(deepcopy(empty))
+                    if self.kind != 'image':
+                        self.publisher.send_message(self.message)
+                raise RuntimeError('Recognition stopped; workers are still closing. Apply again after cleanup.')
+            self.splash = SplashService(cfg, self.settings['player_names'], lookup=lookup)
+            self.player_names = self.splash.names
+            self.settings['song_lookup'] = cfg
+            self._reset()
+            self.save_settings()
+            return {'ok': True}
         if action == 'snapshot':
             return self.snapshot()
         if action == 'results_config':
@@ -412,13 +442,13 @@ class Workbench:
         with self.lock:
             previous_state = self.message['state']
             if self.kind != 'image':
-                self.player_names.submit(packet.image, packet.timestamp, result['raw_state'],
+                self.splash.submit(packet.image, packet.timestamp, result['raw_state'],
                                          result['published']['state'], result['published']['players'],
                                          self.engine.session.song_generation)
             self.result = plain(result)
             self.message = deepcopy(result['published'])
-            self.message['player_names'] = self.player_names.snapshot()
-            self.result['published']['player_names'] = dict(self.message['player_names'])
+            self.message.update(self.splash.snapshot())
+            self.result['published'].update(self.splash.snapshot())
             if self.results.config['enabled']:
                 self.message['results'] = self.results.feed_status()
             self.image_cache.clear()
@@ -457,6 +487,8 @@ class Workbench:
                               frame_age=None if self.last_frame_wall is None else time.perf_counter() - self.last_frame_wall,
                               results=self.results.status(),
                               player_name_status=self.player_names.status(),
+                              song_lookup_status=self.splash.status(),
+                              catalog_preparation=self.catalog_preparation.status(),
                               publisher=self.publisher.status,
                               renderer=dict(running=self.renderer is not None and self.renderer.poll() is None,
                                             exit_code=self.renderer.poll() if self.renderer else None)))
@@ -544,10 +576,12 @@ class Workbench:
         self.save_settings()
         return {'ok': True}
 
-    def browse_path(self, directory=False):
+    def browse_path(self, directory=False, catalog=False):
         args = [sys.executable, '-B', '-m', 'ddrcv.workbench.picker']
         if directory:
             args.append('--directory')
+        elif catalog:
+            args.append('--catalog')
         with self.lock:
             if self.closed.is_set():
                 raise ValueError('Workbench is shutting down')
@@ -649,6 +683,7 @@ class Workbench:
             self.obs_worker.join(timeout=3)
             self.obs.disconnect()
             self.stop_renderer()
-            self.player_names.close()
+            self.splash.close()
+            self.catalog_preparation.close()
             self.results.close()
             logging.getLogger().removeHandler(self.logs)

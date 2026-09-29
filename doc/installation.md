@@ -91,7 +91,7 @@ accept a menu default. Setup returns a nonzero exit code on failure.
 ## Package and manual installation
 
 `pyproject.toml` is the source of package metadata and direct dependencies.
-Extras are `ocr`, `tournament`, `workbench`, and `desktop`; each application
+Extras are `ocr`, `tournament`, `workbench`, `desktop`, and `jacket-lookup`; each application
 includes the tournament and OCR requirements. The desktop extra also includes
 workbench support. `uv.lock` records the transitive resolution and artifact
 hashes. The supported setup runs `uv sync --locked --inexact`: it refuses a
@@ -113,6 +113,16 @@ WebView2 installation. For a smaller manual install, select `.[ocr]`,
 `.[tournament]`, or `.[workbench]` in place of `.[desktop]`; run these commands
 from the repository root. Application dependencies are maintained only in
 `pyproject.toml` and `uv.lock`.
+
+Song and chart recognition is opt-in:
+`setup_desktop.bat -JacketLookup` (also supported by `setup_workbench.bat`).
+This prepares the offline artwork gallery and default Dia Del Ritmo event and
+checks readiness. Enable recognition in the app after preparation, then apply
+the configuration. Rerunning setup updates a compatible venv without removing
+unrelated packages. Normal setup does not download jacket catalogs.
+The `jacket-lookup` extra reuses OCR and adds no Torch or FAISS requirement.
+See [song recognition](song_recognition.md) for other events, offline use, and
+recognition limits.
 
 Historical EasyOCR/Torch/jacket experiments use `requirements-legacy.txt`,
 outside the supported application lock, in a separate environment. The

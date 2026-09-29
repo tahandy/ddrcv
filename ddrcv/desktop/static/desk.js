@@ -238,6 +238,7 @@ function renderConfig(data) {
   $('scene-map').value = JSON.stringify(config.obs?.scene_map ?? data.default_scene_map ?? null, null, 2);
   updateAdvanced();
   sourceFields();
+  queueCatalogInfo(0);
 }
 
 function sourceFields() {
@@ -267,6 +268,7 @@ function selectTab(tab) {
     item.tabIndex = selected ? 0 : -1;
     $(item.getAttribute('aria-controls')).hidden = !selected;
   }
+  if (tab.id === 'tab-song' && loaded) queueCatalogInfo(0);
   if (!historyVisible()) clearHistory();
   else refreshHistory().catch(e => error(e.message));
 }
@@ -321,6 +323,8 @@ async function flush() {
   collectJSON();
   updateAdvanced();
   const value = JSON.parse(JSON.stringify(config));
+  if (value.song_lookup?.catalog_file === '') value.song_lookup.catalog_file = null;
+  if (value.song_lookup?.assets_dir === '') value.song_lookup.assets_dir = null;
   const request = saveChain.catch(() => {}).then(() => api('config', 'PUT', value));
   saveChain = request;
   const saved = await request;
@@ -364,6 +368,13 @@ async function pollOnce() {
     $(`p${i+1}-age`).textContent = age(status.score_age[i]);
     $(`p${i+1}-name`).textContent = status.published.player_names?.[`p${i+1}`] ?? '—';
   }
+  const song = status.published.song;
+  $('song-title').textContent = song ? song.title + (song.artist ? ' · ' + song.artist : '') : 'Song: —';
+  $('song-charts').textContent = ['p1', 'p2'].map(p => {
+    const chart = song?.charts?.[p];
+    return p.toUpperCase() + ': ' + (chart ? title(chart.difficulty) + ' · Max EX ' + (chart.max_ex ?? 'unavailable') : '—');
+  }).join(' · ');
+  showCatalogStatus(status.catalog_preparation || {}, status.song_lookup_status || {});
   const names = status.player_name_status || {};
   const namePhases = {disabled: 'Disabled', initializing: 'Loading OCR model', ready: names.busy ? 'Reading names' : 'Ready', failed: 'OCR failed', closed: 'Stopped'};
   $('name-status').textContent = 'Name recognition: ' + (namePhases[names.phase] || 'Stopped') + (names.error ? ' · ' + names.error : '');
@@ -418,7 +429,9 @@ async function pollOnce() {
     raw_scores: status.raw_scores,
     decisions: status.decisions,
     player_names: status.published.player_names,
-    player_name_status: status.player_name_status
+    player_name_status: status.player_name_status,
+    song: status.published.song,
+    song_lookup: status.song_lookup_status
   }, null, 2);
   if (status.error) error(status.error);
   await refreshHistory();
@@ -750,4 +763,99 @@ async function initialize() {
 window.addEventListener('pywebviewready', () => {
   bridgeReady = true;
   initialize();
+});
+
+for (const action of ['prepare', 'refresh', 'check']) handle('song-' + action, async () => {
+  await flush();
+  catalogOperationKey = catalogKey();
+  await api('action', 'POST', {action: 'song_' + action});
+  await pollOnce();
+});
+
+function catalogConfig() {
+  return {...config.song_lookup, mode: $('song-mode').value,
+    event: $('song-event').value, catalog_file: $('song-assets').value || null};
+}
+function requestCatalogInfo(cfg) { return api('action', 'POST', {action: 'song_info', config: cfg}); }
+
+// Catalog inspection is metadata-only, debounced, and separate from running recognition.
+let catalogTimer = null, catalogEpoch = 0, catalogOperationKey = null, catalogOperationState = '';
+function catalogKey() {
+  const cfg = catalogConfig();
+  return JSON.stringify([cfg.mode, cfg.event, cfg.catalog_file, cfg.assets_dir, cfg.difficulty_method]);
+}
+function catalogMode() {
+  const full = $('song-mode').value === 'full';
+  $('song-event').disabled = full;
+  $('song-event-field').classList.toggle('inactive', full);
+  $('song-event-help').hidden = !full;
+}
+function catalogDate(value) {
+  if (!value) return 'Not recorded';
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? String(value) : date.toLocaleString();
+}
+function showCatalogInfo(info) {
+  $('song-storage-path').textContent = info.catalog_file || '—';
+  $('song-catalog-state').textContent = info.available ?
+    (info.event || 'WORLD') + ' · ' + info.unsupported_count + ' unsupported charts' +
+    (info.needs_conversion ? ' · Folder catalog: Prepare converts it offline.' : '') : info.error || 'No prepared catalog';
+  const link = $('song-catalog-version');
+  link.textContent = info.available ? info.commit.slice(0, 12) : '—';
+  link.title = info.commit || '';
+  if (info.available) link.href = 'https://github.com/noahm/DDRCardDraw/commit/' + encodeURIComponent(info.commit);
+  else link.removeAttribute('href');
+  $('song-catalog-updated').textContent = info.available ? catalogDate(info.dataset_updated_at) : '—';
+  $('song-catalog-prepared').textContent = info.available ? catalogDate(info.packed_at || info.prepared_at) : '—';
+  $('song-gallery-version').textContent = info.available ?
+    info.gallery_commit.slice(0, 12) + ' · ' + info.gallery.slice(0, 12) : '—';
+  $('song-gallery-version').title = info.available ? 'Source commit: ' + info.gallery_commit + '\nGallery fingerprint: ' + info.gallery : '';
+}
+function queueCatalogInfo(delay = 200) {
+  catalogMode();
+  clearTimeout(catalogTimer);
+  const epoch = ++catalogEpoch;
+  const cfg = catalogConfig();
+  showCatalogInfo({error: 'Reading catalog information…'});
+  catalogTimer = setTimeout(async () => {
+    try {
+      const info = await requestCatalogInfo(cfg);
+      if (epoch === catalogEpoch) showCatalogInfo(info);
+    } catch (e) {
+      if (epoch === catalogEpoch) showCatalogInfo({error: e.message});
+    }
+  }, delay);
+}
+function showCatalogStatus(operation, runtime) {
+  const key = catalogKey();
+  const busy = ['preparing', 'checking'].includes(operation.phase);
+  const relevant = catalogOperationKey === key;
+  $('song-readiness').textContent = relevant || busy ?
+    operation.error || operation.message || (operation.ok ? 'Ready. Apply to activate this catalog.' : 'Catalog: ' + (operation.phase || 'unchecked')) :
+    'Check readiness before applying this selection.';
+  for (const id of ['song-prepare', 'song-refresh', 'song-check']) $(id).disabled = busy;
+  const version = runtime.catalog;
+  $('song-active-version').textContent = version ?
+    'Active session: ' + (version.event || 'WORLD') + ' · ' + version.commit.slice(0, 12) + ' · ' + (runtime.phase || 'ready') +
+    (runtime.error ? ' · ' + runtime.error : '') : 'Active session: recognition is not running.';
+  const state = JSON.stringify(operation);
+  if (state !== catalogOperationState) {
+    catalogOperationState = state;
+    if (relevant && !busy) queueCatalogInfo(0);
+  }
+}
+for (const id of ['song-mode', 'song-event', 'song-assets']) $(id).addEventListener('input', () => {
+  catalogOperationKey = null;
+  queueCatalogInfo();
+});
+
+handle('song-browse', async () => {
+  const path = await window.pywebview.api.pick('catalog');
+  if (path) {
+    $('song-assets').value = path;
+    set('song_lookup.catalog_file', path);
+    scheduleSave();
+    catalogOperationKey = null;
+    queueCatalogInfo(0);
+  }
 });

@@ -22,7 +22,7 @@ The `ddrcv` package contains a number of modules that attempt to address orthogo
 | Module            | Purpose                                                                                           |
 |-------------------|---------------------------------------------------------------------------------------------------|
 | `ingest`          | Management of frame ingest from RTSP and video device streams                                     |
-| `jacket_database` | Reverse image lookup to determine step counts from song jacket                                    |
+| `jacket_lookup` | Offline CPU jacket identity, difficulty templates, and chart-specific max EX                                    |
 | `ocr`             | Helper methods for using OCR via EasyOCR (deprecated)                                             |
 | `score`           | Real-time parsing of score from a frame of the gameplay screen                                    |
 | `state`           | Determination of current machine state/screen                                                     |

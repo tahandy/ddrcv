@@ -1,0 +1,205 @@
+{
+  "builds": [
+    {
+      "variant": "haswell",
+      "core": "Haswell",
+      "opencv_optimized": true,
+      "images": 1577,
+      "fingerprint": "06cbc412e6c88e53f39aef09f6c840ad237da2f5cc6e95084feb26c1030e8d33",
+      "build_seconds": 5.2449045000830665
+    },
+    {
+      "variant": "sandybridge",
+      "core": "Sandybridge",
+      "opencv_optimized": true,
+      "images": 1577,
+      "fingerprint": "06cbc412e6c88e53f39aef09f6c840ad237da2f5cc6e95084feb26c1030e8d33",
+      "build_seconds": 5.771259800065309
+    },
+    {
+      "variant": "scalar",
+      "core": "Sandybridge",
+      "opencv_optimized": false,
+      "images": 1577,
+      "fingerprint": "06cbc412e6c88e53f39aef09f6c840ad237da2f5cc6e95084feb26c1030e8d33",
+      "build_seconds": 6.242970800027251
+    },
+    {
+      "variant": "numpy_baseline",
+      "core": "Sandybridge",
+      "opencv_optimized": false,
+      "images": 1577,
+      "fingerprint": "06cbc412e6c88e53f39aef09f6c840ad237da2f5cc6e95084feb26c1030e8d33",
+      "numpy_disabled_features": "AVX,AVX2,FMA3,F16C",
+      "build_seconds": 5.044750200002454
+    }
+  ],
+  "thresholds": {
+    "score": 0.4,
+    "margin": 0.28
+  },
+  "old_profile": {
+    "schema": 1,
+    "score": 0.4,
+    "margin": 0.28,
+    "gallery_fingerprint": "31d166b1936794dbc69e718a4e28de85dfe5887c7d67635c48cf77c495e45d1d",
+    "source_index_sha256": "a5479a17bed57d237682d1c6032ed3026326a10ccace4073dc2ea662bae78af7",
+    "source_commit": "c62053faa82df55ebc926812a7af684f520ae704"
+  },
+  "new_profile": {
+    "schema": 1,
+    "score": 0.4,
+    "margin": 0.28,
+    "gallery_fingerprint": "06cbc412e6c88e53f39aef09f6c840ad237da2f5cc6e95084feb26c1030e8d33",
+    "source_commit": "c62053faa82df55ebc926812a7af684f520ae704",
+    "equivalent_to": "31d166b1936794dbc69e718a4e28de85dfe5887c7d67635c48cf77c495e45d1d"
+  },
+  "differences": [],
+  "max_score_deltas": {
+    "descriptor_score": 3.5762786865234375e-07,
+    "score": 0,
+    "margin": 0
+  },
+  "catalogs": {
+    "event": {
+      "jacket_queries": {
+        "negative": 21,
+        "clean": 11,
+        "withheld": 11,
+        "synthetic": 77,
+        "transition": 22
+      },
+      "splash_comparisons": 54,
+      "warm_template_splash_ms": {
+        "legacy": {
+          "n": 110,
+          "median": 7.304099970497191,
+          "p95": 9.680259978631511,
+          "p99": 10.646849980112165,
+          "maximum": 11.21399994008243
+        },
+        "portable": {
+          "n": 110,
+          "median": 7.434449973516166,
+          "p95": 9.855409996816888,
+          "p99": 10.58776101679541,
+          "maximum": 10.683800093829632
+        }
+      },
+      "warm_encode_ms": {
+        "legacy": {
+          "n": 110,
+          "median": 0.5124500021338463,
+          "p95": 0.6868399796076118,
+          "p99": 0.8374059840571134,
+          "maximum": 0.8434000192210078
+        },
+        "portable": {
+          "n": 110,
+          "median": 0.6176999304443598,
+          "p95": 0.8788800449110566,
+          "p99": 0.9628119971603155,
+          "maximum": 0.978600000962615
+        }
+      }
+    },
+    "full": {
+      "jacket_queries": {
+        "negative": 21,
+        "clean": 11,
+        "withheld": 11,
+        "synthetic": 77,
+        "transition": 22
+      },
+      "splash_comparisons": 54,
+      "warm_template_splash_ms": {
+        "legacy": {
+          "n": 110,
+          "median": 7.290950044989586,
+          "p95": 8.346639992669225,
+          "p99": 10.493266935227433,
+          "maximum": 11.854599928483367
+        },
+        "portable": {
+          "n": 110,
+          "median": 7.300099998246878,
+          "p95": 8.282120007788762,
+          "p99": 13.522897025104596,
+          "maximum": 14.508099993690848
+        }
+      },
+      "warm_encode_ms": {
+        "legacy": {
+          "n": 110,
+          "median": 0.5123999435454607,
+          "p95": 0.813450023997575,
+          "p99": 1.1839209322351951,
+          "maximum": 1.3294999953359365
+        },
+        "portable": {
+          "n": 110,
+          "median": 0.6179999909363687,
+          "p95": 0.849595054751262,
+          "p99": 0.9226159343961626,
+          "maximum": 1.0946000693365932
+        }
+      }
+    }
+  },
+  "cpu_threads": 1,
+  "numpy": "2.2.0",
+  "opencv": "4.10.0",
+  "max_reference_vector_delta": 5.029141902923584e-08,
+  "ok": true,
+  "fresh_offline_prepare": {
+    "empty_build_cache": true,
+    "core": "Sandybridge",
+    "network_access": false,
+    "ok": true,
+    "gallery": "06cbc412e6c88e53f39aef09f6c840ad237da2f5cc6e95084feb26c1030e8d33"
+  },
+  "tests": {
+    "run": 389,
+    "skipped": 12,
+    "failures": 0,
+    "errors": 0,
+    "new_regression_tests": 8
+  },
+  "installed_wheel": {
+    "ok": true,
+    "outside_checkout": true,
+    "checks": [
+      {
+        "environment": "full",
+        "catalogs": [
+          {
+            "version": "legacy",
+            "gallery": "31d166b1936794dbc69e718a4e28de85dfe5887c7d67635c48cf77c495e45d1d",
+            "max_ex": 1881
+          },
+          {
+            "version": "portable",
+            "gallery": "06cbc412e6c88e53f39aef09f6c840ad237da2f5cc6e95084feb26c1030e8d33",
+            "max_ex": 1881
+          }
+        ]
+      },
+      {
+        "environment": "minimal",
+        "catalogs": [
+          {
+            "version": "legacy",
+            "gallery": "31d166b1936794dbc69e718a4e28de85dfe5887c7d67635c48cf77c495e45d1d",
+            "max_ex": 1881
+          },
+          {
+            "version": "portable",
+            "gallery": "06cbc412e6c88e53f39aef09f6c840ad237da2f5cc6e95084feb26c1030e8d33",
+            "max_ex": 1881
+          }
+        ]
+      }
+    ]
+  },
+  "scope": "Existing corpus parity and CPU dispatch checks on Windows x64 i9-14900HX; no new independent songs or live rehearsal."
+}

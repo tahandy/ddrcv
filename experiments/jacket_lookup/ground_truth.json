@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "verification": "All 11 full-frame difficulty labels and query/reference jacket pairs visually inspected by the implementing agent. Nearest-image proposals used only as labeling aids; no acceptance thresholds were fitted during labeling. Metadata is upstream truth, not independently recounted notes.",
+  "labels": {
+    "2025-03-19_16-29-40_00": {
+      "song_id": "sa:69b01qbo8Qdi6liOPq091bqo01i16oQ9",
+      "name": "I'm an Albatraoz",
+      "players": {
+        "p1": {
+          "difficulty": "beginner",
+          "level": 2
+        },
+        "p2": {
+          "difficulty": "basic",
+          "level": 3
+        }
+      },
+      "verified": true
+    },
+    "2025-03-19_16-29-40_01": {
+      "song_id": "sa:Db6odqIqQ90PIDIlD1DIb8l09ol6qIDl",
+      "name": "No Tears Left to Cry",
+      "players": {
+        "p1": {
+          "difficulty": "beginner",
+          "level": 2
+        },
+        "p2": {
+          "difficulty": "basic",
+          "level": 5
+        }
+      },
+      "verified": true
+    },
+    "2025-03-19_16-29-40_02": {
+      "song_id": "sa:b86i9lPlObdl1008PO0PIi09q9o9l88i",
+      "name": "強風オールバック",
+      "players": {
+        "p1": {
+          "difficulty": "beginner",
+          "level": 1
+        },
+        "p2": {
+          "difficulty": "basic",
+          "level": 4
+        }
+      },
+      "verified": true
+    },
+    "2025-03-19_16-29-40_03": {
+      "song_id": "sa:o1d0DDobPPPlq0l8Qli1d6ODI8ldo1qb",
+      "name": "シル・ヴ・プレジデント",
+      "players": {
+        "p1": {
+          "difficulty": "beginner",
+          "level": 2
+        },
+        "p2": {
+          "difficulty": "basic",
+          "level": 4
+        }
+      },
+      "verified": true
+    },
+    "2025-03-19_16-47-45_00": {
+      "song_id": "sa:ODq019O9o1OPdq9PiPl0o8D8DQ8bid88",
+      "name": "Holic",
+      "players": {
+        "p1": {
+          "difficulty": "challenge",
+          "level": 15
+        },
+        "p2": {
+          "difficulty": "challenge",
+          "level": 15
+        }
+      },
+      "verified": true
+    },
+    "2025-03-19_16-47-45_01": {
+      "song_id": "sa:0b8lD690qQO1bDOib1IqiO0OO169o9IQ",
+      "name": "Red. by Full Metal Jacket",
+      "players": {
+        "p1": {
+          "difficulty": "expert",
+          "level": 14
+        },
+        "p2": {
+          "difficulty": "expert",
+          "level": 14
+        }
+      },
+      "verified": true
+    },
+    "2025-03-19_16-47-45_02": {
+      "song_id": "sa:D686d06lO9IID8D0boPq0Pd8P89idO99",
+      "name": "未来（ダ）FUTURE",
+      "players": {
+        "p1": {
+          "difficulty": "expert",
+          "level": 15
+        },
+        "p2": {
+          "difficulty": "expert",
+          "level": 15
+        }
+      },
+      "verified": true
+    },
+    "2025-03-19_16-47-45_03": {
+      "song_id": "sa:odlOiO6di119680QOoOo8dO8IO0DliI9",
+      "name": "No More Love",
+      "players": {
+        "p1": {
+          "difficulty": "expert",
+          "level": 16
+        },
+        "p2": {
+          "difficulty": "expert",
+          "level": 16
+        }
+      },
+      "verified": true
+    },
+    "2025-03-27_15-43-31_00": {
+      "song_id": "sa:QbdQold98oq9lODoIloIbPiIqld6i0Qb",
+      "name": "GUILTY DIAMONDS",
+      "players": {
+        "p1": {
+          "difficulty": "difficult",
+          "level": 10
+        },
+        "p2": {
+          "difficulty": "expert",
+          "level": 14
+        }
+      },
+      "verified": true
+    },
+    "2025-03-27_15-50-18_00": {
+      "song_id": "sa:8DO8obP1b669b9QI6q01609bPOdd1o1b",
+      "name": "メズマライザー",
+      "players": {
+        "p1": {
+          "difficulty": "difficult",
+          "level": 11
+        },
+        "p2": {
+          "difficulty": "expert",
+          "level": 15
+        }
+      },
+      "verified": true
+    },
+    "2025-03-27_15-52-48_00": {
+      "song_id": "sa:I6dI99IOolDD6l6Q1ooPIiDO8Odq0QIP",
+      "name": "UNBELIEVABLE (Sparky remix)",
+      "players": {
+        "p1": {
+          "difficulty": "expert",
+          "level": 15
+        },
+        "p2": {
+          "difficulty": "expert",
+          "level": 15
+        }
+      },
+      "verified": true
+    }
+  }
+}

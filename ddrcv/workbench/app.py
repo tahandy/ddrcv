@@ -56,6 +56,13 @@ def create_app(workbench=None):
     def action():
         args = dict(request.get_json())
         action = args.pop('action')
+        if action == 'song_info':
+            return jsonify(wb.catalog_preparation.describe(args['config']))
+        if action in ('song_prepare', 'song_refresh', 'song_check'):
+            return jsonify(wb.catalog_preparation.start(args['config'],
+                           prepare=action != 'song_check', refresh=action == 'song_refresh'))
+        if action == 'song_lookup':
+            return jsonify(wb.configure_song_lookup(args['config']))
         return jsonify(wb.submit(action, **args))
 
     @app.get('/api/results/<event_id>/screenshot')
@@ -87,7 +94,8 @@ def create_app(workbench=None):
 
     @app.post('/api/browse')
     def browse():
-        return jsonify(path=wb.browse_path(request.get_json().get('directory', False)))
+        args = request.get_json()
+        return jsonify(path=wb.browse_path(args.get('directory', False), args.get('catalog', False)))
 
     @app.get('/frame.jpg')
     def frame():

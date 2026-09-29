@@ -8,3 +8,12 @@ include tests/test_setup.ps1
 include tests/test_setup_menu.ps1
 recursive-include doc *.md
 recursive-include examples *.md *.html *.css *.js *.py
+
+# Isolated source-checkout experiment; exclude generated catalogs, models and frames.
+include experiments/jacket_lookup/*.py
+include experiments/jacket_lookup/*.md
+include experiments/jacket_lookup/ground_truth.json
+include experiments/jacket_lookup/measured_summary.json
+include experiments/jacket_lookup/difficulty_measured_summary.json
+include experiments/jacket_lookup/integration_measured_summary.json
+include experiments/jacket_lookup/container_measured_summary.json

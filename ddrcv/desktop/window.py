@@ -25,6 +25,9 @@ def main():
         def pick(self, action, path=''):
             if action == 'directory':
                 result = window.create_file_dialog(webview.FileDialog.FOLDER)
+            elif action == 'catalog':
+                result = window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=False,
+                    file_types=('DDRCV catalogs (*.ddrcatalog)',))
             elif action == 'save':
                 result = window.create_file_dialog(webview.FileDialog.SAVE, save_filename=path or 'tournament.json',
                     file_types=('JSON configurations (*.json)', 'All files (*.*)'))

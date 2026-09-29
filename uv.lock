@@ -205,6 +205,10 @@ desktop = [
     { name = "table2ascii" },
     { name = "websockets" },
 ]
+jacket-lookup = [
+    { name = "onnxruntime" },
+    { name = "rapidocr" },
+]
 ocr = [
     { name = "onnxruntime" },
     { name = "rapidocr" },
@@ -240,6 +244,7 @@ workbench = [
 [package.metadata]
 requires-dist = [
     { name = "cv2-enumerate-cameras", marker = "extra == 'tournament'", specifier = "==1.1.18.3" },
+    { name = "ddrcv", extras = ["ocr"], marker = "extra == 'jacket-lookup'" },
     { name = "ddrcv", extras = ["ocr"], marker = "extra == 'tournament'" },
     { name = "ddrcv", extras = ["tournament"], marker = "extra == 'workbench'" },
     { name = "ddrcv", extras = ["workbench"], marker = "extra == 'desktop'" },
@@ -260,7 +265,7 @@ requires-dist = [
     { name = "table2ascii", marker = "extra == 'tournament'", specifier = "==1.1.3" },
     { name = "websockets", marker = "extra == 'tournament'", specifier = "==14.1" },
 ]
-provides-extras = ["ocr", "tournament", "workbench", "desktop"]
+provides-extras = ["jacket-lookup", "ocr", "tournament", "workbench", "desktop"]
 
 [[package]]
 name = "discord-webhook"

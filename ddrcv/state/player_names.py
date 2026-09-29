@@ -2,6 +2,7 @@
 from copy import deepcopy
 import math
 import threading
+import time
 
 from ddrcv.ocr import RapidOCRRecognizer, prepare_ddr_crop
 from ddrcv.results.recognition import Evidence
@@ -77,7 +78,8 @@ SplashNameReader = PlayerNameReader
 class PlayerNameService:
     def __init__(self, config=None, reader=None):
         self.config = validate_config(config)
-        self.reader = reader or PlayerNameReader(self.config)
+        from ddrcv.jacket_lookup.names import LazyNameReader
+        self.reader = reader if reader is not None else LazyNameReader(self.config)
         self.lock = threading.Condition()
         self.changed = threading.Event()
         self.closed = False
@@ -246,5 +248,14 @@ class PlayerNameService:
             self.run += 1
             self.pending = None
             self.lock.notify_all()
+        deadline = time.monotonic() + max(0, timeout)
         if self.worker:
-            self.worker.join(timeout=timeout)
+            self.worker.join(timeout=max(0, deadline - time.monotonic()))
+        closer = getattr(self.reader, 'close', None) if callable(getattr(type(self.reader), 'close', None)) else None
+        if closer:
+            closer(timeout=max(0, deadline - time.monotonic()))
+        return not any(worker.is_alive() for worker in self.threads())
+
+    def threads(self):
+        children = self.reader.threads() if callable(getattr(type(self.reader), 'threads', None)) else ()
+        return tuple(w for w in (self.worker, *children) if isinstance(w, threading.Thread))

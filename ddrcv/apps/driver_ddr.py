@@ -2,6 +2,9 @@
 import argparse
 import logging
 import os
+
+for _native_pool in ('OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'OMP_NUM_THREADS'):
+    os.environ[_native_pool] = '1'
 from pathlib import Path
 import time
 
@@ -62,6 +65,10 @@ def create_runtime(config, logger, data_dir=None, desktop=False):
     from ddrcv.apps.tournament_runtime import TournamentRuntime
     from ddrcv.apps.driver_config import normalize_score_mode
     config = normalize_score_mode(config)
+    prepared_lookup = None
+    if config.get('song_lookup', {}).get('enabled'):
+        from ddrcv.jacket_lookup.assets import load
+        prepared_lookup = load(config['song_lookup'])
     matcher = StateRotation(**config['state'])
     extractor = ScoreExtractor(config['score_extractor']['glyph_dir'])
     engine = RecognitionEngine(config, matcher=matcher, extractor=extractor)
@@ -70,7 +77,7 @@ def create_runtime(config, logger, data_dir=None, desktop=False):
         publisher = create_publisher(config['publish'], logger=logger)
         return TournamentRuntime(config, engine, fetcher, publisher, logger,
                                  data_dir=data_dir, clock=time, desktop=desktop,
-                                 results_factory=ResultsService)
+                                 results_factory=ResultsService, prepared_lookup=prepared_lookup)
     except BaseException:
         fetcher.stop()
         raise

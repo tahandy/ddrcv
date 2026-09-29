@@ -21,6 +21,7 @@ dependencies = [
 Repository = "https://github.com/tahandy/ddrcv"
 
 [project.optional-dependencies]
+jacket-lookup = ["ddrcv[ocr]"]
 ocr = ["rapidocr==3.9.2", "onnxruntime==1.30.0"]
 tournament = [
     "ddrcv[ocr]",
@@ -40,6 +41,7 @@ desktop = ["ddrcv[workbench]", "pywebview==6.2.1", "pystray==0.19.5"]
 [project.scripts]
 ddrcv-workbench = "ddrcv.workbench.__main__:main"
 ddrcv-check-ocr = "ddrcv.ocr.check:main"
+ddrcv-jacket-lookup = "ddrcv.jacket_lookup.__main__:main"
 
 [project.gui-scripts]
 ddrcv-desktop = "ddrcv.desktop.__main__:main"
@@ -53,6 +55,7 @@ namespaces = false
 
 [tool.setuptools.package-data]
 "ddrcv.desktop" = ["templates/*.html", "static/*"]
+"ddrcv.jacket_lookup" = ["assets/*.json", "assets/templates/*.json", "assets/templates/*.png"]
 "ddrcv.ocr" = ["README.md", "fixtures/*.png"]
 "ddrcv.score" = ["fonts/*/*.png"]
 "ddrcv.state" = ["world/*.pkl", "data/*.pkl"]

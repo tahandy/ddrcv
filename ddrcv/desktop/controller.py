@@ -80,6 +80,8 @@ class Desk:
         self.operations = threading.Lock()
         self.closed = False
         self.runtime = None
+        from ddrcv.jacket_lookup.operations import CatalogPreparation
+        self.catalog_preparation = CatalogPreparation()
         self.log = logging.getLogger('ddrcv.desktop')
         self.logs = DeskLogs()
         logging.getLogger().addHandler(self.logs)
@@ -156,7 +158,8 @@ class Desk:
                                  (config['state'], 'pkl_dir'), (config['score_extractor'], 'glyph_dir'),
                                  (config['results'], 'screenshot_directory'), (config['results'], 'outbox_directory'),
                                  (config['results'], 'output_directory'),
-                                 (config['renderer'], 'path')):
+                                 (config['renderer'], 'path'), (config['song_lookup'], 'assets_dir'),
+                                 (config['song_lookup'], 'catalog_file')):
                 if section.get(key):
                     section[key] = str(Path(section[key]).expanduser().resolve())
             write_json(target, config)
@@ -164,6 +167,11 @@ class Desk:
             self.draft = config
             self._persist()
         return self.config()
+
+    def prepare_song_lookup(self, *, prepare=False, refresh=False):
+        with self.lock:
+            config = deepcopy(self.draft['song_lookup'])
+        return self.catalog_preparation.start(config, prepare=prepare, refresh=refresh)
 
     def _prepare(self, config):
         if self.runtime_factory:
@@ -369,6 +377,7 @@ class Desk:
             limit = self.applied['score_filter']['max_per_frame']
         status.update(pending=pending, score_mode='Money' if limit is None else 'EX' if limit == 12 else 'Custom',
                       error=self.logs.scrub(str(status.get('error') or self.error or '')) or None)
+        status['catalog_preparation'] = self.catalog_preparation.status()
         status['source'] = mask_config(status.get('source', deepcopy(self.applied['ingest'])))
         status['source_error'] = self.logs.scrub(str(status.get('source_error') or '')) or None
         for integration in ('obs', 'renderer'):
@@ -383,6 +392,7 @@ class Desk:
         self._request_stop()
         with self.operations:
             self.closed = True
+            self.catalog_preparation.close()
             if self.runtime:
                 self.runtime.stop()
             with self.lock:

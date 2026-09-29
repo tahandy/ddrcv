@@ -176,9 +176,6 @@ Desktop.ini
 /recordings/
 /screenshots/
 
-# Downloaded legacy jacket-model weights and generated checksums
-/ddrcv/jacket_database/database/cache/
-
 # Scratch template captures, not the production templates under ddrcv/state
 /state_images/test*.pkl
 /apps/scripts/* - Copy*.bat
@@ -202,3 +199,6 @@ Desktop.ini
 
 # Checkout-local Python and installer tools
 .tools/
+
+# Portable processed catalogs are generated assets, shared separately
+*.ddrcatalog

@@ -13,7 +13,7 @@ class PackagingTests(unittest.TestCase):
         package = metadata.metadata('ddrcv')
         self.assertEqual(package['Requires-Python'], '<3.13,>=3.12')
         self.assertEqual(set(package.get_all('Provides-Extra')),
-                         {'ocr', 'tournament', 'workbench', 'desktop'})
+                         {'ocr', 'tournament', 'workbench', 'desktop', 'jacket-lookup'})
         requirements = metadata.requires('ddrcv')
         self.assertTrue(any(r.startswith('onnxruntime==1.30.0') for r in requirements))
         self.assertTrue(any(r.startswith('ddrcv[workbench]') for r in requirements))
@@ -28,6 +28,8 @@ class PackagingTests(unittest.TestCase):
                               ('ddrcv.desktop', 'static/*'),
                               ('ddrcv.workbench', 'templates/*.html'),
                               ('ddrcv.workbench', 'static/*'),
+                              ('ddrcv.jacket_lookup', 'assets/*.json'),
+                              ('ddrcv.jacket_lookup', 'assets/templates/*.png'),
                               ('ddrcv.state', 'world/*.pkl'),
                               ('ddrcv.state', 'data/*.pkl'),
                               ('ddrcv.score', 'fonts/World2/*.png')]:
@@ -42,6 +44,13 @@ class PackagingTests(unittest.TestCase):
         from ddrcv.score.score_extractor import ScoreExtractor
         StateRotation(**normalize_config({})['state'])
         ScoreExtractor(None)
+        from ddrcv.jacket_lookup.assets import PACKAGE_ASSETS, profile, legacy_profile, qualified_profile
+        from ddrcv.jacket_lookup.difficulty import DifficultyTemplates
+        self.assertEqual(len(DifficultyTemplates(PACKAGE_ASSETS / 'templates').templates), 5)
+        self.assertEqual(profile()['score'], .4)
+        for frozen in (profile(), legacy_profile()):
+            self.assertEqual(qualified_profile(frozen['gallery_fingerprint']), frozen)
+        self.assertEqual(profile()['equivalent_to'], legacy_profile()['gallery_fingerprint'])
 
 
 if __name__ == '__main__':

@@ -1,0 +1,157 @@
+{
+  "schema": 1,
+  "preprocess": "white-next-to-dark-v1",
+  "layout": "WORLD-1280x720",
+  "entries": [
+    {
+      "difficulty": "beginner",
+      "image": "beginner.png",
+      "sha256": "8a5916fa1b2166537f3ca70413f95fd05421603e63b0cfe89279c6c21b92c963",
+      "sample": "2025-03-19_16-29-40_00",
+      "player": "p1",
+      "song_id": "sa:69b01qbo8Qdi6liOPq091bqo01i16oQ9",
+      "source_sha256": "f99092c0a156281ec8c9c49323be09a1bfe8cd4187a3659bc8564e2736d6ff87",
+      "rect": [
+        2,
+        6,
+        142,
+        27
+      ]
+    },
+    {
+      "difficulty": "basic",
+      "image": "basic.png",
+      "sha256": "55bec0ce94392a1ad6b52b8edb7cad073ba29495badbe00de1446d5db8b7d6b9",
+      "sample": "2025-03-19_16-29-40_00",
+      "player": "p2",
+      "song_id": "sa:69b01qbo8Qdi6liOPq091bqo01i16oQ9",
+      "source_sha256": "389069613b276cd872a98a7ac0018f838bb6ecc3ba794ffe6d3c2371c86c6dc6",
+      "rect": [
+        88,
+        8,
+        86,
+        24
+      ]
+    },
+    {
+      "difficulty": "difficult",
+      "image": "difficult.png",
+      "sha256": "a609d4b70dadc31416faef2e61b87d4fed80faf7fe8d791781bdb0924fa2db63",
+      "sample": "2025-03-27_15-43-31_00",
+      "player": "p1",
+      "song_id": "sa:QbdQold98oq9lODoIloIbPiIqld6i0Qb",
+      "source_sha256": "bc693e093296d4609af7827b9611f07a9d26454dcecba9a3d27fc3fe38eb83fb",
+      "rect": [
+        2,
+        6,
+        122,
+        27
+      ]
+    },
+    {
+      "difficulty": "expert",
+      "image": "expert.png",
+      "sha256": "5175a76bb60b5bd428aa604e77243af265f27b358f1be5a215aea8e08b293df4",
+      "sample": "2025-03-19_16-47-45_02",
+      "player": "p1",
+      "song_id": "sa:D686d06lO9IID8D0boPq0Pd8P89idO99",
+      "source_sha256": "cd7a21d8874e9d3a3d478acfe85e2217671e048d648004fbec67a9fcf4716fd0",
+      "rect": [
+        2,
+        6,
+        104,
+        26
+      ]
+    },
+    {
+      "difficulty": "challenge",
+      "image": "challenge.png",
+      "sha256": "02a777e7fb9727d30120bf1ca2f27a2aad833252d015a43218eb58e90e6b2212",
+      "sample": "2025-03-19_16-47-45_00",
+      "player": "p1",
+      "song_id": "sa:ODq019O9o1OPdq9PiPl0o8D8DQ8bid88",
+      "source_sha256": "6fb4cf923e2663dce2ba6704069ce51f0acad1cce49adde2c9fcba7207f796dd",
+      "rect": [
+        2,
+        5,
+        149,
+        27
+      ]
+    }
+  ],
+  "labels_sha256": "7d8811880526ef3643fecb75ec733c23fdc3a6f233990db97c723db27f1e6b26",
+  "thresholds": {
+    "score": 0.56,
+    "margin": 0.02
+  },
+  "phases": {
+    "sa:8DO8obP1b669b9QI6q01609bPOdd1o1b": "calibration",
+    "sa:I6dI99IOolDD6l6Q1ooPIiDO8Odq0QIP": "calibration",
+    "sa:QbdQold98oq9lODoIloIbPiIqld6i0Qb": "template_source",
+    "sa:D686d06lO9IID8D0boPq0Pd8P89idO99": "template_source",
+    "sa:69b01qbo8Qdi6liOPq091bqo01i16oQ9": "template_source",
+    "sa:b86i9lPlObdl1008PO0PIi09q9o9l88i": "evaluation",
+    "sa:ODq019O9o1OPdq9PiPl0o8D8DQ8bid88": "template_source",
+    "sa:Db6odqIqQ90PIDIlD1DIb8l09ol6qIDl": "evaluation",
+    "sa:0b8lD690qQO1bDOib1IqiO0OO169o9IQ": "evaluation",
+    "sa:o1d0DDobPPPlq0l8Qli1d6ODI8ldo1qb": "evaluation",
+    "sa:odlOiO6di119680QOoOo8dO8IO0DliI9": "evaluation"
+  },
+  "manifest_sha256": "e4b7e2057be541f9f27df91b0fe94c0aed76b0f1dfcd2ec94cb010a459243cfc",
+  "frame_hashes": {
+    "frames/2025-03-19_10-18-31_negative0.png": "79fac4206d79838d3fbdb22b9e1f2ae8d3a3bb5164004d813074653ab3f6252a",
+    "frames/2025-03-19_10-18-31_negative1.png": "dab841c714ee46e1d957ec83041d9296eaa244fae45b3b60c9ce2164b309c4c2",
+    "frames/2025-03-19_10-18-31_negative2.png": "861c22a3ddaf048cff47baa9734fd5fe856dc462bd6d05d9323eef9a7abcc6c6",
+    "frames/2025-03-19_16-26-58_negative0.png": "e8994a88bb3bef6f711c3ad8d77606ec5b2e949bd34102dca4fa2bdcec8db655",
+    "frames/2025-03-19_16-26-58_negative1.png": "6a21aca0228a46fc7cca5bd1a64b379d62d0e0b99b31b5c65ba5db134668c5ea",
+    "frames/2025-03-19_16-26-58_negative2.png": "bd8274b40c8a8c1007a1a14801ce8a2d442ba089369dff05c724d118fa385634",
+    "frames/2025-03-19_16-29-40_00.png": "3a37538d74aa75f8ff058edbea9f53ab086b9680e09df23fe1248bf115273419",
+    "frames/2025-03-19_16-29-40_00_entry.png": "e320cb219dd42f7e0b06a70c44080582a9664bfb4aba13b97748069000ec1060",
+    "frames/2025-03-19_16-29-40_00_exit.png": "6c8456d964a120bd05e0ce7ed3bc3f7bd4e3fdffc9c821db701d92de7b623bde",
+    "frames/2025-03-19_16-29-40_01.png": "f36d87a99b98ffbf34bd03b777fa0bc4b2b4a6277f643cf25ed92cc0fd36186e",
+    "frames/2025-03-19_16-29-40_01_entry.png": "fd45f9fd70c9f2d9ae05e4609c296ddb36d2689a4f19eda5eb2bebcc3e5d196d",
+    "frames/2025-03-19_16-29-40_01_exit.png": "af9779bbb675ae937b4e72ce7923a9cca3d92394cd6b83b00d7456c4082ef7fa",
+    "frames/2025-03-19_16-29-40_02.png": "73f7a0c9d14bb1021d3dabd47ac55910812e5aa18091e77392bd5fbe99917f9d",
+    "frames/2025-03-19_16-29-40_02_entry.png": "843d4450b04d9357399f20fabba9d4da1546d31ad17e0d7b77e58b90931ed3d3",
+    "frames/2025-03-19_16-29-40_02_exit.png": "8c6d4ad178f67ba7db3b50206d40983632bad9792c51c9d6230ddf50cb8587ae",
+    "frames/2025-03-19_16-29-40_03.png": "4613195cbc8d1d8fc311909fca1e1968b8472c791aba6aa660d0f80f70bc40b8",
+    "frames/2025-03-19_16-29-40_03_entry.png": "fca6a3628f59a1f6ee695393680fba26e1a40899afd440cd565b91068696614d",
+    "frames/2025-03-19_16-29-40_03_exit.png": "31ec0ba6d24db9fc449f79276df4c737ec8b20f17e27906a92e7b93cef4dc5a4",
+    "frames/2025-03-19_16-29-40_negative0.png": "3b0fd6e390731a0e60138191c25fc10aee01bd0936fd9b962e9f80bd80eaf9c8",
+    "frames/2025-03-19_16-29-40_negative1.png": "50a8ded167c9d0f0107a3065ef2b7e93ad4695ad21bb4d627e9541956d883a2a",
+    "frames/2025-03-19_16-29-40_negative2.png": "e70ceacaffb2d24d5f45d36dc8dbeaeba86524535c57abccd568bc9d7263107d",
+    "frames/2025-03-19_16-47-45_00.png": "ba514975be89cfef649ee2f20b6ff2bd6412f7e25ae109ca1c4f6cfab7f625a2",
+    "frames/2025-03-19_16-47-45_00_entry.png": "8012b2a18f47765ded1970f0a006fd2a0783704e2d04f689fea111a41612036a",
+    "frames/2025-03-19_16-47-45_00_exit.png": "d93095483419a7ec35d733c1a715f45fea24f182b6227b8b6efd76e992ca28d0",
+    "frames/2025-03-19_16-47-45_01.png": "b1358396fb040f32fc8282561b389d335e8b2008cfa2e4b924b192b58fe1849a",
+    "frames/2025-03-19_16-47-45_01_entry.png": "4c78d5c02b585d328a24af1310f70a9c698553e938685ce15e49db0f11aa3504",
+    "frames/2025-03-19_16-47-45_01_exit.png": "fcfa89095f8e83411f6a8ee2fd9c5191b56e1bd4a96358a1a4898038b501b000",
+    "frames/2025-03-19_16-47-45_02.png": "e75fdec4218ec62f0c1a5fd1fa7e0e2ed8ed501a79141c3ce6fe26d3374a3aca",
+    "frames/2025-03-19_16-47-45_02_entry.png": "5f1074c881fd805b55dc637ecccbcc341293badb4476377f7609ff41ef782c6c",
+    "frames/2025-03-19_16-47-45_02_exit.png": "8c6d4ad178f67ba7db3b50206d40983632bad9792c51c9d6230ddf50cb8587ae",
+    "frames/2025-03-19_16-47-45_03.png": "4c500b57c7820d42dc66d814765017936146432ad11ba6f10b2f6d5eaade0831",
+    "frames/2025-03-19_16-47-45_03_entry.png": "5c7ccd3f97c136f8601c7a9bf5d9cb640b686977ac904a9e0aaf9174218c3a21",
+    "frames/2025-03-19_16-47-45_03_exit.png": "9af43426ffd4cc9ef2bd5413d79810fcf0b4e5e83d250f60f4755e2ea07d2da5",
+    "frames/2025-03-19_16-47-45_negative0.png": "a3939732d58878ec474018158fa37fa7bd59dbc078c5dc371dc4e6fa2a7318f0",
+    "frames/2025-03-19_16-47-45_negative1.png": "b092542833f6654ed7cbbe2a63414e054173e09fc5f3e5ca76b3d65ba6fdee43",
+    "frames/2025-03-19_16-47-45_negative2.png": "4d6e21044c3100fbdf9c9aa1e5135ca3dc730ca5669bd045456453b4b318b46f",
+    "frames/2025-03-27_15-43-31_00.png": "3d7e615cd6038ed71cade1d66155510836c40cc4bac22384e2f0d23011303e6b",
+    "frames/2025-03-27_15-43-31_00_entry.png": "446f7ebb6ad311ed64dc62caedc524624afb4c2f4ac73d7bd7d10a5fe7099ff1",
+    "frames/2025-03-27_15-43-31_00_exit.png": "631f2f65a104b93c3dc5228d5939dbe5d39868864a41e928b2cbaab590d4693f",
+    "frames/2025-03-27_15-43-31_negative0.png": "70a9199bae461a287911c89bc714d1bfcf4eb27837e36a5d046dbc96f40287a7",
+    "frames/2025-03-27_15-43-31_negative1.png": "e821f7c0999ff64fd0f812bce556f761622fb3c190d27698226e72937ad72a93",
+    "frames/2025-03-27_15-43-31_negative2.png": "f90995d24dedcf1da1d81a50aa91b449c309a85feae66de2874c96b003cfaed6",
+    "frames/2025-03-27_15-50-18_00.png": "afaab3685850b48f87583ae0fcb79354a798954a09fccd90d442c429762a9422",
+    "frames/2025-03-27_15-50-18_00_entry.png": "dee9ae791e51896f948352a516ec06bf0ec4ba669f1b152fae873c51a21dcade",
+    "frames/2025-03-27_15-50-18_00_exit.png": "229e9eb7a1cb6df82abfccb86059e06048da3eb14cfd5ec673089c922973c20e",
+    "frames/2025-03-27_15-50-18_negative0.png": "5a9b5491ca5b07b0512102017cbcc1f801df5be346cfacfbc17e0411c3a0e7a9",
+    "frames/2025-03-27_15-50-18_negative1.png": "234c64eef1cf2ccd0d05baaa25aa1678b6066ff8a98d788eb4fd04fb13f3faa5",
+    "frames/2025-03-27_15-50-18_negative2.png": "03fde2037d2e3f55e9bc33a3e3ce1703c0e2ab1566137021aa44aeec879015ae",
+    "frames/2025-03-27_15-52-48_00.png": "89633eb4fce06179566b3243cd79b5ed91bb0eb490068229670d59ac5b614720",
+    "frames/2025-03-27_15-52-48_00_entry.png": "93be92e94e165a983eb7042327e885b27dc0a2d207822b1734e768cac6026cc5",
+    "frames/2025-03-27_15-52-48_00_exit.png": "c39e1c15e6162fb22ae7b74eeb01c100340812aba6d10a32ea99a07c84567b88",
+    "frames/2025-03-27_15-52-48_negative0.png": "34b2c570ed2809d836612251a6e6985cb267797d9908bb7ae0f0b0acf8e33833",
+    "frames/2025-03-27_15-52-48_negative1.png": "6da2e7e3558baac5ac6055a290fb77f5078494121f82c8aa100636967793b31b",
+    "frames/2025-03-27_15-52-48_negative2.png": "92405b442e3a98f5d3fc43946cc19cb9c0030b34d78b8868345276ecb67c2986"
+  }
+}

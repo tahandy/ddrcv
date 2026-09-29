@@ -72,7 +72,7 @@ from the workbench HTTP UI (`5002`) and OBS WebSocket (`4455`).
 - No top-level timestamp, sequence number, session/song ID, schema version, or
   score mode is published. The internal song generation is not on the wire.
 - An open socket does not prove that capture is advancing. Paused playback or
-  capture loss can leave an old snapshot in place. Name/Results workers can also
+  capture loss can leave an old snapshot in place. Name/song/Results workers can also
   publish updates without a new video frame. Track connection state and local
   receive time separately; even repeated messages do not prove fresh gameplay.
 
@@ -103,7 +103,7 @@ indices are always `[P1, P2]`, even when only P2 is present.
 | --- | --- | --- |
 | `state` | string | Confirmed screen state; see the table below. |
 | `players` | array of two booleans | Player presence inferred from the song splash, retained through gameplay/results. Defaults to `[true, true]` after reset, so it is not proof that both players have been observed. |
-| `song` | null | Always `null` in the maintained tournament recognizer. No title, chart, difficulty, step count, or maximum score is supplied. Legacy song-database payloads are outside this contract. |
+| `song` | object or null | Optional confirmed song identity and per-player charts. Null while disabled or unconfirmed. See Song and chart lifetime below. Legacy song-database payloads are outside this contract. |
 | `score` | object or null | Latest filtered gameplay scores. `null` means no score object in the current session, including after a reset. |
 | `score.p1_score`, `score.p2_score` | integer or null | Nonnegative raw score, `-1` for unread/reset before an accepted value, or `null` for an absent/unavailable side. `0` is a valid score. |
 | `player_names` | object; tolerate omission | Maintained producers add `p1` and `p2`, each a string or `null`. Confirmed login/splash OCR names, not player IDs. |
@@ -154,6 +154,31 @@ coerce them to zero. For example, this snapshot has an unread P1 and an absent P
   "player_names": {"p1": null, "p2": null}
 }
 ```
+
+### Song and chart lifetime
+
+Song recognition is opt-in. See [setup and catalog preparation](song_recognition.md).
+The song object has song_id, title, artist, catalog, and charts.p1 / charts.p2.
+Catalog includes mode, event, dataset, the pinned metadata commit, and the
+qualified gallery fingerprint. Each chart is null until its difficulty confirms;
+a confirmed record has style, difficulty, level, max_ex, status, and provenance.
+Level comes from chart metadata, not template recognition of digits. Provenance
+contains the dataset and commit supplying max EX, or null values when unavailable.
+
+Identity and each player's chart confirm independently from two accepted
+observations spanning at least 200 ms. A missing player read does not hold back
+the other player or a confirmed song title. Shared artwork cannot establish a
+unique identity. Recognized out-of-pool charts still publish their difficulty with
+max_ex=null and status=chart_outside_pool. Conflicting metadata, unsupported artwork,
+and missing scores also produce null max EX with an explanatory status.
+
+Song/chart values persist through gameplay and per-song results, and clear at
+song/session reset boundaries, source changes, and seeks. Background completion
+can update the snapshot without another captured frame. Clients must honor null
+and replace the complete song object, including its charts.
+
+max_ex is always an EX maximum. It neither changes the score field's configured
+units nor makes a Money score suitable for an EX percentage.
 
 ### Name lifetime
 

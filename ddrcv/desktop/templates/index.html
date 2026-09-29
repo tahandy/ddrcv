@@ -20,6 +20,7 @@
 </div>
 <nav class="tabs" role="tablist" aria-label="Tournament controls">
   <button id="tab-session" role="tab" aria-selected="true" aria-controls="panel-session">Status &amp; configuration</button>
+  <button id="tab-song" role="tab" aria-selected="false" aria-controls="panel-song" tabindex="-1">Song recognition</button>
   <button id="tab-obs" role="tab" aria-selected="false" aria-controls="panel-obs" tabindex="-1">OBS</button>
   <button id="tab-renderer" role="tab" aria-selected="false" aria-controls="panel-renderer" tabindex="-1">Renderer</button>
   <button id="tab-results" role="tab" aria-selected="false" aria-controls="panel-results" tabindex="-1">Results</button>
@@ -38,6 +39,7 @@
       </table>
       <div class="session-state"><span class="quiet">Confirmed state</span><strong id="state">Unknown</strong><span id="raw-state" class="quiet">Waiting for capture</span></div>
     </div>
+    <p id="song-title">Song: —</p><p id="song-charts" class="quiet">Charts: —</p>
     <div class="status-notes"><p id="name-status" class="quiet" role="status">Name recognition stopped</p><p id="results-summary" class="quiet" role="status">Results: not started</p></div>
     <div class="session-bottom">
       <div class="health"><span id="capture">Capture stopped</span><span id="publisher">Publisher stopped</span><span id="throughput" title="Processing capacity = 1 / average active frame time over the last 2 seconds (up to 120 frames). An older running backend uses its latest frame timing, labeled last frame; fully exit and relaunch the app to enable averaging. Includes recognition, worker submissions and publishing; excludes capture, video decoding/playback waits and background OCR/delivery. Throughput is completed frames per wall-clock second. File FPS is the recording's nominal rate. Capacity below File FPS indicates processing cannot keep up; higher capacity alone does not prove the whole pipeline is keeping up.">0 frames processed</span></div>
@@ -67,6 +69,51 @@
     <div class="source-actions"><span id="active-source" class="quiet">Capture stopped</span><span id="source-feedback" role="status" class="quiet"></span></div>
     <p class="quiet source-note">Switch camera applies only the source and resets score tracking once ready. Other edits stay pending until Apply and Restart.</p>
     <details id="advanced"><summary>Advanced driver configuration</summary><p class="quiet">Complete shared CLI JSON, including result screenshots and custom recognition settings. Secret placeholders preserve existing values.</p><textarea id="config-json" spellcheck="false" aria-label="Advanced driver JSON"></textarea><button id="use-json">Use edited JSON</button></details>
+  </section>
+</div>
+<div id="panel-song" role="tabpanel" aria-labelledby="tab-song" hidden>
+  <section id="song-settings" class="integration-panel" aria-labelledby="song-heading">
+    <div class="section-title"><h2 id="song-heading">Song and chart recognition</h2><span class="quiet">Apply and Restart activates changes</span></div>
+    <div class="form-grid">
+      <label class="check wide"><input data-path="song_lookup.enabled" type="checkbox">Recognize song and max EX</label>
+      <label>Catalog<select id="song-mode" data-path="song_lookup.mode"><option value="event">Event pool</option><option value="full">Full DDR / WORLD charts</option></select></label>
+      <label id="song-event-field">Event URL or slug<input id="song-event" data-path="song_lookup.event" placeholder="dia_del_ritmo_26" aria-describedby="song-event-help"></label>
+      <label>Style<select data-path="song_lookup.style"><option value="single">Singles</option><option value="double">Doubles</option></select></label>
+    </div>
+    <p id="song-event-help" class="quiet" hidden>Full DDR uses WORLD charts; an event is not needed.</p>
+    <div class="toolbar wrap"><button id="song-prepare">Prepare catalog</button><button id="song-refresh">Refresh metadata</button><button id="song-check">Check readiness</button></div>
+    <p id="song-readiness" class="quiet" role="status">Prepare a catalog before enabling recognition.</p>
+    <details><summary>Advanced recognition settings</summary>
+      <div class="form-grid">
+        <label>Difficulty reader<select data-path="song_lookup.difficulty_method"><option value="template">Templates</option><option value="ocr">OCR</option></select></label>
+        <label class="check"><input data-path="song_lookup.high_qos" type="checkbox">HighQoS workers</label>
+      </div>
+    </details>
+  </section>
+  <section class="catalog-version-panel" aria-labelledby="catalog-heading">
+      <h2 id="catalog-heading">Prepared catalog</h2>
+      <p id="song-catalog-state" class="quiet" role="status">Reading catalog information…</p>
+      <dl class="catalog-facts">
+        <dt>Metadata revision</dt><dd><a id="song-catalog-version" target="_blank" rel="noopener noreferrer">—</a></dd>
+        <dt>Dataset updated</dt><dd id="song-catalog-updated">—</dd>
+        <dt>Catalog created</dt><dd id="song-catalog-prepared">—</dd>
+        <dt>Artwork gallery</dt><dd id="song-gallery-version">—</dd>
+      </dl>
+      <p id="song-active-version" class="quiet">Active session: recognition is not running.</p>
+    </section>
+  <section class="catalog-storage" aria-labelledby="storage-heading">
+    <h2 id="storage-heading">Storage and sharing</h2>
+    <label class="catalog-folder">Catalog file<div class="inline"><input id="song-assets" data-path="song_lookup.catalog_file" placeholder="Default .ddrcatalog file" aria-describedby="song-storage-path"><button id="song-browse" type="button">Browse…</button></div></label>
+    <p class="quiet">One portable file with jackets, chart data, and version information. Leave blank to use the default location.</p>
+    <p class="catalog-location quiet">File: <code id="song-storage-path">—</code></p>
+    <details class="catalog-sharing"><summary>Share a prepared catalog</summary>
+      <ol>
+        <li>After preparation finishes, copy this <code>.ddrcatalog</code> file to the other machine.</li>
+        <li>In a compatible DDRCV version, browse to that file and select the same event or Full DDR.</li>
+        <li>Check readiness, then apply the configuration.</li>
+      </ol>
+      <p class="quiet">No extraction, jacket download, or encoding is needed. OCR models are installed separately by normal setup.</p>
+    </details>
   </section>
 </div>
 <div id="panel-obs" role="tabpanel" aria-labelledby="tab-obs" hidden>

@@ -245,7 +245,16 @@ function init(settings) {
   $('renderer-path').value = settings.renderer_path; $('port').value = settings.port;
   $('obs-host').value = settings.obs.host; $('obs-port').value = settings.obs.port;
   for (const state of Object.keys(stateNames)) if (state !== 'unknown') $('map-' + state).value = settings.obs.scene_map[state] || '';
+  const song = settings.song_lookup || {};
+  $('song-enabled').checked = !!song.enabled;
+  $('song-mode').value = song.mode || 'event';
+  $('song-event').value = song.event || 'dia_del_ritmo_26';
+  $('song-style').value = song.style || 'single';
+  $('song-difficulty').value = song.difficulty_method || 'template';
+  $('song-assets').value = song.catalog_file || '';
+  $('song-qos').checked = song.high_qos !== false;
   sourceControls(); modeHelp(settings.score_mode); initialized = true;
+  queueCatalogInfo(0);
 }
 function playbackControls(s) {
   const kind = s.source.kind, video = kind === 'video', live = kind === 'camera' || kind === 'rtsp';
@@ -303,6 +312,13 @@ async function poll() {
     $('performance').title = `Video decode: ${s.decode_ms ?? 0} ms; recognition and publication: ${s.recognition_ms ?? 0} ms. Preview delivery runs separately, up to 30 fps.`;
     $('performance').className = s.lagging ? 'warning' : 'muted';
     // Poll name updates even while the frame sequence is held or capture is lost.
+    const song = s.published.song;
+    text('song-title', song ? song.title + (song.artist ? ' · ' + song.artist : '') : 'Song: —');
+    text('song-charts', ['p1', 'p2'].map(p => {
+      const chart = song?.charts?.[p];
+      return p.toUpperCase() + ': ' + (chart ? chart.difficulty + ' · Max EX ' + (chart.max_ex ?? 'unavailable') : '—');
+    }).join(' · '));
+    showCatalogStatus(s.catalog_preparation || {}, s.song_lookup_status || {});
     const names = s.player_name_status || {};
     const namePhases = {disabled: 'Disabled', initializing: 'Loading OCR model', ready: 'Ready', failed: 'OCR failed', closed: 'Stopped'};
     text('name-status', namePhases[names.phase] || 'Unavailable');
@@ -360,3 +376,120 @@ async function pollObs() {
 }
 connectPanel();
 setInterval(poll, 250); setInterval(pollObs, 1500); poll(); pollObs();
+
+function songConfig() {
+  return {...current?.settings?.song_lookup, enabled: $('song-enabled').checked, mode: $('song-mode').value,
+    event: $('song-event').value, style: $('song-style').value,
+    difficulty_method: $('song-difficulty').value, catalog_file: $('song-assets').value || null,
+    high_qos: $('song-qos').checked};
+}
+for (const operation of ['prepare', 'refresh', 'check']) bind('song-' + operation,
+  () => { catalogOperationKey = catalogKey(); return action('song_' + operation, {config: songConfig()}); });
+bind('song-apply', () => action('song_lookup', {config: songConfig()}));
+
+const catalogConfig = songConfig;
+function requestCatalogInfo(cfg) { return action('song_info', {config: cfg}); }
+
+// Catalog inspection is metadata-only, debounced, and separate from running recognition.
+let catalogTimer = null, catalogEpoch = 0, catalogOperationKey = null, catalogOperationState = '';
+function catalogKey() {
+  const cfg = catalogConfig();
+  return JSON.stringify([cfg.mode, cfg.event, cfg.catalog_file, cfg.assets_dir, cfg.difficulty_method]);
+}
+function catalogMode() {
+  const full = $('song-mode').value === 'full';
+  $('song-event').disabled = full;
+  $('song-event-field').classList.toggle('inactive', full);
+  $('song-event-help').hidden = !full;
+}
+function catalogDate(value) {
+  if (!value) return 'Not recorded';
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? String(value) : date.toLocaleString();
+}
+function showCatalogInfo(info) {
+  $('song-storage-path').textContent = info.catalog_file || '—';
+  $('song-catalog-state').textContent = info.available ?
+    (info.event || 'WORLD') + ' · ' + info.unsupported_count + ' unsupported charts' +
+    (info.needs_conversion ? ' · Folder catalog: Prepare converts it offline.' : '') : info.error || 'No prepared catalog';
+  const link = $('song-catalog-version');
+  link.textContent = info.available ? info.commit.slice(0, 12) : '—';
+  link.title = info.commit || '';
+  if (info.available) link.href = 'https://github.com/noahm/DDRCardDraw/commit/' + encodeURIComponent(info.commit);
+  else link.removeAttribute('href');
+  $('song-catalog-updated').textContent = info.available ? catalogDate(info.dataset_updated_at) : '—';
+  $('song-catalog-prepared').textContent = info.available ? catalogDate(info.packed_at || info.prepared_at) : '—';
+  $('song-gallery-version').textContent = info.available ?
+    info.gallery_commit.slice(0, 12) + ' · ' + info.gallery.slice(0, 12) : '—';
+  $('song-gallery-version').title = info.available ? 'Source commit: ' + info.gallery_commit + '\nGallery fingerprint: ' + info.gallery : '';
+}
+function queueCatalogInfo(delay = 200) {
+  catalogMode();
+  clearTimeout(catalogTimer);
+  const epoch = ++catalogEpoch;
+  const cfg = catalogConfig();
+  showCatalogInfo({error: 'Reading catalog information…'});
+  catalogTimer = setTimeout(async () => {
+    try {
+      const info = await requestCatalogInfo(cfg);
+      if (epoch === catalogEpoch) showCatalogInfo(info);
+    } catch (e) {
+      if (epoch === catalogEpoch) showCatalogInfo({error: e.message});
+    }
+  }, delay);
+}
+function showCatalogStatus(operation, runtime) {
+  const key = catalogKey();
+  const busy = ['preparing', 'checking'].includes(operation.phase);
+  const relevant = catalogOperationKey === key;
+  $('song-readiness').textContent = relevant || busy ?
+    operation.error || operation.message || (operation.ok ? 'Ready. Apply to activate this catalog.' : 'Catalog: ' + (operation.phase || 'unchecked')) :
+    'Check readiness before applying this selection.';
+  for (const id of ['song-prepare', 'song-refresh', 'song-check']) $(id).disabled = busy;
+  const version = runtime.catalog;
+  $('song-active-version').textContent = version ?
+    'Active session: ' + (version.event || 'WORLD') + ' · ' + version.commit.slice(0, 12) + ' · ' + (runtime.phase || 'ready') +
+    (runtime.error ? ' · ' + runtime.error : '') : 'Active session: recognition is not running.';
+  const state = JSON.stringify(operation);
+  if (state !== catalogOperationState) {
+    catalogOperationState = state;
+    if (relevant && !busy) queueCatalogInfo(0);
+  }
+}
+for (const id of ['song-mode', 'song-event', 'song-assets']) $(id).addEventListener('input', () => {
+  catalogOperationKey = null;
+  queueCatalogInfo();
+});
+
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+function selectTab(tab) {
+  for (const item of tabs) {
+    const selected = item === tab;
+    item.setAttribute('aria-selected', String(selected));
+    item.tabIndex = selected ? 0 : -1;
+    $(item.getAttribute('aria-controls')).hidden = !selected;
+  }
+  if (tab.id === 'tab-song' && initialized) queueCatalogInfo(0);
+}
+for (const tab of tabs) {
+  tab.addEventListener('click', () => selectTab(tab));
+  tab.addEventListener('keydown', event => {
+    let index = tabs.indexOf(tab);
+    if (event.key === 'ArrowRight') index = (index + 1) % tabs.length;
+    else if (event.key === 'ArrowLeft') index = (index + tabs.length - 1) % tabs.length;
+    else if (event.key === 'Home') index = 0;
+    else if (event.key === 'End') index = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    selectTab(tabs[index]); tabs[index].focus();
+  });
+}
+
+bind('song-browse', async () => {
+  const data = await post('/api/browse', {catalog: true});
+  if (data.path) {
+    $('song-assets').value = data.path;
+    catalogOperationKey = null;
+    queueCatalogInfo(0);
+  }
+});

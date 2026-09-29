@@ -54,6 +54,16 @@ try {
     Assert-True ($env:UV_PROJECT_ENVIRONMENT -eq 'sentinel') 'Environment must be restored'
     Assert-True (@($script:calls | Where-Object { $_ -contains '--provision' }).Count -eq 1) 'Must provision real OCR'
 
+    Assert-True (@($script:calls | Where-Object { $_ -contains 'ddrcv.jacket_lookup' }).Count -eq 0) 'Default setup must not prepare a jacket catalog'
+    $script:calls.Clear()
+    Install-DDRCV $testRoot 'desktop' '' $envDir -EnableJacketLookup
+    $optional = @($script:calls | Where-Object { $_[0] -eq 'sync' })
+    Assert-True ($optional[0] -contains 'jacket-lookup') 'Opt-in must request the locked optional extra'
+    Assert-True (@($script:calls | Where-Object { $_ -contains 'ddrcv.jacket_lookup' }).Count -eq 2) 'Opt-in must prepare and check the packaged catalog'
+    Assert-True (@($script:calls | Where-Object { $_[0] -eq 'venv' }).Count -eq 0) 'Optional patch must reuse the existing environment'
+    $script:calls.Clear()
+    Install-DDRCV $testRoot 'desktop' '' $envDir -EnableJacketLookup
+    Assert-True (@($script:calls | Where-Object { $_[0] -eq 'venv' }).Count -eq 0) 'Repeated optional setup must be idempotent'
     $script:calls.Clear()
     Install-DDRCV $testRoot 'workbench' '' $envDir
     Assert-True (@($script:calls | Where-Object { $_[0] -eq 'venv' }).Count -eq 0) 'Compatible environment must be reused'

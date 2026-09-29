@@ -29,7 +29,7 @@ header { display: flex; align-items: center; gap: 24px; padding: 10px 16px; bord
 .profile-name { display: flex; gap: 8px; min-width: 0; flex: 1; }
 #profile { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #pending { margin-left: auto; }
-.tabs { display: flex; gap: 6px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px; border-bottom: 1px solid var(--border); }
 .tabs button { padding: 9px 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); }
 .tabs button:hover { background: var(--surface); color: var(--text); }
 .tabs button[aria-selected=true] { color: var(--text); border-bottom-color: var(--accent); }
@@ -142,3 +142,19 @@ footer { display: flex; align-items: center; justify-content: space-between; fle
 .reveal-secret .eye-slash { display: none; }
 .reveal-secret[aria-pressed=true] .eye-slash { display: block; }
 .credential-field input::-ms-reveal { display: none; }
+
+/* Song recognition has a persistent top-level panel; tab switches never restart workers. */
+#song-event-field.inactive { opacity: .45; }
+#song-event-field input:disabled { cursor: not-allowed; }
+#song-event-help { margin: 8px 0; }
+#song-settings > details { margin-top: 14px; }
+#song-settings > details > .form-grid { margin-top: 12px; }
+.catalog-facts { display: grid; grid-template-columns: 145px minmax(0, 1fr); gap: 8px 16px; margin: 12px 0; }
+.catalog-facts dt { color: var(--muted); }
+.catalog-facts dd { margin: 0; text-align: left; overflow-wrap: anywhere; }
+.catalog-version-panel > p, .catalog-storage > p { margin-top: 8px; }
+.catalog-folder { display: grid; grid-template-columns: 165px minmax(0, 1fr); margin-top: 14px; }
+.catalog-location { overflow-wrap: anywhere; }
+.catalog-sharing { margin-top: 14px; }
+.catalog-sharing li { margin: 6px 0; }
+.catalog-sharing ol { padding-left: 22px; }

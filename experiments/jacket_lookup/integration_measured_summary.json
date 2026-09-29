@@ -1,0 +1,1018 @@
+{
+  "schema": 1,
+  "measured_date": "2026-09-29",
+  "environment": {
+    "os": "Windows x64",
+    "cpu": "Intel Core i9-14900HX",
+    "python": "CPython 3.12",
+    "cpu_only": true,
+    "native_threads": 1,
+    "high_qos": true,
+    "names": "two persistent OCR instances"
+  },
+  "profile": {
+    "schema": 1,
+    "score": 0.4,
+    "margin": 0.28,
+    "gallery_fingerprint": "31d166b1936794dbc69e718a4e28de85dfe5887c7d67635c48cf77c495e45d1d",
+    "source_index_sha256": "a5479a17bed57d237682d1c6032ed3026326a10ccace4073dc2ea662bae78af7",
+    "source_commit": "c62053faa82df55ebc926812a7af684f520ae704"
+  },
+  "parity": {
+    "catalogs": {
+      "event": {
+        "jacket_comparisons": 142,
+        "splash_comparisons": 54,
+        "evaluation": {
+          "clean": {
+            "queries": 6,
+            "known": 1,
+            "accepted": 1,
+            "correct": 1,
+            "false_accepts": 0,
+            "precision": 1.0,
+            "coverage": 1.0,
+            "top1": 1.0,
+            "top5": 1.0
+          },
+          "negative": {
+            "queries": 6,
+            "known": 0,
+            "accepted": 0,
+            "correct": 0,
+            "false_accepts": 0,
+            "precision": null,
+            "coverage": null,
+            "top1": null,
+            "top5": null
+          },
+          "transition": {
+            "queries": 12,
+            "known": 1,
+            "accepted": 1,
+            "correct": 1,
+            "false_accepts": 0,
+            "precision": 1.0,
+            "coverage": 1.0,
+            "top1": 1.0,
+            "top5": 1.0
+          },
+          "withheld": {
+            "queries": 6,
+            "known": 0,
+            "accepted": 0,
+            "correct": 0,
+            "false_accepts": 0,
+            "precision": null,
+            "coverage": null,
+            "top1": null,
+            "top5": null
+          },
+          "synthetic": {
+            "queries": 42,
+            "known": 7,
+            "accepted": 7,
+            "correct": 7,
+            "false_accepts": 0,
+            "precision": 1.0,
+            "coverage": 1.0,
+            "top1": 1.0,
+            "top5": 1.0
+          }
+        }
+      },
+      "full": {
+        "jacket_comparisons": 142,
+        "splash_comparisons": 54,
+        "evaluation": {
+          "clean": {
+            "queries": 6,
+            "known": 6,
+            "accepted": 6,
+            "correct": 6,
+            "false_accepts": 0,
+            "precision": 1.0,
+            "coverage": 1.0,
+            "top1": 1.0,
+            "top5": 1.0
+          },
+          "negative": {
+            "queries": 6,
+            "known": 0,
+            "accepted": 0,
+            "correct": 0,
+            "false_accepts": 0,
+            "precision": null,
+            "coverage": null,
+            "top1": null,
+            "top5": null
+          },
+          "transition": {
+            "queries": 12,
+            "known": 7,
+            "accepted": 6,
+            "correct": 6,
+            "false_accepts": 0,
+            "precision": 1.0,
+            "coverage": 0.8571428571428571,
+            "top1": 0.8571428571428571,
+            "top5": 0.8571428571428571
+          },
+          "withheld": {
+            "queries": 6,
+            "known": 0,
+            "accepted": 0,
+            "correct": 0,
+            "false_accepts": 0,
+            "precision": null,
+            "coverage": null,
+            "top1": null,
+            "top5": null
+          },
+          "synthetic": {
+            "queries": 42,
+            "known": 42,
+            "accepted": 42,
+            "correct": 42,
+            "false_accepts": 0,
+            "precision": 1.0,
+            "coverage": 1.0,
+            "top1": 1.0,
+            "top5": 1.0
+          }
+        }
+      }
+    },
+    "differences": [],
+    "score_max_error": 0.0
+  },
+  "performance": {
+    "protocol": "Three fresh processes, 11 clean images, warmup then three passes at 5 Hz per process",
+    "distinct_images": 11,
+    "pooled": {
+      "total_ms": {
+        "n": 99,
+        "median": 28.199899941682816,
+        "p95": 34.90045991493388,
+        "p99": 37.44637002935632,
+        "maximum": 39.70869991462678
+      },
+      "chart_ms": {
+        "n": 99,
+        "median": 16.095299972221255,
+        "p95": 22.869570075999945,
+        "p99": 23.846738000866022,
+        "maximum": 24.41700000781566
+      }
+    },
+    "stages": {
+      "encode": {
+        "n": 99,
+        "median": 2.2616999922320247,
+        "p95": 3.9666000171564515,
+        "p99": 4.8182579735293976,
+        "maximum": 5.1102000288665295
+      },
+      "search": {
+        "n": 99,
+        "median": 1.159599982202053,
+        "p95": 2.2933499305509026,
+        "p99": 2.6745160599239157,
+        "maximum": 2.9790999833494425
+      },
+      "verify": {
+        "n": 99,
+        "median": 10.396099998615682,
+        "p95": 14.931779936887322,
+        "p99": 16.217654002830383,
+        "maximum": 16.774000017903745
+      },
+      "total": {
+        "n": 99,
+        "median": 14.219499891623855,
+        "p95": 20.18976005492732,
+        "p99": 20.79360998002812,
+        "maximum": 21.725099999457598
+      },
+      "difficulty": {
+        "n": 99,
+        "median": 3.983900067396462,
+        "p95": 7.422710047103465,
+        "p99": 8.023946075700223,
+        "maximum": 8.143799961544573
+      },
+      "template": {
+        "n": 99,
+        "median": 3.983900067396462,
+        "p95": 7.422710047103465,
+        "p99": 8.023946075700223,
+        "maximum": 8.143799961544573
+      },
+      "splash_total": {
+        "n": 99,
+        "median": 15.224900096654892,
+        "p95": 21.77705999929458,
+        "p99": 22.6596659864299,
+        "maximum": 22.8343999478966
+      }
+    },
+    "runs": [
+      {
+        "init_ms": 1484.1321998974308,
+        "initial_rss": 74596352,
+        "warm_rss": 327204864,
+        "mean_cpu_cores": 0.35208089126517894,
+        "summary": {
+          "total_ms": {
+            "n": 33,
+            "median": 30.701500014401972,
+            "p95": 34.79255991987884,
+            "p99": 38.13781991135329,
+            "maximum": 39.70869991462678
+          },
+          "chart_ms": {
+            "n": 33,
+            "median": 19.338199985213578,
+            "p95": 22.920180042274296,
+            "p99": 23.970407997258008,
+            "maximum": 24.41700000781566
+          }
+        },
+        "enqueue_ms": {
+          "n": 44,
+          "median": 0.31745003070682287,
+          "p95": 1.883930014446378,
+          "p99": 2.2276030166540295,
+          "maximum": 2.2739999694749713
+        },
+        "confirmation_ms": {
+          "song_ms": {
+            "n": 11,
+            "median": 228.05869998410344,
+            "p95": 233.8373499806039,
+            "p99": 234.44834997644648,
+            "maximum": 234.60109997540712
+          },
+          "charts_ms": {
+            "n": 11,
+            "median": 228.05869998410344,
+            "p95": 233.8373499806039,
+            "p99": 234.44834997644648,
+            "maximum": 234.60109997540712
+          },
+          "names_ms": {
+            "n": 11,
+            "median": 448.9195999922231,
+            "p95": 456.2397000263445,
+            "p99": 456.3705800450407,
+            "maximum": 456.40330004971474
+          }
+        }
+      },
+      {
+        "init_ms": 1413.9235999900848,
+        "initial_rss": 74883072,
+        "warm_rss": 327782400,
+        "mean_cpu_cores": 0.33548166086758174,
+        "summary": {
+          "total_ms": {
+            "n": 33,
+            "median": 30.16099997330457,
+            "p95": 36.03894000407308,
+            "p99": 37.061096020042896,
+            "maximum": 37.40020003169775
+          },
+          "chart_ms": {
+            "n": 33,
+            "median": 17.87270000204444,
+            "p95": 23.638400016352534,
+            "p99": 23.785691997036338,
+            "maximum": 23.835100000724196
+          }
+        },
+        "enqueue_ms": {
+          "n": 44,
+          "median": 0.4017999744974077,
+          "p95": 1.9135100068524482,
+          "p99": 2.047472990816459,
+          "maximum": 2.051300019957125
+        },
+        "confirmation_ms": {
+          "song_ms": {
+            "n": 11,
+            "median": 228.94130006898195,
+            "p95": 236.01650004275143,
+            "p99": 236.21354005299509,
+            "maximum": 236.262800055556
+          },
+          "charts_ms": {
+            "n": 11,
+            "median": 228.94130006898195,
+            "p95": 236.01650004275143,
+            "p99": 236.21354005299509,
+            "maximum": 236.262800055556
+          },
+          "names_ms": {
+            "n": 11,
+            "median": 454.3618999887258,
+            "p95": 458.31810001982376,
+            "p99": 459.01458006119356,
+            "maximum": 459.188700071536
+          }
+        }
+      },
+      {
+        "init_ms": 1333.0023000016809,
+        "initial_rss": 75018240,
+        "warm_rss": 327737344,
+        "mean_cpu_cores": 0.2693941356487799,
+        "summary": {
+          "total_ms": {
+            "n": 33,
+            "median": 20.67699993494898,
+            "p95": 31.1902999645099,
+            "p99": 33.590995920822024,
+            "maximum": 34.00849993340671
+          },
+          "chart_ms": {
+            "n": 33,
+            "median": 9.589600027538836,
+            "p95": 18.666419968940318,
+            "p99": 20.015035970136523,
+            "maximum": 20.527899963781238
+          }
+        },
+        "enqueue_ms": {
+          "n": 44,
+          "median": 0.30860002152621746,
+          "p95": 1.4147300622425973,
+          "p99": 1.675229970132932,
+          "maximum": 1.7994999652728438
+        },
+        "confirmation_ms": {
+          "song_ms": {
+            "n": 11,
+            "median": 222.3522000713274,
+            "p95": 234.74289994919673,
+            "p99": 235.1798599702306,
+            "maximum": 235.28909997548908
+          },
+          "charts_ms": {
+            "n": 11,
+            "median": 222.3522000713274,
+            "p95": 234.74289994919673,
+            "p99": 235.1798599702306,
+            "maximum": 235.28909997548908
+          },
+          "names_ms": {
+            "n": 11,
+            "median": 452.5712999748066,
+            "p95": 458.08895002119243,
+            "p99": 458.52507003583014,
+            "maximum": 458.63410003948957
+          }
+        }
+      }
+    ],
+    "replaced_jobs": 0,
+    "replaced_name_samples": 0,
+    "errors": [],
+    "websocket": {
+      "state_ms": {
+        "n": 11,
+        "median": 310.4812001110986,
+        "p95": 341.68879996286705,
+        "p99": 342.0445599243976,
+        "maximum": 342.13349991478026
+      },
+      "song_ms": {
+        "n": 11,
+        "median": 527.3185000987723,
+        "p95": 560.668199963402,
+        "p99": 561.6901999688707,
+        "maximum": 561.9456999702379
+      },
+      "charts_ms": {
+        "n": 11,
+        "median": 527.3185000987723,
+        "p95": 560.668199963402,
+        "p99": 561.6901999688707,
+        "maximum": 561.9456999702379
+      },
+      "names_ms": {
+        "n": 11,
+        "median": 751.4349999837577,
+        "p95": 810.1743999868631,
+        "p99": 834.8984000273049,
+        "maximum": 841.0794000374153
+      }
+    },
+    "targets": {
+      "complete_p95_under_50_ms": true,
+      "enqueue_p95_under_3_ms": true
+    },
+    "gallery_bytes": 110471881
+  },
+  "replay": {
+    "protocol": "All video frames decoded; recognition 10 Hz; drain async jobs during splash/login; source-time confirmation, not wall latency",
+    "videos": [
+      {
+        "file": "2025-03-19_10-18-31.mkv",
+        "decoded_frames": 621,
+        "expected_splashes": 0
+      },
+      {
+        "file": "2025-03-19_16-26-58.mkv",
+        "decoded_frames": 616,
+        "expected_splashes": 0
+      },
+      {
+        "file": "2025-03-19_16-29-40.mkv",
+        "decoded_frames": 26951,
+        "expected_splashes": 4
+      },
+      {
+        "file": "2025-03-19_16-47-45.mkv",
+        "decoded_frames": 27143,
+        "expected_splashes": 4
+      },
+      {
+        "file": "2025-03-27_15-43-31.mkv",
+        "decoded_frames": 11079,
+        "expected_splashes": 1
+      },
+      {
+        "file": "2025-03-27_15-50-18.mkv",
+        "decoded_frames": 4318,
+        "expected_splashes": 1
+      },
+      {
+        "file": "2025-03-27_15-52-48.mkv",
+        "decoded_frames": 13632,
+        "expected_splashes": 1
+      }
+    ],
+    "decoded_frames": 84360,
+    "distinct_song_events": 11,
+    "modes": {
+      "event": {
+        "song_events": 11,
+        "song_correct": 11,
+        "difficulties_correct": 22,
+        "chart_results": 22,
+        "max_ex_and_provenance_correct": 22,
+        "available_max_ex": 1,
+        "unavailable_max_ex": 21
+      },
+      "full": {
+        "song_events": 11,
+        "song_correct": 11,
+        "difficulties_correct": 22,
+        "chart_results": 22,
+        "max_ex_and_provenance_correct": 22,
+        "available_max_ex": 22,
+        "unavailable_max_ex": 0
+      }
+    },
+    "chart_checks": [
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-29-40_00",
+        "player": "p1",
+        "difficulty": "beginner",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-29-40_00",
+        "player": "p2",
+        "difficulty": "basic",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-29-40_00",
+        "player": "p1",
+        "difficulty": "beginner",
+        "expected_max_ex": 177,
+        "actual_max_ex": 177,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-29-40_00",
+        "player": "p2",
+        "difficulty": "basic",
+        "expected_max_ex": 375,
+        "actual_max_ex": 375,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-29-40_01",
+        "player": "p1",
+        "difficulty": "beginner",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-29-40_01",
+        "player": "p2",
+        "difficulty": "basic",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-29-40_01",
+        "player": "p1",
+        "difficulty": "beginner",
+        "expected_max_ex": 186,
+        "actual_max_ex": 186,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-29-40_01",
+        "player": "p2",
+        "difficulty": "basic",
+        "expected_max_ex": 417,
+        "actual_max_ex": 417,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-29-40_02",
+        "player": "p1",
+        "difficulty": "beginner",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-29-40_02",
+        "player": "p2",
+        "difficulty": "basic",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-29-40_02",
+        "player": "p1",
+        "difficulty": "beginner",
+        "expected_max_ex": 174,
+        "actual_max_ex": 174,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-29-40_02",
+        "player": "p2",
+        "difficulty": "basic",
+        "expected_max_ex": 543,
+        "actual_max_ex": 543,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-29-40_03",
+        "player": "p1",
+        "difficulty": "beginner",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-29-40_03",
+        "player": "p2",
+        "difficulty": "basic",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-29-40_03",
+        "player": "p1",
+        "difficulty": "beginner",
+        "expected_max_ex": 186,
+        "actual_max_ex": 186,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-29-40_03",
+        "player": "p2",
+        "difficulty": "basic",
+        "expected_max_ex": 369,
+        "actual_max_ex": 369,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-47-45_00",
+        "player": "p1",
+        "difficulty": "challenge",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-47-45_00",
+        "player": "p2",
+        "difficulty": "challenge",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-47-45_00",
+        "player": "p1",
+        "difficulty": "challenge",
+        "expected_max_ex": 1338,
+        "actual_max_ex": 1338,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-47-45_00",
+        "player": "p2",
+        "difficulty": "challenge",
+        "expected_max_ex": 1338,
+        "actual_max_ex": 1338,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-47-45_01",
+        "player": "p1",
+        "difficulty": "expert",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-47-45_01",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-47-45_01",
+        "player": "p1",
+        "difficulty": "expert",
+        "expected_max_ex": 1542,
+        "actual_max_ex": 1542,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-47-45_01",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": 1542,
+        "actual_max_ex": 1542,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-47-45_02",
+        "player": "p1",
+        "difficulty": "expert",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-47-45_02",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-47-45_02",
+        "player": "p1",
+        "difficulty": "expert",
+        "expected_max_ex": 1566,
+        "actual_max_ex": 1566,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-47-45_02",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": 1566,
+        "actual_max_ex": 1566,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-47-45_03",
+        "player": "p1",
+        "difficulty": "expert",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-19_16-47-45_03",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-47-45_03",
+        "player": "p1",
+        "difficulty": "expert",
+        "expected_max_ex": 1881,
+        "actual_max_ex": 1881,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-19_16-47-45_03",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": 1881,
+        "actual_max_ex": 1881,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-27_15-43-31_00",
+        "player": "p1",
+        "difficulty": "difficult",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-27_15-43-31_00",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-27_15-43-31_00",
+        "player": "p1",
+        "difficulty": "difficult",
+        "expected_max_ex": 1152,
+        "actual_max_ex": 1152,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-27_15-43-31_00",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": 1512,
+        "actual_max_ex": 1512,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-27_15-50-18_00",
+        "player": "p1",
+        "difficulty": "difficult",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-27_15-50-18_00",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": 1881,
+        "actual_max_ex": 1881,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-27_15-50-18_00",
+        "player": "p1",
+        "difficulty": "difficult",
+        "expected_max_ex": 1191,
+        "actual_max_ex": 1191,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-27_15-50-18_00",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": 1881,
+        "actual_max_ex": 1881,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-27_15-52-48_00",
+        "player": "p1",
+        "difficulty": "expert",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "event",
+        "sample": "2025-03-27_15-52-48_00",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": null,
+        "actual_max_ex": null,
+        "status": "chart_outside_pool",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-27_15-52-48_00",
+        "player": "p1",
+        "difficulty": "expert",
+        "expected_max_ex": 1635,
+        "actual_max_ex": 1635,
+        "status": "matched",
+        "correct": true
+      },
+      {
+        "mode": "full",
+        "sample": "2025-03-27_15-52-48_00",
+        "player": "p2",
+        "difficulty": "expert",
+        "expected_max_ex": 1635,
+        "actual_max_ex": 1635,
+        "status": "matched",
+        "correct": true
+      }
+    ]
+  },
+  "installation": {
+    "checks": [
+      {
+        "name": "venv",
+        "ok": true
+      },
+      {
+        "name": "fresh",
+        "ok": true
+      },
+      {
+        "name": "sentinel",
+        "ok": true
+      },
+      {
+        "name": "repeat",
+        "ok": true
+      },
+      {
+        "name": "existing-update",
+        "ok": true
+      },
+      {
+        "name": "repeat-update",
+        "ok": true
+      },
+      {
+        "name": "preserved",
+        "ok": true
+      },
+      {
+        "name": "wheel",
+        "ok": true
+      },
+      {
+        "name": "wheel-assets",
+        "ok": true
+      },
+      {
+        "name": "wheel-offline",
+        "ok": true
+      },
+      {
+        "name": "minimal-venv",
+        "ok": true
+      },
+      {
+        "name": "minimal-install",
+        "ok": true
+      },
+      {
+        "name": "minimal-offline",
+        "ok": true
+      },
+      {
+        "name": "browser-tools",
+        "ok": true
+      }
+    ]
+  },
+  "browser": [
+    {
+      "surface": "desktop",
+      "ok": true,
+      "checks": [
+        "opt-in",
+        "default-event",
+        "high-qos",
+        "readiness",
+        "difficulty-toggle",
+        "song-and-max-ex-rendering"
+      ]
+    },
+    {
+      "surface": "workbench",
+      "ok": true,
+      "checks": [
+        "opt-in",
+        "readiness",
+        "apply",
+        "song-and-max-ex-rendering"
+      ]
+    }
+  ],
+  "tests": {
+    "total": 365,
+    "optional_skipped": 12,
+    "real_ocr_tests": 17,
+    "powershell_assertions": 25
+  },
+  "limits": [
+    "Six held-out song groups; repeated frames and perturbations are not independent evidence.",
+    "No held-out Challenge difficulty examples and no held-out eligible-event max-EX positive.",
+    "One eligible Dia chart among the 22 replayed player charts.",
+    "Video replay decodes all frames but evaluates the recognition engine at 10 Hz and drains splash/login jobs.",
+    "WebSocket latency uses recorded stable frames at 30 Hz after warmup; no physical capture rehearsal.",
+    "Portable fingerprint equivalence tested on Windows on this host; other architectures are unqualified."
+  ]
+}

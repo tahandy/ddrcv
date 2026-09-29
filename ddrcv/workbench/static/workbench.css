@@ -143,3 +143,29 @@ code { overflow-wrap: anywhere; }
 .result-card h3 { margin-top: 0; }
 .result-card button { margin: 8px; }
 @media (max-width: 650px) { .result-card { grid-template-columns: 1fr; } }
+
+/* Song recognition has a persistent top-level panel; tab switches never restart workers. */
+#song-event-field.inactive { opacity: .45; }
+#song-event-field input:disabled { cursor: not-allowed; }
+#song-event-help { margin: 8px 0; }
+#song-settings > details { margin-top: 14px; }
+#song-settings > details > .form-grid { margin-top: 12px; }
+.catalog-facts { display: grid; grid-template-columns: 145px minmax(0, 1fr); gap: 8px 16px; margin: 12px 0; }
+.catalog-facts dt { color: var(--muted); }
+.catalog-facts dd { margin: 0; text-align: left; overflow-wrap: anywhere; }
+.catalog-version-panel > p, .catalog-storage > p { margin-top: 8px; }
+.catalog-folder { display: grid; grid-template-columns: 165px minmax(0, 1fr); margin-top: 14px; }
+.catalog-location { overflow-wrap: anywhere; }
+.catalog-sharing { margin-top: 14px; }
+.catalog-sharing li { margin: 6px 0; }
+.catalog-sharing ol { padding-left: 22px; }
+
+.tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); }
+.tabs button[aria-selected=true] { color: var(--accent); border-bottom-color: var(--accent); }
+#panel-song { max-width: 1200px; }
+#panel-song > section { border: 1px solid var(--line); padding: 16px; margin-bottom: 16px; }
+.catalog-folder input { width: 100%; }
+
+.catalog-folder .inline { display:flex; gap:8px; }
+.catalog-folder .inline input { flex:1; min-width:0; }

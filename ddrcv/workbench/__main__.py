@@ -1,3 +1,7 @@
+import os
+
+for _native_pool in ('OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'OMP_NUM_THREADS'):
+    os.environ[_native_pool] = '1'
 import argparse
 import logging
 import threading

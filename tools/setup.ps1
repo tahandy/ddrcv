@@ -4,7 +4,8 @@ param(
     [ValidateSet('desktop', 'workbench')][string]$App = 'desktop',
     [string]$Python,
     [string]$Venv = '.venv',
-    [switch]$NonInteractive
+    [switch]$NonInteractive,
+    [switch]$JacketLookup
 )
 
 $ErrorActionPreference = 'Stop'
@@ -227,7 +228,7 @@ function Install-WebView2 {
 }
 
 function Install-DDRCV {
-    param([string]$Root, [string]$Application, [string]$Interpreter, [string]$Environment)
+    param([string]$Root, [string]$Application, [string]$Interpreter, [string]$Environment, [switch]$EnableJacketLookup)
     if (-not [Environment]::Is64BitOperatingSystem) { throw 'DDRCV requires 64-bit Windows.' }
     if (-not [IO.Path]::IsPathRooted($Environment)) { $Environment = Join-Path $Root $Environment }
     # Validate before downloading or changing an existing environment.
@@ -260,8 +261,10 @@ function Install-DDRCV {
         }
         Assert-Environment $Environment $Interpreter
         Write-Host 'Installing DDRCV and its locked dependencies...'
-        Invoke-Checked $uv @('sync', '--locked', '--inexact', '--no-dev', '--extra', $Application,
-                            '--python', $venvPython, '--no-python-downloads')
+        $syncArguments = @('sync', '--locked', '--inexact', '--no-dev', '--extra', $Application,
+                           '--python', $venvPython, '--no-python-downloads')
+        if ($EnableJacketLookup) { $syncArguments += @('--extra', 'jacket-lookup') }
+        Invoke-Checked $uv $syncArguments
         # Native file dialogs are part of both applications.
         Invoke-Checked $venvPython @('-I', '-c', "import tkinter; t = tkinter.Tcl(); print('Tkinter ready: ' + t.eval('info patchlevel'))")
         if ($Application -eq 'desktop') { Install-WebView2 $venvPython $toolsDirectory }
@@ -272,6 +275,10 @@ function Install-DDRCV {
             Write-Host 'Optional ddr_score_render not found. You can select its folder in the app later.'
         }
         Invoke-Checked $venvPython @('-B', '-m', 'ddrcv.ocr.check', '--provision')
+        if ($EnableJacketLookup) {
+            Invoke-Checked $venvPython @('-B', '-m', 'ddrcv.jacket_lookup', 'prepare')
+            Invoke-Checked $venvPython @('-B', '-m', 'ddrcv.jacket_lookup', 'check')
+        }
         Invoke-Checked $venvPython @('-B', '-m', "ddrcv.$Application", '--check')
         Write-Host ''
         Write-Host "Setup complete. Environment: $Environment" -ForegroundColor Green
@@ -302,7 +309,7 @@ if ($MyInvocation.InvocationName -ne '.') {
             }
             $Python = $selection.Python
         }
-        Install-DDRCV -Root $root -Application $App -Interpreter $Python -Environment $Venv
+        Install-DDRCV -Root $root -Application $App -Interpreter $Python -Environment $Venv -EnableJacketLookup:$JacketLookup
         exit 0
     } catch {
         Write-Host "Setup failed: $_" -ForegroundColor Red

@@ -1,0 +1,258 @@
+{
+  "schema": 1,
+  "method": "WORLD difficulty label templates; no digit recognition",
+  "thresholds": {
+    "score": 0.56,
+    "margin": 0.02
+  },
+  "bank_sha256": "0e5dae5679feec15333ad92213788df3eae0f373936e20224b09e1a8f02a3e55",
+  "phases": {
+    "sa:8DO8obP1b669b9QI6q01609bPOdd1o1b": "calibration",
+    "sa:I6dI99IOolDD6l6Q1ooPIiDO8Odq0QIP": "calibration",
+    "sa:QbdQold98oq9lODoIloIbPiIqld6i0Qb": "template_source",
+    "sa:D686d06lO9IID8D0boPq0Pd8P89idO99": "template_source",
+    "sa:69b01qbo8Qdi6liOPq091bqo01i16oQ9": "template_source",
+    "sa:b86i9lPlObdl1008PO0PIi09q9o9l88i": "evaluation",
+    "sa:ODq019O9o1OPdq9PiPl0o8D8DQ8bid88": "template_source",
+    "sa:Db6odqIqQ90PIDIlD1DIb8l09ol6qIDl": "evaluation",
+    "sa:0b8lD690qQO1bDOib1IqiO0OO169o9IQ": "evaluation",
+    "sa:o1d0DDobPPPlq0l8Qli1d6ODI8ldo1qb": "evaluation",
+    "sa:odlOiO6di119680QOoOo8dO8IO0DliI9": "evaluation"
+  },
+  "template_cold_seconds": 0.0017145000165328383,
+  "ocr_cold_seconds": 0.42472049995558336,
+  "template_bytes": 2693,
+  "timing_protocol": "CPU, one OpenCV/BLAS/ORT thread, warm, interleaved methods, alternating order",
+  "independent_evaluation_songs": 5,
+  "template": {
+    "clean": {
+      "queries": 10,
+      "positive": 10,
+      "accepted": 10,
+      "correct": 10,
+      "false_accepts": 0,
+      "coverage": 1.0,
+      "precision": 1.0,
+      "top1": 1.0
+    },
+    "negative": {
+      "queries": 12,
+      "positive": 0,
+      "accepted": 0,
+      "correct": 0,
+      "false_accepts": 0,
+      "coverage": null,
+      "precision": null,
+      "top1": null
+    },
+    "synthetic": {
+      "queries": 60,
+      "positive": 60,
+      "accepted": 50,
+      "correct": 50,
+      "false_accepts": 0,
+      "coverage": 0.8333333333333334,
+      "precision": 1.0,
+      "top1": 1.0
+    },
+    "withheld": {
+      "queries": 10,
+      "positive": 0,
+      "accepted": 0,
+      "correct": 0,
+      "false_accepts": 0,
+      "coverage": null,
+      "precision": null,
+      "top1": null
+    }
+  },
+  "ocr": {
+    "clean": {
+      "queries": 10,
+      "positive": 10,
+      "accepted": 10,
+      "correct": 10,
+      "false_accepts": 0,
+      "coverage": 1.0,
+      "precision": 1.0,
+      "top1": 1.0
+    },
+    "negative": {
+      "queries": 12,
+      "positive": 0,
+      "accepted": 0,
+      "correct": 0,
+      "false_accepts": 0,
+      "coverage": null,
+      "precision": null,
+      "top1": null
+    },
+    "synthetic": {
+      "queries": 60,
+      "positive": 60,
+      "accepted": 60,
+      "correct": 60,
+      "false_accepts": 0,
+      "coverage": 1.0,
+      "precision": 1.0,
+      "top1": 1.0
+    }
+  },
+  "template_source_checks": {
+    "clean": {
+      "queries": 8,
+      "positive": 8,
+      "accepted": 8,
+      "correct": 8,
+      "false_accepts": 0,
+      "coverage": 1.0,
+      "precision": 1.0,
+      "top1": 1.0
+    }
+  },
+  "modes": {
+    "full": {
+      "template": {
+        "total_ms": {
+          "n": 220,
+          "median": 11.601350008277223,
+          "p95": 16.170559992315248,
+          "p99": 23.115971979568716,
+          "maximum": 30.470400000922382
+        },
+        "difficulty_ms": {
+          "n": 220,
+          "median": 2.9061500099487603,
+          "p95": 4.0128399938112125,
+          "p99": 5.59428298729472,
+          "maximum": 8.119000005535781
+        },
+        "all_player_checks": 22,
+        "all_difficulties_correct": 22,
+        "all_complete_correct": 22,
+        "false_max_ex": 0,
+        "evaluation_player_checks": 10,
+        "evaluation_complete_correct": 10
+      },
+      "ocr": {
+        "total_ms": {
+          "n": 220,
+          "median": 48.65030001383275,
+          "p95": 66.85607497056475,
+          "p99": 119.7834579763003,
+          "maximum": 132.9480999847874
+        },
+        "difficulty_ms": {
+          "n": 220,
+          "median": 40.05989999859594,
+          "p95": 57.95786999515258,
+          "p99": 102.45824602374346,
+          "maximum": 110.16140005085617
+        },
+        "all_player_checks": 22,
+        "all_difficulties_correct": 22,
+        "all_complete_correct": 22,
+        "false_max_ex": 0,
+        "evaluation_player_checks": 10,
+        "evaluation_complete_correct": 10
+      }
+    },
+    "event": {
+      "template": {
+        "total_ms": {
+          "n": 220,
+          "median": 9.778200008440763,
+          "p95": 17.972460007877086,
+          "p99": 23.342331998283047,
+          "maximum": 26.51599998353049
+        },
+        "difficulty_ms": {
+          "n": 220,
+          "median": 1.4244499616324902,
+          "p95": 2.6699749927502117,
+          "p99": 3.557641002698802,
+          "maximum": 4.048899980261922
+        },
+        "all_player_checks": 22,
+        "all_difficulties_correct": 22,
+        "all_complete_correct": 22,
+        "false_max_ex": 0,
+        "evaluation_player_checks": 10,
+        "evaluation_complete_correct": 10
+      },
+      "ocr": {
+        "total_ms": {
+          "n": 220,
+          "median": 48.44515002332628,
+          "p95": 79.63781498838215,
+          "p99": 92.02654002700002,
+          "maximum": 110.03860004711896
+        },
+        "difficulty_ms": {
+          "n": 220,
+          "median": 39.94729998521507,
+          "p95": 66.64940003538503,
+          "p99": 79.94109498744366,
+          "maximum": 98.02869998384267
+        },
+        "all_player_checks": 22,
+        "all_difficulties_correct": 22,
+        "all_complete_correct": 22,
+        "false_max_ex": 0,
+        "evaluation_player_checks": 10,
+        "evaluation_complete_correct": 10
+      }
+    }
+  },
+  "transitions": {
+    "annotation": "Visually reviewed all 44 ROIs. Entry labels fade in; exits have no readable label. Same-event stress cases, not independent songs.",
+    "evaluation": {
+      "empty_exit": {
+        "queries": 10,
+        "positive": 0,
+        "accepted": 0,
+        "correct": 0,
+        "false_accepts": 0,
+        "coverage": null,
+        "precision": null,
+        "top1": null
+      },
+      "fading_entry": {
+        "queries": 10,
+        "positive": 10,
+        "accepted": 0,
+        "correct": 0,
+        "false_accepts": 0,
+        "coverage": 0.0,
+        "precision": null,
+        "top1": 0.3
+      }
+    },
+    "all_phases": {
+      "empty_exit": {
+        "queries": 22,
+        "positive": 0,
+        "accepted": 0,
+        "correct": 0,
+        "false_accepts": 0,
+        "coverage": null,
+        "precision": null,
+        "top1": null
+      },
+      "fading_entry": {
+        "queries": 22,
+        "positive": 22,
+        "accepted": 0,
+        "correct": 0,
+        "false_accepts": 0,
+        "coverage": 0.0,
+        "precision": null,
+        "top1": 0.18181818181818182
+      }
+    }
+  },
+  "validation": {
+    "focused_tests": 25,
+    "offline_real_splash_with_ocr_imports_blocked": true
+  }
+}

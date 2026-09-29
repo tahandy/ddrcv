@@ -41,10 +41,9 @@ def default_config():
                 'login'
             ]
         },
-        "jacket_database": {
-            "prebuilt_database": r'/home/tim/persistent/database/db_effnetb0-20241126.pkl',
-            "cache_dir": r'/home/tim/persistent/database/cache'
-        },
+        "song_lookup": {"enabled": False, "mode": "event", "event": "dia_del_ritmo_26",
+                        "style": "single", "catalog_file": None, "assets_dir": None, "difficulty_method": "template",
+                        "high_qos": True},
         "results": {
             "enabled": True,
             "parse_names": True,
@@ -96,6 +95,10 @@ def normalize_config(overrides):
     if not isinstance(overrides, dict):
         raise ValueError('Configuration must be a JSON object')
     overrides = normalize_score_mode(overrides)
+    if 'jacket_database' in overrides:
+        import logging
+        logging.getLogger(__name__).warning('Ignoring obsolete jacket_database configuration; prepare song_lookup assets to enable recognition')
+        overrides.pop('jacket_database')
     legacy = overrides.get('results', {})
     if isinstance(legacy, dict):
         if 'outbox_directory' not in legacy and legacy.get('screenshot_directory'):
@@ -125,7 +128,7 @@ def validate_config(overrides):
     """Validate without opening capture or connecting integrations."""
     config = normalize_config(overrides)
     for section in ('ingest', 'publish', 'debounce', 'score_filter', 'score_extractor',
-                    'state', 'results', 'player_names', 'driver_debug', 'obs', 'renderer'):
+                    'state', 'results', 'player_names', 'song_lookup', 'driver_debug', 'obs', 'renderer'):
         if not isinstance(config[section], dict):
             raise ValueError(f'{section} must be an object')
     ingest = config['ingest']
@@ -168,6 +171,8 @@ def validate_config(overrides):
     StateDebouncer(**config['debounce'])
     for key in ('confirm_seconds', 'unknown_seconds', 'max_frame_gap', 'min_fraction'):
         number(config['debounce'][key], 'debounce.' + key, 0)
+    from ddrcv.jacket_lookup.config import validate_config as validate_song_lookup
+    config['song_lookup'] = validate_song_lookup(config['song_lookup'])
     result = config['results']
     from ddrcv.state.player_names import validate_config as validate_names
     config['player_names'] = validate_names(config['player_names'])

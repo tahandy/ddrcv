@@ -334,7 +334,7 @@ class NamesIntegrationTests(unittest.TestCase):
             service = PlayerNameService(dict(enabled=True), reader=reader)
             runtime = RuntimeTests().make_runtime(tmp)
             runtime.engine.matcher.match.return_value = ('song_splash', dict(p1_present=True, p2_present=True))
-            with patch('ddrcv.apps.tournament_runtime.PlayerNameService', return_value=service):
+            with patch('ddrcv.state.player_names.PlayerNameService', return_value=service):
                 runtime.start()
                 try:
                     self.assertTrue(entered.wait(2))
@@ -366,7 +366,7 @@ class NamesIntegrationTests(unittest.TestCase):
             service = PlayerNameService(dict(enabled=True), reader=reader)
             runtime = RuntimeTests().make_runtime(tmp)
             runtime.engine.matcher.match.return_value = ('song_splash', dict(p1_present=True, p2_present=True))
-            with patch('ddrcv.apps.tournament_runtime.PlayerNameService', return_value=service):
+            with patch('ddrcv.state.player_names.PlayerNameService', return_value=service):
                 runtime.start()
                 try:
                     self.assertTrue(entered.wait(3))
@@ -390,7 +390,7 @@ class NamesIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             engine = make_engine()
             engine.matcher.match.return_value = ('song_splash', dict(p1_present=True, p2_present=True))
-            with patch('ddrcv.workbench.controller.PlayerNameService', return_value=service):
+            with patch('ddrcv.state.player_names.PlayerNameService', return_value=service):
                 wb = Workbench(tmp, engine=engine, start_publisher=False)
             try:
                 wb.kind = 'video'
