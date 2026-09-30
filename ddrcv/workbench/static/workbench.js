@@ -316,7 +316,7 @@ async function poll() {
     text('song-title', song ? song.title + (song.artist ? ' · ' + song.artist : '') : 'Song: —');
     text('song-charts', ['p1', 'p2'].map(p => {
       const chart = song?.charts?.[p];
-      return p.toUpperCase() + ': ' + (chart ? chart.difficulty + ' · Max EX ' + (chart.max_ex ?? 'unavailable') : '—');
+      return p.toUpperCase() + ': ' + (chart ? chart.difficulty + ' · ' + chartExplanation(chart) : '—');
     }).join(' · '));
     showCatalogStatus(s.catalog_preparation || {}, s.song_lookup_status || {});
     const names = s.player_name_status || {};
@@ -383,24 +383,89 @@ function songConfig() {
     difficulty_method: $('song-difficulty').value, catalog_file: $('song-assets').value || null,
     high_qos: $('song-qos').checked};
 }
-for (const operation of ['prepare', 'refresh', 'check']) bind('song-' + operation,
-  () => { catalogOperationKey = catalogKey(); return action('song_' + operation, {config: songConfig()}); });
-bind('song-apply', () => action('song_lookup', {config: songConfig()}));
-
 const catalogConfig = songConfig;
+function catalogEnvironment() {
+  const runtime = current?.song_lookup_status || {}, source = current?.source || {};
+  const running = !!source.kind && current?.phase !== 'Simulation';
+  return {runtime, applied: current?.settings?.song_lookup || {}, running, starting: false,
+    readyText: 'Ready to apply — use Apply / reset recognition below.',
+    appliedText: 'Recognition configured — open a camera or video on Playback and setup.',
+    pendingText: 'Changes pending — use Apply / reset recognition.',
+    activeText: source.kind === 'image' ? 'Still image diagnostics — use video or a camera for live confirmation.' : !current?.playing ? 'Recognition ready — resume playback to read song splashes.' : null,
+    button: 'Apply / reset recognition', help: 'Applies song settings and resets recognition and current tracking. ' +
+      (!source.kind || current?.phase === 'Simulation' ? 'Then use Playback and setup to open a camera or video.' :
+       source.kind === 'image' ? 'A still image is diagnostic only; open a video or camera on Playback for live confirmation.' :
+       !current?.playing ? 'Playback is paused; use Play on Playback and setup to continue.' : 'Recognition uses the next song splash.')};
+}
 function requestCatalogInfo(cfg) { return action('song_info', {config: cfg}); }
-
-// Catalog inspection is metadata-only, debounced, and separate from running recognition.
-let catalogTimer = null, catalogEpoch = 0, catalogOperationKey = null, catalogOperationState = '';
+async function buildCatalog() { showCatalogStatus(await action('song_build', {config: songConfig()}), current?.song_lookup_status || {}); }
+function selectCatalogFields(selected) {
+  for (const [id, key] of [['song-assets', 'catalog_file'], ['song-mode', 'mode'], ['song-event', 'event']]) $(id).value = selected[key] ?? '';
+  queueCatalogInfo(0);
+}
+bind('song-build', () => catalogAction(buildCatalog));
+bind('song-apply', async () => {
+  catalogActivating = true; renderCatalogState(); $('song-activation-error').hidden = true;
+  try { await action('song_lookup', {config: songConfig()}); await poll(); }
+  catch (e) { $('song-activation-error').textContent = e.message; $('song-activation-error').hidden = false; throw e; }
+  finally { catalogActivating = false; renderCatalogState(); }
+});
+// Catalog status belongs to the backend; the panel only holds the current inspection.
+let catalogTimer = null, catalogEpoch = 0, catalogOperationState = '';
+let catalogRequestPending = false, catalogActivating = false, catalogLastOperation = {};
+let catalogInfo = null, catalogLastRead = 0, catalogReading = 0, catalogCoverageKey = '';
+let catalogCommandError = null;
+const catalogReasons = {
+  unsupported_identity: 'Song is not in the supported artwork library',
+  unsupported_artwork: 'Artwork is not supported by this DDRCV version',
+  ambiguous_artwork: 'Shared jacket — automatic song identification unavailable',
+  duplicate_title_ids: 'Multiple catalog IDs for this title — automatic song identification unavailable',
+  shared_jacket: 'Jacket shared by multiple songs or variants — automatic song identification unavailable',
+  chart_outside_pool: 'Outside selected pool — check the event or use Full WORLD',
+  missing_max_ex: 'Max EX missing from the catalog',
+  ambiguous_chart: 'Ambiguous chart match', song_unconfirmed: 'Waiting for song confirmation'
+};
+function chartExplanation(chart) { return chart.max_ex != null ? 'Max EX ' + chart.max_ex : catalogReasons[chart.status] || 'Max EX unavailable'; }
+function eventSlug(value) {
+  try { if (value.includes('://')) return new URL(value).hash.replace(/^#game-/, ''); } catch {}
+  return value;
+}
 function catalogKey() {
-  const cfg = catalogConfig();
-  return JSON.stringify([cfg.mode, cfg.event, cfg.catalog_file, cfg.assets_dir, cfg.difficulty_method]);
+  const c = catalogConfig();
+  return JSON.stringify([c.mode, c.mode === 'event' ? eventSlug(c.event) : null, c.catalog_file || null, c.assets_dir || null, c.difficulty_method]);
+}
+function settingsKey(c = {}) {
+  return JSON.stringify([!!c.enabled, c.mode, c.mode === 'event' ? eventSlug(c.event || '') : null,
+    c.catalog_file || null, c.assets_dir || null, c.style, c.difficulty_method, c.high_qos]);
+}
+function bundleKey(info) { return info ? [info.bundle, info.gallery, info.selection_sha256].map(v => v || '').join(':') : null; }
+function catalogName(c) {
+  if (c.mode === 'full') return 'Full DDR / WORLD';
+  const event = eventSlug(c.event || '');
+  return event === 'dia_del_ritmo_26' ? 'Dia Del Ritmo 2026 (dia_del_ritmo_26)' : event || 'Choose an event';
+}
+function catalogBusy() { return catalogRequestPending || ['preparing', 'checking'].includes(catalogLastOperation.phase); }
+function catalogButtons() {
+  const busy = catalogBusy();
+  for (const id of ['song-build', 'song-load', 'song-build-default', 'song-use-loaded']) $(id).disabled = busy;
+  $('song-build').disabled = busy || !!catalogInfo?.selection_mismatch;
+}
+async function catalogAction(task) {
+  if (catalogBusy()) return;
+  catalogRequestPending = true;
+  catalogCommandError = null;
+  catalogButtons();
+  try { await task(); }
+  catch (e) { catalogCommandError = {key: catalogKey(), message: e.message}; throw e; }
+  finally { catalogRequestPending = false; renderCatalogState(); }
 }
 function catalogMode() {
   const full = $('song-mode').value === 'full';
   $('song-event').disabled = full;
   $('song-event-field').classList.toggle('inactive', full);
-  $('song-event-help').hidden = !full;
+  $('song-event-help').textContent = full ? 'Full DDR uses WORLD charts; an event is not needed.' : 'Selected event: ' + catalogName(catalogConfig()) + '. Change this if you are running another event.';
+  $('song-event-link').hidden = full;
+  $('song-pool-help').hidden = full;
 }
 function catalogDate(value) {
   if (!value) return 'Not recorded';
@@ -408,10 +473,8 @@ function catalogDate(value) {
   return Number.isNaN(date.valueOf()) ? String(value) : date.toLocaleString();
 }
 function showCatalogInfo(info) {
+  catalogInfo = info;
   $('song-storage-path').textContent = info.catalog_file || '—';
-  $('song-catalog-state').textContent = info.available ?
-    (info.event || 'WORLD') + ' · ' + info.unsupported_count + ' unsupported charts' +
-    (info.needs_conversion ? ' · Folder catalog: Prepare converts it offline.' : '') : info.error || 'No prepared catalog';
   const link = $('song-catalog-version');
   link.textContent = info.available ? info.commit.slice(0, 12) : '—';
   link.title = info.commit || '';
@@ -419,47 +482,82 @@ function showCatalogInfo(info) {
   else link.removeAttribute('href');
   $('song-catalog-updated').textContent = info.available ? catalogDate(info.dataset_updated_at) : '—';
   $('song-catalog-prepared').textContent = info.available ? catalogDate(info.packed_at || info.prepared_at) : '—';
-  $('song-gallery-version').textContent = info.available ?
-    info.gallery_commit.slice(0, 12) + ' · ' + info.gallery.slice(0, 12) : '—';
-  $('song-gallery-version').title = info.available ? 'Source commit: ' + info.gallery_commit + '\nGallery fingerprint: ' + info.gallery : '';
+  $('song-gallery-version').textContent = info.available ? info.gallery_commit.slice(0, 12) + ' · ' + info.gallery.slice(0, 12) : '—';
+  const warnings = info.coverage?.warnings || [];
+  $('song-coverage').hidden = !warnings.length;
+  $('song-coverage-summary').textContent = `Coverage warnings (${warnings.length}) — affected songs and charts`;
+  const coverageKey = JSON.stringify(warnings);
+  if (catalogCoverageKey !== coverageKey) {
+    catalogCoverageKey = coverageKey;
+    $('song-coverage-list').replaceChildren(...warnings.map(item => {
+      const li = document.createElement('li');
+      li.textContent = [item.title, item.artist, item.style, item.difficulty].filter(Boolean).join(' · ') + ': ' + (catalogReasons[item.detail] || catalogReasons[item.reason] || 'Recognition unavailable');
+      return li;
+    }));
+  }
+  $('song-mismatch').hidden = !info.selection_mismatch;
+  if (info.selection_mismatch) $('song-mismatch-message').textContent = 'Loaded file: ' + catalogName(info.selection_mismatch) + '. Your selection: ' + catalogName(catalogConfig()) + '.';
+  renderCatalogState();
 }
-function queueCatalogInfo(delay = 200) {
+function queueCatalogInfo(delay = 200, keep = false) {
   catalogMode();
   clearTimeout(catalogTimer);
-  const epoch = ++catalogEpoch;
-  const cfg = catalogConfig();
-  showCatalogInfo({error: 'Reading catalog information…'});
+  const epoch = ++catalogEpoch, key = catalogKey(), cfg = catalogConfig();
+  if (!keep) { catalogInfo = null; $('song-mismatch').hidden = true; $('song-coverage').hidden = true; renderCatalogState(); }
   catalogTimer = setTimeout(async () => {
+    catalogTimer = null; catalogReading++;
     try {
       const info = await requestCatalogInfo(cfg);
-      if (epoch === catalogEpoch) showCatalogInfo(info);
+      if (epoch === catalogEpoch && key === catalogKey()) showCatalogInfo(info);
     } catch (e) {
-      if (epoch === catalogEpoch) showCatalogInfo({error: e.message});
-    }
+      if (epoch === catalogEpoch && key === catalogKey()) showCatalogInfo({error: e.message});
+    } finally { catalogReading--; catalogLastRead = Date.now(); }
   }, delay);
 }
-function showCatalogStatus(operation, runtime) {
-  const key = catalogKey();
+function renderCatalogState() {
+  const c = catalogConfig(), env = catalogEnvironment(), runtime = env.runtime;
+  const info = catalogInfo, operation = catalogLastOperation;
+  const sameBundle = !!info?.available && bundleKey(runtime.catalog) === info.catalog_identity && runtime.catalog_stamp === info.catalog_stamp;
+  const sameSettings = settingsKey(c) === settingsKey(env.applied);
+  const loaded = sameBundle && ['ready', 'recognizing', 'confirmed'].includes(runtime.phase);
+  const verified = info?.validated || (loaded && sameSettings);
+  const warnings = info?.coverage?.warnings?.length || 0;
+  $('song-catalog-state').textContent = !info ? 'Reading catalog information…' : info.available ?
+    catalogName(info) + ' · ' + (verified ? (warnings ? 'Ready with coverage warnings' : 'Catalog validated') : 'Catalog found — checked when activated') +
+    (!verified && warnings ? ' · Coverage warnings' : '') : info.error || 'Build or load a catalog to continue.';
+  const relevant = !!info?.selection_key && operation.selection_key === info.selection_key;
   const busy = ['preparing', 'checking'].includes(operation.phase);
-  const relevant = catalogOperationKey === key;
-  $('song-readiness').textContent = relevant || busy ?
-    operation.error || operation.message || (operation.ok ? 'Ready. Apply to activate this catalog.' : 'Catalog: ' + (operation.phase || 'unchecked')) :
-    'Check readiness before applying this selection.';
-  for (const id of ['song-prepare', 'song-refresh', 'song-check']) $(id).disabled = busy;
-  const version = runtime.catalog;
-  $('song-active-version').textContent = version ?
-    'Active session: ' + (version.event || 'WORLD') + ' · ' + version.commit.slice(0, 12) + ' · ' + (runtime.phase || 'ready') +
-    (runtime.error ? ' · ' + runtime.error : '') : 'Active session: recognition is not running.';
+  const commandError = catalogCommandError?.key === catalogKey() ? catalogCommandError.message : '';
+  $('song-operation').hidden = !(commandError || busy || (relevant && operation.error));
+  $('song-operation').textContent = commandError || (busy ? (relevant ? operation.message || (operation.phase === 'preparing' ? 'Building catalog…' : 'Validating catalog…') : 'Catalog preparation is running for another selection.') :
+    relevant && operation.error ? operation.error + (info?.available ? ' The previous catalog remains available.' : '') : '');
+  let readiness;
+  if (!c.enabled) readiness = env.applied.enabled ? 'Changes pending — apply to disable recognition.' : 'Recognition disabled — enable it above when your catalog is prepared.';
+  else if (!info) readiness = 'Reading the selected catalog…';
+  else if (!info.available) readiness = info.selection_mismatch ? 'Resolve the catalog selection in step 2.' : 'Prepare a catalog in step 2 before activating recognition.';
+  else if (runtime.error && sameSettings) readiness = 'Recognition error: ' + runtime.error;
+  else if (loaded && sameSettings) readiness = env.running ? env.activeText || (runtime.phase === 'confirmed' ? 'Recognition active — song confirmed.' : 'Recognition active — waiting for a song splash.') : env.appliedText;
+  else if (env.running || (env.applied.enabled && runtime.catalog)) readiness = env.pendingText;
+  else readiness = env.readyText;
+  $('song-readiness').textContent = readiness;
+  $('song-active-version').textContent = runtime.error ? 'Active session error: ' + runtime.error : runtime.catalog && env.applied.enabled && !['closed', 'disabled'].includes(runtime.phase) ?
+    'Applied catalog: ' + catalogName(runtime.catalog) + (!sameBundle && info?.available ? ' · The selected file differs; apply to use it.' : '') + (!env.running ? ' · Camera/video is stopped.' : '') : 'Active session: recognition is not running.';
+  $('song-apply').textContent = env.button;
+  $('song-activation-help').textContent = env.help;
+  $('song-apply').disabled = catalogActivating || env.starting || (c.enabled && (catalogBusy() || !info?.available)) || (!c.enabled && !env.applied.enabled);
+  catalogButtons();
+}
+function showCatalogStatus(operation, runtime) {
+  catalogLastOperation = operation;
+  renderCatalogState();
   const state = JSON.stringify(operation);
   if (state !== catalogOperationState) {
     catalogOperationState = state;
-    if (relevant && !busy) queueCatalogInfo(0);
-  }
+    if (!['preparing', 'checking'].includes(operation.phase)) queueCatalogInfo(0, true);
+  } else if ($('tab-song').getAttribute('aria-selected') === 'true' && Date.now() - catalogLastRead > 3000 && !catalogTimer && !catalogReading) queueCatalogInfo(0, true);
 }
-for (const id of ['song-mode', 'song-event', 'song-assets']) $(id).addEventListener('input', () => {
-  catalogOperationKey = null;
-  queueCatalogInfo();
-});
+for (const id of ['song-mode', 'song-event', 'song-assets', 'song-difficulty']) $(id).addEventListener('input', () => queueCatalogInfo());
+for (const id of ['song-enabled', 'song-style', 'song-qos']) $(id).addEventListener('change', renderCatalogState);
 
 const tabs = [...document.querySelectorAll('[role="tab"]')];
 function selectTab(tab) {
@@ -485,11 +583,22 @@ for (const tab of tabs) {
   });
 }
 
-bind('song-browse', async () => {
+bind('song-load', () => catalogAction(async () => {
   const data = await post('/api/browse', {catalog: true});
-  if (data.path) {
-    $('song-assets').value = data.path;
-    catalogOperationKey = null;
-    queueCatalogInfo(0);
-  }
-});
+  if (!data.path) return;
+  const epoch = ++catalogEpoch;
+  const selected = await action('song_file_config', {config: songConfig(), path: data.path});
+  if (epoch !== catalogEpoch) return;
+  selectCatalogFields(selected);
+  showCatalogStatus(await action('song_check', {config: selected}), current?.song_lookup_status || {});
+}));
+bind('song-build-default', () => catalogAction(async () => {
+  selectCatalogFields({...songConfig(), catalog_file: null}); await buildCatalog();
+}));
+bind('song-use-loaded', () => catalogAction(async () => {
+  const epoch = ++catalogEpoch;
+  const selected = await action('song_file_config', {config: songConfig(), path: catalogInfo?.catalog_file || $('song-assets').value});
+  if (epoch !== catalogEpoch) return;
+  selectCatalogFields(selected);
+  showCatalogStatus(await action('song_check', {config: selected}), current?.song_lookup_status || {});
+}));

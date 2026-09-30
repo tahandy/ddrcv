@@ -64,10 +64,13 @@ def create_app(desk, token, open_panel=None, shutdown=None):
     def action():
         args = request.get_json()
         name = args['action']
+        if name == 'song_file_config':
+            from ddrcv.jacket_lookup.assets import config_for_file
+            return jsonify(config_for_file(args['config'], args['path']))
         if name == 'song_info':
             return jsonify(desk.catalog_preparation.describe(args['config']))
-        if name in ('song_prepare', 'song_refresh', 'song_check'):
-            return jsonify(desk.prepare_song_lookup(prepare=name != 'song_check', refresh=name == 'song_refresh'))
+        if name in ('song_build', 'song_prepare', 'song_refresh', 'song_check'):
+            return jsonify(desk.prepare_song_lookup(config=args.get('config'), prepare=name != 'song_check', refresh=name in ('song_build', 'song_refresh')))
         if name == 'start':
             return jsonify(desk.start())
         if name == 'stop':

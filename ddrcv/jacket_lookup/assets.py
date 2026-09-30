@@ -1,12 +1,13 @@
 """Explicit provisioning and immutable, offline runtime bundles."""
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import json
 import os
 from pathlib import Path
 from uuid import uuid4
 
 from . import catalog
-from .config import assets_root, catalog_path, selection_key, validate_config
+from .config import assets_root, catalog_path, catalog_stamp, inspection_key, selection_key, validate_config
 from .archive import CatalogArchive, write_archive
 from .features import build_index, PortableEncoder
 from .lookup import Lookup
@@ -203,6 +204,55 @@ def version_info(selection, pointer):
                 selection_sha256=pointer['selection_sha256'])
 
 
+def config_for_file(config, path):
+    """Read a portable file's selection without loading its gallery or using the network."""
+    if not isinstance(path, str) or not path.strip() or Path(path).suffix.lower() != '.ddrcatalog':
+        raise ValueError('Choose a .ddrcatalog file')
+    cfg = {**(config or {}), 'catalog_file': path}
+    with _archive(path) as archive:
+        data = archive.selection['catalog']
+        cfg['mode'] = data['mode']
+        if data['mode'] == 'event':
+            cfg['event'] = data['event']
+    return validate_config(cfg)
+
+
+def catalog_identity(info):
+    return ':'.join(str(info.get(key) or '') for key in ('bundle', 'gallery', 'selection_sha256'))
+
+
+def coverage_info(selection, gallery=None):
+    """Operator-facing coverage derived from existing metadata, without loading images."""
+    records = selection['catalog']['records']
+    by_id = {row['record_id']: row for row in records}
+    warnings = []
+    for item in selection['unsupported']:
+        row = by_id.get(item['record_id'], {})
+        warnings.append({**item, 'title': row.get('name', item['record_id']), 'artist': row.get('artist', '')})
+    blocked = set(selection['blocked_song_ids'])
+    shared_entries = {}
+    for entry in (gallery or {}).get('entries', []):
+        if len(entry['songs']) > 1:
+            for sid in entry['songs']:
+                shared_entries.setdefault(sid, []).append(entry)
+    seen = set()
+    for row in records:
+        if row['song_id'] in blocked and row['song_id'] not in seen:
+            entries = shared_entries.get(row['song_id'], [])
+            same_title = entries and all(
+                catalog.normalize(name) == catalog.normalize(row['name'])
+                for entry in entries for name in entry['songs'].values())
+            warnings.append(dict(title=row['name'], artist=row.get('artist', ''), reason='ambiguous_artwork',
+                                 detail='duplicate_title_ids' if same_title else 'shared_jacket'))
+            seen.add(row['song_id'])
+        for chart in row['charts']:
+            if chart['max_ex'] is None and not chart.get('unavailable_reason'):
+                warnings.append(dict(title=row['name'], artist=row.get('artist', ''),
+                                     style=chart['style'], difficulty=chart['difficulty'], reason='missing_max_ex'))
+    warnings.sort(key=lambda item: (item['title'].casefold(), item.get('style', ''), item.get('difficulty', ''), item['reason']))
+    return dict(unsupported_count=len(selection['unsupported']), ambiguous_songs=len(blocked), warnings=warnings)
+
+
 def describe(config=None):
     """Inspect prepared metadata offline without loading image arrays or OCR.
 
@@ -213,26 +263,35 @@ def describe(config=None):
     root = assets_root(cfg)
     destination = catalog_path(cfg)
     info = dict(available=False, assets_dir=str(root), catalog_file=str(destination),
-                mode=cfg['mode'], event=cfg['event'])
+                mode=cfg['mode'], event=cfg['event'], selection_key=inspection_key(cfg))
     try:
         if destination.exists():
             with _archive(destination) as archive:
                 selection, pointer = archive.selection, archive.pointer()
+                gallery = json.loads(archive.read('gallery/index.json')) if selection['blocked_song_ids'] else None
             storage_format = 'ddrcatalog'
-            _matches(selection, cfg)
+            stored = selection['catalog']
+            if stored['mode'] != cfg['mode'] or (cfg['mode'] == 'event' and stored['event'] != cfg['event']):
+                info.update(error_code='selection_mismatch',
+                            selection_mismatch=dict(mode=stored['mode'], event=stored['event']),
+                            error='This file contains a different catalog. Choose which selection to use below.')
+                return info
         elif cfg['catalog_file']:
             raise FileNotFoundError(destination)
         else:
             pointer = catalog.read_json(root / 'active' / (selection_key(cfg) + '.json'))
             selection = _selection(root, pointer, cfg)
             storage_format = 'directory'
+            gallery = (catalog.read_json(root / 'galleries' / pointer['gallery'] / 'index.json')
+                       if selection['blocked_song_ids'] else None)
         info.update(version_info(selection, pointer), available=True, storage_format=storage_format,
                     needs_conversion=storage_format == 'directory',
-                    unsupported_count=len(selection['unsupported']))
+                    unsupported_count=len(selection['unsupported']), coverage=coverage_info(selection, gallery))
+        info['catalog_identity'] = catalog_identity(info)
     except FileNotFoundError:
-        info['error'] = 'No prepared catalog file at this location'
+        info.update(error_code='missing', error='No prepared catalog file at this location')
     except Exception as exc:
-        info['error'] = str(exc)
+        info.update(error_code='invalid', error=str(exc))
     return info
 
 
@@ -248,6 +307,7 @@ def _load(root, pointer, config):
 
 def load(config=None):
     cfg = validate_config(config)
+    stamp = catalog_stamp(cfg)
     root = assets_root(cfg)
     destination = catalog_path(cfg)
     if destination.exists() or cfg['catalog_file']:
@@ -260,16 +320,22 @@ def load(config=None):
         DifficultyTemplates(PACKAGE_ASSETS / 'templates')
     else:
         lookup._get_recognizer().warmup()
+    lookup._catalog_stamp = stamp if stamp == catalog_stamp(cfg) else None
     return lookup
 
 
 def check(config=None):
     cfg = validate_config(config)
     try:
+        stamp = catalog_stamp(cfg)
         lookup = load(cfg)
+        if stamp != catalog_stamp(cfg):
+            raise ValueError('Catalog changed during validation; try again')
         data = lookup.selection['catalog']
         return dict(ok=True, phase='ready', mode=data['mode'], event=data['event'],
                     commit=data['commit'], gallery=lookup.bundle_info['gallery'],
+                    selection_key=inspection_key(cfg), catalog_stamp=stamp,
+                    catalog_identity=catalog_identity(lookup.bundle_info), coverage=coverage_info(lookup.selection, lookup.meta),
                     unsupported=lookup.selection['unsupported'],
                     ambiguous_songs=len(lookup.selection['blocked_song_ids']),
                     catalog_info={**lookup.bundle_info, 'catalog_file': str(catalog_path(cfg)),

@@ -7,21 +7,54 @@ or Results/Discord delivery.
 
 ## Enable it
 
-Run the optional setup once, including when updating an existing compatible venv:
+After normal application setup, open **Song recognition**. Both Desktop and
+Workbench use **Choose → Prepare → Activate**:
 
-    setup_desktop.bat -JacketLookup
+1. **Choose your catalog.** Select **DDRCardDraw event pool** or **Full DDR / WORLD
+   charts**. The event field accepts a DDRCardDraw slug or an event link such as
+   `https://ddr.tools/#game-dia_del_ritmo_26`, available from
+   [ddr.tools](https://ddr.tools/). It does not accept tournament registration
+   links. The default is Dia Del Ritmo 2026; change it for another event.
+   Event selection uses the complete dataset, ignoring website difficulty filters.
+2. **Prepare the catalog.** **Build catalog** downloads current chart metadata,
+   reuses supported artwork when available, and validates before replacing a file.
+   **Load catalog…** opens an existing `.ddrcatalog` offline, detects its event or
+   Full WORLD selection, and validates it. Neither action starts capture.
+3. **Activate recognition.** Enable **Recognize song and max EX** and choose the
+   game style. In Desktop, use **Start** in the window header to apply pending
+   settings and start the selected source. While running, the header’s **Apply
+   and Restart** applies pending settings and resets tracking. Workbench's **Apply / reset
+   recognition** resets recognition/tracking; use **Playback and setup** to open
+   a source and play the recording when needed.
 
-The workbench installer accepts the same flag. This downloads the pinned artwork
-gallery and pins the latest Dia Del Ritmo 2026 metadata. Rerunning preparation
-reuses a verified existing selection; refreshing metadata is a separate action.
-If preparation is interrupted, rerun it: downloads without committed checksums
-are fetched again. A checksum mismatch in a previously verified file remains an
-error rather than being silently trusted.
+Rehearse from before a song splash, then compare the confirmed song and chart
+max EX with the recording. Names keep their independent enable switch.
 
-In the desktop's **Song recognition** tab, prepare the catalog,
-check readiness, enable recognition, choose the game style, and use **Apply and
-Restart**. The workbench has the same top-level tab; applying resets recognition.
-Names keep their existing independent enable switch.
+The preparation status distinguishes **Catalog validated** from **Catalog found —
+checked when activated**. The latter is expected after restarting the application:
+metadata inspection does not load the full gallery or OCR. Activation validates
+before use. Closing and reopening just the panel retains backend validation.
+A file change or a different difficulty reader requires fresh validation.
+Preparation errors are shown separately from the previous catalog's availability
+and the session currently using it.
+
+**Coverage warnings** lists affected songs/charts and reasons. A valid file does
+not guarantee complete event coverage. Ordinary score capture can continue where
+song identity or max EX is unavailable. Out-of-pool charts may require another
+event or Full WORLD. Multiple IDs for the same title need catalog identity cleanup;
+shared jackets need additional evidence to distinguish songs or variants.
+Unsupported artwork needs updated artwork support.
+Technical identifiers and file paths are under **Catalog version, storage and sharing**.
+
+If a loaded file conflicts with a new event/mode, choose **Use the loaded catalog’s
+selection**, or **Build this selection at its default location**. The latter
+clears the custom path and prepares a separate selection while preserving the
+loaded file. Changing the dropdown alone never activates or overwrites a catalog.
+
+For command-line provisioning of the default event, the optional
+`setup_desktop.bat -JacketLookup` flag remains available; Workbench setup accepts
+it too. A retry reuses verified downloads. A verified cache checksum mismatch is
+reported rather than silently accepted.
 
 The defaults are Dia Del Ritmo 2026 (dia_del_ritmo_26), Singles, difficulty
 templates, and HighQoS. Name recognition uses a persistent single-threaded OCR
@@ -76,12 +109,12 @@ Leave the field blank for the default location, which the tab displays:
 
     %LOCALAPPDATA%\ddrcv\jacket_lookup\catalogs\event-dia_del_ritmo_26.ddrcatalog
 
-Full DDR uses `catalogs/full-world.ddrcatalog`. Browse selects an existing file;
-you can paste a new `.ddrcatalog` path before preparing a catalog there. Downloads
+Full DDR uses `catalogs/full-world.ddrcatalog`. Load catalog selects an existing file;
+you can paste a new `.ddrcatalog` path before building a catalog there. Downloads
 and intermediate build files remain in the preparation cache separately. They are
 not needed for recognition or transfer.
 
-The **Prepared catalog** panel shows the DDRCardDraw metadata commit (linked to
+The **Catalog version, storage and sharing** section shows the DDRCardDraw metadata commit (linked to
 its source), the dataset's recorded update date, the file's creation date, and the
 separately pinned artwork-gallery commit and fingerprint. The dataset date is not
 the Git commit timestamp. Older folder catalogs may lack a preparation date.
@@ -90,7 +123,8 @@ The active-session line identifies the version held by the recognition workers.
 Preparation/refresh validates a complete new file before atomically replacing the
 previous file. A failed build leaves the old file intact. Existing sessions keep
 their loaded version until Apply and Restart. Version inspection is offline and
-does not load image arrays or OCR; Check readiness validates the whole catalog.
+does not load image arrays or OCR. Build and Load validate the whole catalog
+automatically; no separate readiness check is needed.
 
 Selecting **Full DDR / WORLD charts** disables and fades the event field. Its
 value is retained for switching back to Event pool. The selection must match the
@@ -101,8 +135,10 @@ To share a catalog:
 1. Finish preparation on the first machine, then copy its `.ddrcatalog` file to a
    local folder on the receiving machine.
 2. Install a compatible DDRCV version using normal setup. In **Song recognition**,
-   browse to the copied file and choose the matching event or Full DDR.
-3. Click **Check readiness**, compare the displayed revisions, and apply.
+   choose **Load catalog…** and open the copied file. Its event or Full DDR selection
+   is filled in automatically.
+3. Wait for validation to finish, review coverage warnings, and enable recognition
+   in step 3. Start/apply using the action appropriate to the application.
 
 For example:
 
@@ -125,8 +161,11 @@ its gallery; no rebuild or migration is required. The new build profile has the
 same artwork, thresholds, and verified matching decisions, with CPU-independent
 normalization and fixed intermediate precision.
 
-Existing folder catalogs remain readable. **Prepare catalog** converts an existing
-selection offline when its default file does not exist. To choose a destination:
+Existing folder catalogs remain readable. The CLI `prepare` command converts an
+existing selection offline when its default file does not exist. The UI's
+**Build catalog** instead requests current chart metadata, reuses cached artwork,
+and safely replaces the catalog only after validation. To choose a destination
+for an offline conversion:
 
     python -m ddrcv.jacket_lookup pack --assets-dir C:\OldCatalogFolder --catalog-file C:\DDRCV-Catalogs\dia.ddrcatalog
 

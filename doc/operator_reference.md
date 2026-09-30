@@ -115,3 +115,24 @@ contain credentials; remove secrets before sharing them for support.
 For a reproducible recognition problem, use the
 [browser workbench's diagnostic export](tournament_handoff.md#4-save-a-problem-and-identify-the-failing-layer)
 to capture the frame, crops, and read decisions.
+
+## Song catalog setup and recovery
+
+Use **Song recognition → Choose → Prepare → Activate**. **Build catalog** needs
+internet; **Load catalog…** opens a supplied file offline and detects its event.
+Both validate automatically. Check **Recognize song and max EX**, select the game
+style, then use **Start** in the window header while stopped or **Apply and
+Restart** in the header while running. These actions apply all pending changes.
+
+| Message or situation | Action |
+| --- | --- |
+| Catalog found — checked when activated | Enable recognition and start/apply; DDRCV validates before use. No rebuild is required. |
+| Recognition disabled | Enable the checkbox in step 3, then use Start or Apply in the window header. |
+| Changes pending | Apply at an appropriate break; Desktop restarts capture and resets tracking. |
+| File belongs to another event | Restore the loaded file's selection or build the requested selection at its default location. |
+| Coverage warnings | Expand the affected songs/charts. Check the event or use Full WORLD for out-of-pool charts. Unsupported artwork needs updated DDRCV artwork support; ordinary score capture can continue. |
+| Build failed | Read the preparation error and retry when resolved. The previous catalog and running recognition session are retained. |
+
+Version identifiers, custom file paths, and sharing instructions are under
+**Catalog version, storage and sharing**. See the
+[song-recognition guide](song_recognition.md) for more detail.

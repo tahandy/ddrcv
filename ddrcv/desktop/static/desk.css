@@ -144,6 +144,10 @@ footer { display: flex; align-items: center; justify-content: space-between; fle
 .credential-field input::-ms-reveal { display: none; }
 
 /* Song recognition has a persistent top-level panel; tab switches never restart workers. */
+.catalog-actions-help { margin-top: 8px; }
+.catalog-credit { margin: 0 0 12px; text-align: center; font-size: 12px; color: var(--muted); }
+.catalog-credit a { color: inherit; text-underline-offset: 3px; }
+.catalog-credit a:hover, .catalog-credit a:focus-visible { color: var(--accent); }
 #song-event-field.inactive { opacity: .45; }
 #song-event-field input:disabled { cursor: not-allowed; }
 #song-event-help { margin: 8px 0; }
@@ -158,3 +162,37 @@ footer { display: flex; align-items: center; justify-content: space-between; fle
 .catalog-sharing { margin-top: 14px; }
 .catalog-sharing li { margin: 6px 0; }
 .catalog-sharing ol { padding-left: 22px; }
+
+/* One visible sequence; technical details stay available without crowding setup. */
+#panel-song .catalog-step { min-width: 0; }
+#panel-song .catalog-step h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 10px; font-size: 16px; }
+.catalog-step-number { border: 1px solid var(--accent); color: var(--accent); border-radius: 50%; width: 25px; height: 25px; display: inline-grid; place-items: center; flex-shrink: 0; }
+.catalog-fields { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(240px, 2fr); gap: 12px; align-items: end; margin: 12px 0; }
+.catalog-fields input:not([type=checkbox]), .catalog-fields select { width: 100%; min-width: 0; }
+#song-settings .catalog-fields { grid-template-columns: minmax(230px, 1fr) minmax(0, 2fr); column-gap: 24px; margin: 16px 0 12px; }
+#song-settings .catalog-fields > label { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+#panel-song p { margin: 8px 0; overflow-wrap: anywhere; }
+#panel-song a { color: var(--accent); }
+.catalog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.catalog-actions button { white-space: normal; text-align: left; }
+.catalog-callout { border-left: 3px solid var(--accent); padding-left: 12px; margin-top: 12px; }
+.catalog-warning-list { max-height: 230px; overflow: auto; padding-left: 24px; overflow-wrap: anywhere; }
+.catalog-warning-list li { margin: 8px 0; }
+#panel-song details { margin-top: 12px; }
+#panel-song h3 { font-size: 14px; margin-bottom: 6px; }
+#song-readiness, #song-catalog-state { font-weight: 600; }
+@media (max-width: 740px) { .catalog-fields, #song-settings .catalog-fields { grid-template-columns: minmax(0, 1fr); } #panel-song .catalog-folder { grid-template-columns: minmax(0, 1fr); gap: 5px; } }
+
+.footer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+button.text-button { border-color: transparent; background: transparent; color: var(--muted); padding: 4px 0; font-size: 12px; }
+button.text-button:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+#about-dialog { width: min(520px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 20px; overflow: auto; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 16px 48px #0008; }
+#about-dialog::backdrop { background: #0009; }
+.about-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.about-heading form { margin: 0; }
+#about-description { color: var(--muted); }
+.credits-list { margin: 20px 0; }
+.credits-list dt { font-weight: 600; margin-top: 16px; }
+.credits-list dd { margin: 4px 0 0; color: var(--muted); }
+#about-dialog a { color: var(--accent); text-underline-offset: 3px; }
+#about-dialog a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -82,9 +82,40 @@ If a supplied profile enables OBS automation or Discord publishing, turn those
 off for a local-only rehearsal. On **Results**, click **Apply results settings**
 after disabling publishing if capture is already running.
 
+## Optional: identify songs and chart max EX
+
+On **Song recognition**, follow **Choose → Prepare → Activate**. Gameplay score
+reading works without this optional feature.
+
+1. **Choose:** select your **DDRCardDraw event pool** or **Full DDR / WORLD charts**.
+   The default is **Dia Del Ritmo 2026**; change it for another event. Use the
+   event link from [ddr.tools](https://ddr.tools/), such as
+   `https://ddr.tools/#game-dia_del_ritmo_26`. Tournament registration links are
+   not catalog links. Website difficulty filters do not restrict recognition.
+2. **Prepare:** choose **Build catalog** while online, or **Load catalog…** to use
+   a supplied `.ddrcatalog` file offline. Load fills in its event automatically.
+   Both validate the file. Expand any **Coverage warnings** to see affected
+   songs/charts; a usable catalog can still have incomplete recognition coverage.
+3. **Recognition settings:** check **Recognize song and max EX** and choose **Singles** or
+   **Doubles**. Use **Start** in the window header to apply pending settings and
+   start the source selected on **Status & configuration**. While running, use
+   the header’s **Apply and Restart** to apply changes and reset tracking.
+4. Play a recording from before the song splash. Check **Recognition active**,
+   then verify the identified song and each player's chart max EX on the status
+   tab. Building or loading alone does not enable recognition or start capture.
+
+**Catalog found — checked when activated** means the file exists but has not yet
+been validated in this application session. Activation checks it before use.
+Closing and reopening the panel keeps the backend's validation state.
+If the loaded file belongs to another selection, use the offered actions to
+restore its event or build your new selection at its default location.
+
+For offline sharing, coverage limits, and recovery, see
+[song and chart recognition](song_recognition.md).
+
 ## 4. Start recognition and check the picture
 
-1. Click **Start**. It uses the settings currently in the form.
+1. If capture is still stopped, click **Start**. It uses the settings currently in the form.
 2. Check that the phase becomes **Running** and capture is healthy.
 3. Click **View stream** to inspect the input. This is one timestamped snapshot;
    click **Refresh frame** for another. A still preview by itself does not mean

@@ -145,6 +145,10 @@ code { overflow-wrap: anywhere; }
 @media (max-width: 650px) { .result-card { grid-template-columns: 1fr; } }
 
 /* Song recognition has a persistent top-level panel; tab switches never restart workers. */
+.catalog-actions-help { margin-top: 8px; }
+.catalog-credit { margin: 0 0 12px; text-align: center; font-size: 12px; color: var(--muted); }
+.catalog-credit a { color: inherit; text-underline-offset: 3px; }
+.catalog-credit a:hover, .catalog-credit a:focus-visible { color: var(--accent); }
 #song-event-field.inactive { opacity: .45; }
 #song-event-field input:disabled { cursor: not-allowed; }
 #song-event-help { margin: 8px 0; }
@@ -169,3 +173,22 @@ code { overflow-wrap: anywhere; }
 
 .catalog-folder .inline { display:flex; gap:8px; }
 .catalog-folder .inline input { flex:1; min-width:0; }
+
+/* One visible sequence; technical details stay available without crowding setup. */
+#panel-song .catalog-step { min-width: 0; }
+#panel-song .catalog-step h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 10px; font-size: 16px; }
+.catalog-step-number { border: 1px solid var(--accent); color: var(--accent); border-radius: 50%; width: 25px; height: 25px; display: inline-grid; place-items: center; flex-shrink: 0; }
+.catalog-fields { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(240px, 2fr); gap: 12px; align-items: end; margin: 12px 0; }
+.catalog-fields input:not([type=checkbox]), .catalog-fields select { width: 100%; min-width: 0; }
+#panel-song p { margin: 8px 0; overflow-wrap: anywhere; }
+#panel-song a { color: var(--accent); }
+.catalog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.catalog-actions button { white-space: normal; text-align: left; }
+.catalog-callout { border-left: 3px solid var(--accent); padding-left: 12px; margin-top: 12px; }
+.catalog-warning-list { max-height: 230px; overflow: auto; padding-left: 24px; overflow-wrap: anywhere; }
+.catalog-warning-list li { margin: 8px 0; }
+.catalog-error { color: #ffb4ab; }
+#panel-song details { margin-top: 12px; }
+#panel-song h3 { font-size: 14px; margin-bottom: 6px; }
+#song-readiness, #song-catalog-state { font-weight: 600; }
+@media (max-width: 740px) { .catalog-fields { grid-template-columns: minmax(0, 1fr); } #panel-song .catalog-folder { grid-template-columns: minmax(0, 1fr); gap: 5px; } }

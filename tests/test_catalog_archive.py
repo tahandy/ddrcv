@@ -82,6 +82,130 @@ class ArchiveTests(unittest.TestCase):
             gallery=self.profile['gallery_fingerprint'],selection_sha256=catalog.sha256(selection.read_bytes())))
         return root
 
+
+    def test_guided_inspection_reports_mismatch_and_named_coverage(self):
+        selection = deepcopy(self.selection)
+        row = selection['catalog']['records'][0]
+        selection['unsupported'] = [dict(record_id=row['record_id'], style='single', difficulty='expert', reason='unsupported_artwork')]
+        selection['blocked_song_ids'] = [row['song_id']]
+        selection['catalog']['records'][1]['charts'][0]['max_ex'] = None
+        self.write(selection=selection)
+        with patch('socket.socket.connect', side_effect=AssertionError('Network')), patch.object(
+                CatalogArchive, 'gallery', side_effect=AssertionError('Gallery load')):
+            info = assets.describe(self.cfg)
+            mismatch = assets.describe({**self.cfg, 'mode': 'full'})
+        self.assertTrue(info['available'])
+        self.assertEqual({w['reason'] for w in info['coverage']['warnings']},
+                         {'unsupported_artwork', 'ambiguous_artwork', 'missing_max_ex'})
+        self.assertTrue(all(w['title'].startswith('Song ') for w in info['coverage']['warnings']))
+        self.assertEqual(mismatch['error_code'], 'selection_mismatch')
+        self.assertEqual(mismatch['selection_mismatch'], dict(mode='event', event='event'))
+        self.assertFalse(mismatch['available'])
+        self.assertNotEqual(info['selection_key'], mismatch['selection_key'])
+
+    def test_coverage_distinguishes_duplicate_title_ids_from_shared_jackets(self):
+        selection = deepcopy(self.selection)
+        row = selection['catalog']['records'][0]
+        selection['blocked_song_ids'] = [row['song_id']]
+        metadata = json.loads(self.metadata)
+        entry = next(e for e in metadata['entries'] if row['song_id'] in e['songs'])
+        for other_title, expected in ((row['name'], 'duplicate_title_ids'),
+                                      ('Another song (TYPE2)', 'shared_jacket')):
+            with self.subTest(other_title=other_title):
+                entry['songs']['placeholder-id'] = other_title
+                self.write(selection=selection, metadata=json.dumps(metadata).encode())
+                with patch.object(CatalogArchive, 'gallery', side_effect=AssertionError('Array load')):
+                    warning = assets.describe(self.cfg)['coverage']['warnings'][0]
+                self.assertEqual(warning['reason'], 'ambiguous_artwork')
+                self.assertEqual(warning['detail'], expected)
+                self.assertEqual(warning['title'], row['name'])
+        self.assertEqual(assets.coverage_info(selection)['warnings'][0]['detail'], 'shared_jacket')
+
+    def test_validation_survives_panel_reads_and_failed_refresh_but_not_file_changes(self):
+        operation = CatalogPreparation()
+        self.addCleanup(operation.close)
+        def run(**kwargs):
+            operation.start(self.cfg, **kwargs)
+            operation.worker.join(10)
+            self.assertFalse(operation.worker.is_alive())
+            return operation.status()
+        self.assertFalse(operation.describe(self.cfg)['validated'])
+        result = run()
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['selection_key'], operation.describe(self.cfg)['selection_key'])
+        for _ in range(2):
+            self.assertTrue(operation.describe(self.cfg)['validated'])
+        with patch.object(assets, 'prepare', side_effect=OSError('Offline')):
+            self.assertFalse(run(prepare=True, refresh=True)['ok'])
+        self.assertTrue(operation.describe(self.cfg)['validated'])
+        self.assertFalse(operation.describe({**self.cfg, 'difficulty_method': 'ocr'})['validated'])
+        with patch.object(assets, 'check', return_value=dict(ok=False, phase='unavailable', error='Reader unavailable')):
+            self.assertFalse(run()['ok'])
+        self.assertFalse(operation.describe(self.cfg)['validated'])
+        self.assertTrue(run()['ok'])
+        self.assertFalse(CatalogPreparation().describe(self.cfg)['validated'])
+        changed = deepcopy(self.selection)
+        changed['catalog']['commit'] = 'c'*40
+        self.write(selection=changed)
+        self.assertFalse(operation.describe(self.cfg)['validated'])
+        self.assertTrue(run()['ok'])
+        self.assertTrue(operation.describe(self.cfg)['validated'])
+        self.path.write_bytes(b'broken file')
+        info = operation.describe(self.cfg)
+        self.assertFalse(info['available'])
+        self.assertFalse(info['validated'])
+
+    def test_validation_rejects_a_file_replaced_during_check(self):
+        original = assets.load
+        def load_and_replace(cfg):
+            loaded = original(cfg)
+            self.write()
+            return loaded
+        with patch.object(assets, 'load', side_effect=load_and_replace):
+            result = assets.check(self.cfg)
+        self.assertFalse(result['ok'])
+        self.assertIn('changed during validation', result['error'])
+
+    def test_normalized_readiness_identity_and_default_recovery_preserve_loaded_file(self):
+        from ddrcv.jacket_lookup.config import inspection_key
+        self.assertEqual(inspection_key(self.cfg), inspection_key({**self.cfg, 'event': 'https://ddr.tools/#game-event'}))
+        original = self.path.read_bytes()
+        cfg = {**self.cfg, 'mode': 'full', 'catalog_file': None}
+        self.assertNotEqual(catalog_path(cfg), self.path)
+        self.assertEqual(assets.config_for_file(cfg, str(self.path))['mode'], 'event')
+        self.assertEqual(original, self.path.read_bytes())
+
+    def test_file_selection_infers_event_offline_without_loading_gallery(self):
+        draft = {**self.cfg, 'mode': 'full', 'event': '', 'style': 'double', 'enabled': True}
+        before = deepcopy(draft)
+        with patch('socket.socket.connect', side_effect=AssertionError('Network')), patch.object(
+                CatalogArchive, 'gallery', side_effect=AssertionError('Gallery load')):
+            selected = assets.config_for_file(draft, str(self.path))
+        self.assertEqual(selected['mode'], 'event')
+        self.assertEqual(selected['event'], 'event')
+        self.assertEqual(selected['style'], 'double')
+        self.assertTrue(selected['enabled'])
+        self.assertEqual(selected['catalog_file'], str(self.path))
+        self.assertEqual(draft, before)
+
+    def test_file_selection_infers_full_and_preserves_previous_event(self):
+        selection = deepcopy(self.selection)
+        selection['catalog'].update(mode='full', event=None, metadata_dataset='ddr_world')
+        self.write(selection=selection)
+        selected = assets.config_for_file(self.cfg, str(self.path))
+        self.assertEqual(selected['mode'], 'full')
+        self.assertEqual(selected['event'], self.cfg['event'])
+
+    def test_file_selection_rejects_invalid_files_before_changing_config(self):
+        before = deepcopy(self.cfg)
+        for path in ('', str(self.root / 'wrong.zip'), str(self.root / 'missing.ddrcatalog')):
+            with self.subTest(path=path), self.assertRaises((ValueError, FileNotFoundError)):
+                assets.config_for_file(self.cfg, path)
+        self.rewrite(lambda payloads: payloads.update({'selection.json': b'{}'}))
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            assets.config_for_file(self.cfg, str(self.path))
+        self.assertEqual(self.cfg, before)
+
     def test_direct_offline_load_exact_matching_and_chart_provenance(self):
         folder = Lookup(self.root/'index', thresholds=self.profile)
         with patch('socket.socket.connect', side_effect=AssertionError('Network')), patch.object(

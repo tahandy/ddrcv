@@ -56,11 +56,14 @@ def create_app(workbench=None):
     def action():
         args = dict(request.get_json())
         action = args.pop('action')
+        if action == 'song_file_config':
+            from ddrcv.jacket_lookup.assets import config_for_file
+            return jsonify(config_for_file(args['config'], args['path']))
         if action == 'song_info':
             return jsonify(wb.catalog_preparation.describe(args['config']))
-        if action in ('song_prepare', 'song_refresh', 'song_check'):
+        if action in ('song_build', 'song_prepare', 'song_refresh', 'song_check'):
             return jsonify(wb.catalog_preparation.start(args['config'],
-                           prepare=action != 'song_check', refresh=action == 'song_refresh'))
+                           prepare=action != 'song_check', refresh=action in ('song_build', 'song_refresh')))
         if action == 'song_lookup':
             return jsonify(wb.configure_song_lookup(args['config']))
         return jsonify(wb.submit(action, **args))

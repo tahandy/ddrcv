@@ -168,9 +168,9 @@ class Desk:
             self._persist()
         return self.config()
 
-    def prepare_song_lookup(self, *, prepare=False, refresh=False):
+    def prepare_song_lookup(self, config=None, *, prepare=False, refresh=False):
         with self.lock:
-            config = deepcopy(self.draft['song_lookup'])
+            config = deepcopy(self.draft['song_lookup'] if config is None else config)
         return self.catalog_preparation.start(config, prepare=prepare, refresh=refresh)
 
     def _prepare(self, config):
@@ -378,6 +378,8 @@ class Desk:
         status.update(pending=pending, score_mode='Money' if limit is None else 'EX' if limit == 12 else 'Custom',
                       error=self.logs.scrub(str(status.get('error') or self.error or '')) or None)
         status['catalog_preparation'] = self.catalog_preparation.status()
+        with self.lock:
+            status['applied_song_lookup'] = deepcopy(self.applied['song_lookup'])
         status['source'] = mask_config(status.get('source', deepcopy(self.applied['ingest'])))
         status['source_error'] = self.logs.scrub(str(status.get('source_error') or '')) or None
         for integration in ('obs', 'renderer'):

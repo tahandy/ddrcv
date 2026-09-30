@@ -112,46 +112,63 @@
 <details class="section"><summary>Logs</summary><button id="logs-refresh">Refresh logs</button><pre id="logs"></pre></details>
 </div>
 <div id="panel-song" role="tabpanel" aria-labelledby="tab-song" hidden>
-  <section id="song-settings" class="section catalog-settings" aria-labelledby="song-heading">
-    <h2 id="song-heading">Song and chart recognition</h2>
-    <div class="row">
-      <label class="check"><input id="song-enabled" type="checkbox">Recognize song and max EX</label>
-      <label>Catalog<select id="song-mode"><option value="event">Event pool</option><option value="full">Full DDR / WORLD charts</option></select></label>
-      <label class="grow" id="song-event-field">Event URL or slug<input id="song-event" value="dia_del_ritmo_26" aria-describedby="song-event-help"></label>
-      <label>Style<select id="song-style"><option value="single">Singles</option><option value="double">Doubles</option></select></label>
+  <p class="catalog-credit">Catalog data courtesy of <a href="https://github.com/noahm/DDRCardDraw" target="_blank" rel="noopener noreferrer">DDRCardDraw</a></p>
+  <section id="song-settings" class="section catalog-step" aria-labelledby="song-heading">
+    <h2 id="song-heading"><span class="catalog-step-number">1</span> Choose your catalog</h2>
+    <p class="muted">An event pool uses that event’s chart list. Full DDR uses all WORLD chart records.</p>
+    <div class="catalog-fields">
+      <label>Catalog<select id="song-mode"><option value="event">DDRCardDraw event pool</option><option value="full">Full DDR / WORLD charts</option></select></label>
+      <label id="song-event-field">DDRCardDraw event URL or slug<input id="song-event" value="dia_del_ritmo_26" aria-describedby="song-event-help"></label>
     </div>
-    <p id="song-event-help" class="muted" hidden>Full DDR uses WORLD charts; an event is not needed.</p>
-    <div class="row"><button id="song-prepare">Prepare catalog</button><button id="song-refresh">Refresh metadata</button><button id="song-check">Check readiness</button><button id="song-apply">Apply / reset recognition</button></div>
-    <p id="song-readiness" class="muted" role="status">Prepare a catalog before enabling recognition.</p>
-    <details><summary>Advanced recognition settings</summary><div class="row">
-      <label>Difficulty reader<select id="song-difficulty"><option value="template">Templates</option><option value="ocr">OCR</option></select></label>
-      <label class="check"><input id="song-qos" type="checkbox" checked>HighQoS workers</label>
-    </div></details>
+    <p id="song-event-help" class="muted"></p>
+    <p id="song-event-link" class="muted"><a href="https://ddr.tools/" target="_blank" rel="noopener noreferrer">Find your event on ddr.tools</a> · Example: <code>https://ddr.tools/#game-dia_del_ritmo_26</code></p>
+    <p id="song-pool-help" class="muted">Uses the event’s complete chart dataset. Difficulty filters on the website do not restrict recognition.</p>
   </section>
-  <section class="catalog-version-panel" aria-labelledby="catalog-heading">
-      <h2 id="catalog-heading">Prepared catalog</h2>
-      <p id="song-catalog-state" class="muted" role="status">Reading catalog information…</p>
+  <section class="section catalog-step" aria-labelledby="song-prepare-heading">
+    <h2 id="song-prepare-heading"><span class="catalog-step-number">2</span> Prepare the catalog</h2>
+    <div class="catalog-actions"><button id="song-build">Build catalog</button><button id="song-load">Load catalog…</button></div>
+    <p class="muted">Build downloads the latest chart data and validates the catalog. Load opens and validates an existing .ddrcatalog file offline.</p>
+    <p id="song-catalog-state" role="status">Reading catalog information…</p>
+    <p id="song-operation" class="muted" role="status" hidden></p>
+    <div id="song-mismatch" class="catalog-callout" hidden>
+      <p id="song-mismatch-message"></p>
+      <div class="catalog-actions"><button id="song-build-default">Build this selection at its default location</button><button id="song-use-loaded">Use the loaded catalog’s selection</button></div>
+      <p class="muted">The loaded file is preserved when building a different selection at its default location.</p>
+    </div>
+    <details id="song-coverage" hidden><summary id="song-coverage-summary">Coverage warnings</summary>
+      <p class="muted">Score capture still works; song identification or chart max EX may be unavailable. For charts outside the pool, select the correct event or Full WORLD. Duplicate catalog IDs need metadata cleanup; shared jackets need another way to distinguish the songs.</p>
+      <ul id="song-coverage-list" class="catalog-warning-list"></ul>
+    </details>
+    <details id="song-version-details"><summary>Catalog version, storage and sharing</summary>
       <dl class="catalog-facts">
         <dt>Metadata revision</dt><dd><a id="song-catalog-version" target="_blank" rel="noopener noreferrer">—</a></dd>
         <dt>Dataset updated</dt><dd id="song-catalog-updated">—</dd>
         <dt>Catalog created</dt><dd id="song-catalog-prepared">—</dd>
         <dt>Artwork gallery</dt><dd id="song-gallery-version">—</dd>
       </dl>
-      <p id="song-active-version" class="muted">Active session: recognition is not running.</p>
-    </section>
-  <section class="catalog-storage" aria-labelledby="storage-heading">
-    <h2 id="storage-heading">Storage and sharing</h2>
-    <label class="catalog-folder">Catalog file<div class="inline"><input id="song-assets" placeholder="Default .ddrcatalog file" aria-describedby="song-storage-path"><button id="song-browse" type="button">Browse…</button></div></label>
-    <p class="muted">One portable file with jackets, chart data, and version information. Leave blank to use the default location.</p>
-    <p class="catalog-location muted">File: <code id="song-storage-path">—</code></p>
-    <details class="catalog-sharing"><summary>Share a prepared catalog</summary>
-      <ol>
-        <li>After preparation finishes, copy this <code>.ddrcatalog</code> file to the other machine.</li>
-        <li>In a compatible DDRCV version, browse to that file and select the same event or Full DDR.</li>
-        <li>Check readiness, then apply the configuration.</li>
-      </ol>
-      <p class="muted">No extraction, jacket download, or encoding is needed. OCR models are installed separately by normal setup.</p>
+      <label class="catalog-folder">Catalog file<input id="song-assets" placeholder="Default .ddrcatalog file" aria-describedby="song-storage-help song-storage-path"></label>
+      <p id="song-storage-help" class="muted">Build saves to this file; leave blank for the default location. Load selects an existing file.</p>
+      <p class="catalog-location muted">File: <code id="song-storage-path">—</code></p>
+      <h3>Share a prepared catalog</h3>
+      <ol><li>After preparation finishes, copy this .ddrcatalog file to the other machine.</li><li>In a compatible DDRCV version, choose Load catalog and open that file.</li><li>Wait for validation, then enable recognition in step 3.</li></ol>
+      <p class="muted">No extraction or artwork download is needed. Normal application setup installs OCR models separately.</p>
     </details>
+  </section>
+  <section class="section catalog-step" aria-labelledby="song-activate-heading">
+    <h2 id="song-activate-heading"><span class="catalog-step-number">3</span> Activate recognition</h2>
+    <div class="catalog-fields">
+      <label class="check"><input id="song-enabled" type="checkbox">Recognize song and max EX</label>
+      <label>Game style<select id="song-style"><option value="single">Singles</option><option value="double">Doubles</option></select></label>
+    </div>
+    <p id="song-readiness" role="status">Recognition disabled</p>
+    <p id="song-active-version" class="muted" role="status">Active session: recognition is not running.</p>
+    <div class="catalog-actions"><button id="song-apply" class="primary">Apply / reset recognition</button></div>
+    <p id="song-activation-help" class="muted"></p>
+    <p id="song-activation-error" class="catalog-error" role="alert" hidden></p>
+    <details><summary>Advanced recognition settings</summary><div class="catalog-fields">
+      <label>Difficulty reader<select id="song-difficulty"><option value="template">Templates</option><option value="ocr">OCR</option></select></label>
+      <label class="check"><input id="song-qos" type="checkbox" checked>HighQoS workers</label>
+    </div></details>
   </section>
 </div>
 <div class="shutdown"><p class="muted">Closing the last workbench tab stops playback and releases the score feed port.</p><button id="shutdown">Shut down workbench</button></div>

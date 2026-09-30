@@ -2,7 +2,7 @@
 from copy import deepcopy
 import threading
 
-from .config import validate_config
+from .config import catalog_stamp, inspection_key, validate_config
 
 
 class CatalogPreparation:
@@ -11,6 +11,7 @@ class CatalogPreparation:
         self.worker = None
         self.value = dict(phase='idle')
         self.closed = False
+        self.validated = {}
         self._description = None
         self._description_key = None
 
@@ -21,7 +22,7 @@ class CatalogPreparation:
                 raise ValueError('Application is closing')
             if self.worker and self.worker.is_alive():
                 raise ValueError('Catalog operation is already running')
-            self.value = dict(phase='preparing' if prepare else 'checking')
+            self.value = dict(phase='preparing' if prepare else 'checking', selection_key=inspection_key(cfg))
             self.worker = threading.Thread(target=self._run, args=(cfg, prepare, refresh),
                                            name='catalog-preparation', daemon=True)
             self.worker.start()
@@ -39,8 +40,13 @@ class CatalogPreparation:
                       if prepare else assets.check(config))
         except Exception as exc:
             result = dict(ok=False, phase='failed', error=str(exc))
+        result['selection_key'] = inspection_key(config)
         with self.lock:
             if not self.closed:
+                if result.get('ok') and result.get('catalog_stamp'):
+                    self.validated[result['selection_key']] = (result['catalog_stamp'], result['catalog_identity'])
+                elif not prepare:
+                    self.validated.pop(result['selection_key'], None)
                 self.value = result
                 self._description_key = None
 
@@ -50,22 +56,17 @@ class CatalogPreparation:
 
     def describe(self, config):
         from . import assets
-        from .config import assets_root, catalog_path
         cfg = validate_config(config)
-        root = assets_root(cfg)
-        destination = catalog_path(cfg)
-        pointer = destination if destination.exists() or cfg['catalog_file'] else root / 'active' / (assets.selection_key(cfg) + '.json')
-        try:
-            stat = pointer.stat()
-            stamp = (stat.st_mtime_ns, stat.st_size, stat.st_ino)
-        except OSError:
-            stamp = None
-        key = (str(root), str(destination), assets.selection_key(cfg), stamp)
+        selection = inspection_key(cfg)
+        stamp = catalog_stamp(cfg)
+        key = (selection, stamp)
         with self.lock:
             if key == self._description_key:
                 return deepcopy(self._description)
         value = assets.describe(cfg)
+        value['catalog_stamp'] = stamp
         with self.lock:
+            value['validated'] = bool(value.get('available') and self.validated.get(selection) == (stamp, value.get('catalog_identity')))
             self._description_key, self._description = key, value
         return deepcopy(value)
 

@@ -18,6 +18,9 @@ from installation through a complete rehearsal. Keep the
 [operator quick reference](doc/operator_reference.md) nearby for event controls,
 Results recovery, and troubleshooting.
 
+**Optional song and chart recognition:** follow the guided **Choose → Prepare → Activate**
+flow on the Song recognition tab. See [catalog setup and sharing](doc/song_recognition.md).
+
 For a training session or handoff, use the [operator slide deck](doc/slides/README.md)
 (editable PowerPoint, PDF, and speaker notes).
 

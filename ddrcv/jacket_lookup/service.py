@@ -203,6 +203,7 @@ class SplashService:
             phase = ('closed' if self.closed else 'disabled' if not self.config['enabled'] else 'failed' if self.error else
                      'confirmed' if done else 'recognizing' if self.last_sample != -math.inf else 'ready')
             return dict(phase=phase, error=self.error, reason=self.last_reason,
+                        catalog_stamp=getattr(getattr(self.processor, 'lookup', None), '_catalog_stamp', None),
                         completed=self.completed, timings_ms=deepcopy(self.timings),
                         catalog=deepcopy(getattr(getattr(self.processor, 'lookup', None), 'bundle_info', None)),
                         **(self.worker.status() if self.worker else dict(busy=False, pending=0, replaced=0, alive=False)))

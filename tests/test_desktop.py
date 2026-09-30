@@ -76,6 +76,23 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(self.desk.config()['draft']['publish']['websocket']['port'], 19005)
         self.assertTrue(self.desk.config()['pending'])
 
+    def test_status_distinguishes_applied_song_settings_from_draft(self):
+        original = self.desk.status()['applied_song_lookup']
+        draft = self.desk.config()['draft']
+        draft['song_lookup']['mode'] = 'full'
+        self.desk.edit(draft)
+        self.assertEqual(self.desk.status()['applied_song_lookup'], original)
+        self.desk.apply()
+        self.assertEqual(self.desk.status()['applied_song_lookup']['mode'], 'full')
+
+    def test_catalog_action_prepares_its_snapshot_without_applying_draft(self):
+        selected = {**self.desk.config()['draft']['song_lookup'], 'mode': 'full'}
+        with patch.object(self.desk.catalog_preparation, 'start', return_value={'phase': 'preparing'}) as start:
+            self.desk.prepare_song_lookup(selected, prepare=True, refresh=True)
+        start.assert_called_once_with(selected, prepare=True, refresh=True)
+        self.assertEqual(self.desk.config()['draft']['song_lookup']['mode'], 'event')
+        self.assertIsNone(self.desk.runtime)
+
     def test_desktop_prepares_the_neutral_driver_runtime(self):
         self.desk.runtime_factory = None
         config = self.desk.config()['draft']
