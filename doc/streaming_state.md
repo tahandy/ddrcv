@@ -159,6 +159,13 @@ coerce them to zero. For example, this snapshot has an unread P1 and an absent P
 
 Song recognition is opt-in. See [setup and catalog preparation](song_recognition.md).
 The song object has song_id, title, artist, catalog, and charts.p1 / charts.p2.
+When supplied by the selected catalog record, it also includes optional strings
+`name_translation` and `artist_translation`, using DDRCardDraw's field names.
+These accompany the original `title` and `artist`; they do not replace them.
+Missing, null, or blank translations are omitted. Consumers may display
+`song.name_translation ?? song.title` and `song.artist_translation ?? song.artist`.
+Existing saved catalogs already retain this metadata and do not need rebuilding.
+
 Catalog includes mode, event, dataset, the pinned metadata commit, and the
 qualified gallery fingerprint. Each chart is null until its difficulty confirms;
 a confirmed record has style, difficulty, level, max_ex, status, and provenance.

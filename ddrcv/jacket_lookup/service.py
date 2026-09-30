@@ -167,6 +167,11 @@ class SplashService:
                                               dataset=selected['metadata_dataset'], commit=selected['commit'],
                                               gallery=self.processor.selection.get('gallery_fingerprint')),
                                  charts=dict(p1=None, p2=None))
+                # Existing catalog files already retain optional DDRCardDraw metadata.
+                for field in ('name_translation', 'artist_translation'):
+                    value = row.get('original', {}).get(field)
+                    if isinstance(value, str) and value.strip():
+                        self.song[field] = value
                 self.confirmed_candidate = deepcopy(candidate)
             for i, evidence in enumerate(self.chart_evidence, 1):
                 key = f'p{i}'

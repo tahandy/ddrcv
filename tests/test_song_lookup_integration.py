@@ -353,6 +353,38 @@ class ServiceTests(unittest.TestCase):
         self.service.submit(self.frame, .8, 'song_splash', 'song_splash', (True, True), 'song')
         self.assertEqual(self.service.completed, count)
         self.assertEqual(self.service.status()['phase'], 'confirmed')
+    def test_optional_translations_survive_catalog_projection_and_websocket(self):
+        from ddrcv.publish.websocket_publisher import WebSocketPublisher
+        from websockets.sync.client import connect
+        publisher = WebSocketPublisher('127.0.0.1', 0, delay=.01)
+        self.addCleanup(publisher.stop)
+        publisher.start()
+        port = publisher._server.sockets[0].getsockname()[1]
+        cases = ({}, {'name_translation': 'Sakura'}, {'artist_translation': 'Rei'},
+                 {'name_translation': 'Sakura', 'artist_translation': 'Rei / \u96f6'},
+                 {'name_translation': '', 'artist_translation': None})
+        for fields in cases:
+            with self.subTest(fields=fields):
+                gallery, _ = fixture()
+                raw = dict(raw_song(name='\u685c'), artist='\u96f6', **fields)
+                selected = normalize_catalog({'event': {'songs': [raw]}}, event='event', commit='b'*40)
+                selected['assets'] = {'ddr_world/a.png': {'sha256': 'image-a'}}
+                # JSON round-trip uses the same representation as saved catalogs.
+                self.processor.selection = json.loads(json.dumps(project_catalog(gallery, selected)))
+                self.processor.result['song']['name'] = raw['name']
+                self.service.reset('song')
+                self.submit(0)
+                self.submit(.2)
+                publisher.send_message(self.service.snapshot())
+                with connect(f'ws://127.0.0.1:{port}', open_timeout=2) as client:
+                    song = json.loads(client.recv(timeout=2))['song']
+                self.assertEqual(song['title'], raw['name'])
+                self.assertEqual(song['artist'], raw['artist'])
+                expected = {k: v for k, v in fields.items() if isinstance(v, str) and v.strip()}
+                self.assertEqual({k: song[k] for k in ('name_translation', 'artist_translation') if k in song}, expected)
+                self.service.reset('next-song')
+                self.assertIsNone(self.service.snapshot()['song'])
+
     def test_rejection_and_gap_break_agreement(self):
         self.submit(0)
         self.processor.result['accepted'] = False
