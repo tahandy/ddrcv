@@ -5,6 +5,9 @@ and publish chart-specific max EX. Recognition is optional and disabled in
 existing profiles. It does not change gameplay score reading, renderer layouts,
 or Results/Discord delivery.
 
+For an accessible explanation of the matching process, see
+[How DDRCV encodes jackets and recognizes songs](jacket_lookup_algorithm.md).
+
 ## Enable it
 
 After normal application setup, open **Song recognition**. Both Desktop and

@@ -20,6 +20,7 @@ Results recovery, and troubleshooting.
 
 **Optional song and chart recognition:** follow the guided **Choose → Prepare → Activate**
 flow on the Song recognition tab. See [catalog setup and sharing](doc/song_recognition.md).
+For the algorithm, read [how jacket encoding and reverse lookup work](doc/jacket_lookup_algorithm.md).
 
 For a training session or handoff, use the [operator slide deck](doc/slides/README.md)
 (editable PowerPoint, PDF, and speaker notes).
