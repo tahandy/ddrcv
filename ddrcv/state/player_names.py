@@ -66,7 +66,7 @@ class PlayerNameReader:
         return values
 
     def _name(self, reading):
-        text = reading.text.strip()
+        text = ''.join(reading.text.split())
         return text if (reading.confidence >= self.config['confidence'] and
                         0 < len(text) <= 32 and all(c.isprintable() for c in text)) else None
 

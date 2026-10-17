@@ -95,6 +95,15 @@ on at least five samples spanning one second. Low confidence, missing text,
 contradictions, capture gaps, or interrupted results recognition clear the
 relevant consecutive evidence. A paused frame never accumulates votes.
 
+Scores are integers. Score parsing discards everything except ASCII digits
+`0–9`, so `1,128`, `1.128`, and `EX 1 128` all parse as 1128. It does not
+substitute lookalike letters for digits. Empty digit strings, more than seven
+digits, out-of-range values, and low-confidence reads remain unconfirmed.
+
+Player names have all whitespace removed before validation and confirmation,
+so `Player2` and `Player 2` count as the same name. Case and punctuation remain
+unchanged. Login/splash name recognition uses the same normalization.
+
 As soon as scores for all present players confirm, the supporting frame and scores
 are saved and queued. Names never delay this first post. Missing names continue
 being read until they confirm, the screen ends, or the original ten-second deadline

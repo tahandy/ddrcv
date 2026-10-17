@@ -179,7 +179,9 @@ class NamesTests(unittest.TestCase):
         recognizer = Mock()
         reader = SplashNameReader(validate_config(), recognizer)
         for text, confidence, expected in [('ZERO.', .99, 'ZERO.'), ('N.NATURE', .99, 'N.NATURE'),
-                                            ('guess', .79, None), ('', .99, None), ('a\nb', .99, None)]:
+                                            (' Player\t2\n', .99, 'Player2'), ('Player\u00a02', .99, 'Player2'),
+                                            ('guess', .79, None), ('', .99, None), (' \t\n', .99, None),
+                                            ('a\nb', .99, 'ab'), ('a\x00b', .99, None)]:
             recognizer.recognize_many.return_value = [OCRResult(text, confidence)]
             self.assertEqual(reader.read({1: self.frame[:34, :212]})[1], expected)
 
@@ -286,7 +288,7 @@ class NamesTests(unittest.TestCase):
         band = self.frame[:50, :338]
         for text, confidence, expected in [('DANCER NAME', .99, 'ZVIDUN'), ('DANCERNAME', .99, 'ZVIDUN'),
                                            ('In-game event now', .99, None), ('DANCER NAME', .79, None)]:
-            recognizer.recognize_many.return_value = [OCRResult(text, confidence), OCRResult('ZVIDUN', .99)]
+            recognizer.recognize_many.return_value = [OCRResult(text, confidence), OCRResult(' Z\tVI DUN\n', .99)]
             self.assertEqual(reader.read_login({0: band}), {0: expected})
 
 

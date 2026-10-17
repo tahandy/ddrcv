@@ -11,10 +11,12 @@ MONEY_BOXES = ((269, 348, 246, 56), (797, 348, 246, 56))
 
 
 def parse_number(text, mode):
-    text = text.strip()
-    if not re.fullmatch(r'(?:[0-9]{1,7}|[0-9]{1,3}(?:,[0-9]{3}){1,2})', text):
+    # DDR scores are integers. Ignore OCR punctuation, spaces, and stray text;
+    # do not substitute lookalike letters for digits.
+    digits = re.sub(r'[^0-9]', '', text)
+    if not digits or len(digits) > 7:
         return None
-    value = int(text.replace(',', ''))
+    value = int(digits)
     return value if value <= (99999 if mode == 'ex' else 1000000) else None
 
 
@@ -49,6 +51,7 @@ class ResultsReader:
                 continue
             text = result.text.strip()
             if field == 'name':
+                text = ''.join(text.split())
                 value = text if text and len(text) <= 32 and all(c.isprintable() for c in text) else None
             else:
                 value = parse_number(text, mode)

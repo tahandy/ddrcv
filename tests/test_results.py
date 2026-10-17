@@ -60,13 +60,18 @@ class ParseTests(unittest.TestCase):
         self.assertNotIn('_P1-', screenshot_filename(r))
         self.assertIn('_P2-', screenshot_filename(r))
 
-    def test_strict_scores_zero_and_money_semantics(self):
-        for text, expected in [('0',0), ('1,615',1615), ('00012',12), ('1632',1632)]:
+    def test_scores_discard_non_digits_and_preserve_zero_and_ranges(self):
+        for text, expected in [('0',0), ('1,615',1615), ('1.615',1615),
+                               ('1.128',1128), ('1.777',1777), ('00012',12), ('1632',1632),
+                               ('EX 1 632',1632), ('1_632!',1632), ('1,61',161),
+                               ('1..128',1128), ('-1',1), ('1.6150',16150)]:
             self.assertEqual(parse_number(text, 'ex'), expected)
-        for text in ('-1', '1.615', '1,61', 'O', '', 'EX 1632', '1 632', 'NaN', '100000'):
+        for text in ('O', '', 'NaN', 'EX', '１０００', '100000', '1,000.000', '00000000'):
             self.assertIsNone(parse_number(text, 'ex'))
-        self.assertEqual(parse_number('1,000,000', 'money'), 1000000)
+        for text in ('1,000,000', '1.000.000', '1,000.000', '1 000 000'):
+            self.assertEqual(parse_number(text, 'money'), 1000000)
         self.assertIsNone(parse_number('1,000,001', 'money'))
+        self.assertIsNone(parse_number('1.000.001', 'money'))
         self.assertEqual(outcome(players(), 'money')['kind'], 'unavailable')
 
     def test_evidence_requires_fresh_time_and_resets_on_contradiction_or_gap(self):
@@ -86,7 +91,7 @@ class ParseTests(unittest.TestCase):
         result = ResultsReader(recognizer=backend).read(np.zeros((720,1280,3),np.uint8),(False,True),'ex')
         self.assertEqual(result,[dict(name=None,score=None),dict(name=None,score=1632)])
         self.assertEqual(len(backend.recognize_many.call_args.args[0]),2)
-        backend.recognize_many.return_value = [OCRResult('NAME',.79), OCRResult('1632',.79)]
+        backend.recognize_many.return_value = [OCRResult('NAME',.79), OCRResult('1.632',.79)]
         self.assertEqual(ResultsReader(recognizer=backend).read(np.zeros((720,1280,3),np.uint8),(False,True),'ex')[1],dict(name=None,score=None))
 
     def test_formatter_winner_tie_zero_partial_and_escaping(self):
@@ -220,6 +225,32 @@ class ServiceTests(unittest.TestCase):
         self.assertIn('Winner: P2 (+17 EX)', text)
         self.assertNotIn('name unread', text)
         self.assertNotIn('Partial result', text)
+
+    def test_thousands_separator_variation_confirms_same_integer_scores(self):
+        backend = Mock()
+        outputs = [('1.128', '1,144'), ('1,128', '1.144')] * 9
+        backend.recognize_many.side_effect = [
+            [OCRResult(text, .96) for text in pair] for pair in outputs]
+        self.service.reader = ResultsReader(recognizer=backend)
+        self.service.configure(parse_names=False)
+        self.settled()
+        result = self.service.status()['records'][0]
+        self.assertEqual([p['score'] for p in result['players']], [1128, 1144])
+        self.assertFalse(result['partial'])
+        self.assertTrue(result['screenshot_confirmed'])
+        self.assertEqual(result['outcome'], dict(kind='winner', winner=1, margin=16))
+
+    def test_whitespace_variation_confirms_same_player_names(self):
+        backend = Mock()
+        names = [('Player1', 'Player 2'), (' Player\t1\n', 'Player\u00a02')] * 9
+        backend.recognize_many.side_effect = [
+            [OCRResult(first, .96), OCRResult('1,615', .96),
+             OCRResult(second, .96), OCRResult('1,632', .96)] for first, second in names]
+        self.service.reader = ResultsReader(recognizer=backend)
+        self.settled()
+        result = self.service.status()['records'][0]
+        self.assertEqual([p['name'] for p in result['players']], ['Player1', 'Player2'])
+        self.assertFalse(result['partial'])
 
     def test_screenshots_only_skips_ocr_and_delivers_at_departure(self):
         sender = Mock(return_value=dict(message_id='123', message_url=None))
@@ -1048,6 +1079,17 @@ class WebhookProbeTests(unittest.TestCase):
             with self.assertRaises(DeliveryError) as caught:
                 send_test_message(hook)
             self.assertNotIn('private-test-token', str(caught.exception))
+
+
+@unittest.skipUnless(os.environ.get('DDRCV_TEST_OCR_MODEL'), 'Set local model path')
+class RealResultsCropTests(unittest.TestCase):
+    def test_obs_thousands_separator_scores(self):
+        reader = ResultsReader(dict(parse_names=False, ocr=dict(
+            model_path=os.environ['DDRCV_TEST_OCR_MODEL'], allow_download=False)))
+        frame = cv2.imread(str(Path(__file__).parent / 'fixtures/results_obs_ex_1128_1144.png'))
+        self.assertIsNotNone(frame)
+        readings = reader.read(frame, (True, True), 'ex')
+        self.assertEqual([p['score'] for p in readings], [1128, 1144])
 
 
 @unittest.skipUnless(os.environ.get('DDRCV_RESULTS_VIDEO') and os.environ.get('DDRCV_TEST_OCR_MODEL'), 'Set local video/model paths')
